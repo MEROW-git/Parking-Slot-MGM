@@ -1,0 +1,578 @@
+/* ==========================================================================
+   SomPark Design System
+   High-Contrast Khmer Functionalism (ស្ថាបត្យកម្មចំណតឆ្លាតវៃ ភ្នំពេញ)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --sp-font-khmer: 'Noto Sans Khmer', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --sp-font-mono: 'JetBrains Mono', monospace;
+
+  /* Color Tokens - Warm limestone, deep midnight navy, decisive Cambodian red */
+  --sp-bg: #F7F5F0;
+  --sp-bg-alt: #EEEAE1;
+  --sp-surface: #FFFFFF;
+  --sp-text: #0B1726;
+  --sp-text-muted: #526071;
+  --sp-text-subtle: #7E8C9F;
+  --sp-border: #D8D2C4;
+  --sp-border-strong: #0B1726;
+
+  /* Accent & State Colors */
+  --sp-red: #C92A2A;
+  --sp-red-dark: #A61E1E;
+  --sp-red-light: #FFE3E3;
+  --sp-green: #2B8A3E;
+  --sp-green-dark: #237032;
+  --sp-green-light: #EBFBEE;
+  --sp-amber: #D97706;
+  --sp-amber-light: #FEF3C7;
+
+  /* Geometry & Spacing */
+  --sp-radius-sm: 2px;
+  --sp-radius: 4px;
+  --sp-radius-md: 6px;
+  --sp-shadow-hard: 3px 3px 0px var(--sp-border-strong);
+  --sp-shadow-hard-lg: 5px 5px 0px var(--sp-border-strong);
+  --sp-transition: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--sp-font-khmer);
+  background-color: var(--sp-bg);
+  color: var(--sp-text);
+  line-height: 1.6;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography Scale */
+h1, h2, h3, h4, .sp-heading {
+  color: var(--sp-text);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+h1 { font-size: clamp(2rem, 4vw, 3.25rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.25rem); }
+h3 { font-size: clamp(1.25rem, 2vw, 1.65rem); }
+h4 { font-size: 1.15rem; }
+
+p { margin-bottom: 1rem; }
+p:last-child { margin-bottom: 0; }
+
+a {
+  color: var(--sp-text);
+  text-decoration: none;
+  transition: color var(--sp-transition);
+}
+
+/* Container & Layout */
+.sp-container {
+  width: 100%;
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.sp-main {
+  flex: 1;
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+/* Navigation Bar */
+.sp-navbar {
+  background: var(--sp-surface);
+  border-bottom: 2px solid var(--sp-border-strong);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.sp-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+}
+
+.sp-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: -0.03em;
+  color: var(--sp-text);
+}
+
+.sp-brand-badge {
+  background: var(--sp-red);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--sp-border-strong);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sp-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  list-style: none;
+}
+
+.sp-nav-link {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sp-text);
+  padding: 0.4rem 0.6rem;
+  border-bottom: 2px solid transparent;
+}
+
+.sp-nav-link:hover, .sp-nav-link.active {
+  color: var(--sp-red);
+  border-bottom-color: var(--sp-red);
+}
+
+.sp-nav-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+/* Buttons */
+.sp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--sp-font-khmer);
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.65rem 1.3rem;
+  border-radius: var(--sp-radius);
+  border: 2px solid var(--sp-border-strong);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--sp-transition);
+  white-space: nowrap;
+}
+
+.sp-btn-primary {
+  background: var(--sp-red);
+  color: #FFFFFF;
+  box-shadow: 2px 2px 0px var(--sp-border-strong);
+}
+
+.sp-btn-primary:hover {
+  background: var(--sp-red-dark);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px var(--sp-border-strong);
+  color: #FFFFFF;
+}
+
+.sp-btn-secondary {
+  background: var(--sp-surface);
+  color: var(--sp-text);
+  box-shadow: 2px 2px 0px var(--sp-border-strong);
+}
+
+.sp-btn-secondary:hover {
+  background: var(--sp-bg-alt);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px var(--sp-border-strong);
+  color: var(--sp-text);
+}
+
+.sp-btn-dark {
+  background: var(--sp-text);
+  color: #FFFFFF;
+  box-shadow: 2px 2px 0px var(--sp-red);
+}
+
+.sp-btn-dark:hover {
+  background: #1A293D;
+  color: #FFFFFF;
+}
+
+.sp-btn-destructive {
+  background: #FFFFFF;
+  color: var(--sp-red);
+  border-color: var(--sp-red);
+}
+
+.sp-btn-destructive:hover {
+  background: var(--sp-red-light);
+}
+
+.sp-btn-sm {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+}
+
+.sp-btn:disabled, .sp-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Forms & Inputs */
+.sp-form-group {
+  margin-bottom: 1.35rem;
+}
+
+.sp-label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin-bottom: 0.45rem;
+  color: var(--sp-text);
+}
+
+.sp-input, .sp-select, select.sp-input, textarea.sp-input {
+  width: 100%;
+  font-family: var(--sp-font-khmer);
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--sp-surface);
+  color: var(--sp-text);
+  border: 2px solid var(--sp-border-strong);
+  border-radius: var(--sp-radius);
+  outline: none;
+  transition: border-color var(--sp-transition), box-shadow var(--sp-transition);
+}
+
+.sp-input:focus, .sp-select:focus {
+  border-color: var(--sp-red);
+  box-shadow: 0 0 0 3px rgba(201, 42, 42, 0.18);
+}
+
+.sp-input.is-invalid {
+  border-color: var(--sp-red);
+  background-color: var(--sp-red-light);
+}
+
+.sp-field-help {
+  font-size: 0.82rem;
+  color: var(--sp-text-muted);
+  margin-top: 0.35rem;
+}
+
+.sp-field-error {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sp-red);
+  margin-top: 0.35rem;
+}
+
+/* Availability Indicators */
+.sp-avail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+  border: 1px solid var(--sp-border-strong);
+  border-radius: var(--sp-radius-sm);
+}
+
+.sp-avail-badge.available {
+  background: var(--sp-green-light);
+  color: var(--sp-green-dark);
+}
+
+.sp-avail-badge.limited {
+  background: var(--sp-amber-light);
+  color: #92400E;
+}
+
+.sp-avail-badge.full {
+  background: var(--sp-red-light);
+  color: var(--sp-red-dark);
+}
+
+.sp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Asymmetric Parking Zone Board */
+.sp-zone-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.sp-zone-card {
+  background: var(--sp-surface);
+  border: 2px solid var(--sp-border-strong);
+  border-radius: var(--sp-radius);
+  box-shadow: var(--sp-shadow-hard);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform var(--sp-transition), box-shadow var(--sp-transition);
+}
+
+.sp-zone-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--sp-shadow-hard-lg);
+}
+
+.sp-zone-card.full-zone {
+  background: #FCFAF8;
+  border-style: dashed;
+}
+
+.sp-zone-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.sp-zone-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.sp-zone-khmer {
+  font-size: 0.9rem;
+  color: var(--sp-text-muted);
+  margin-top: 0.2rem;
+}
+
+.sp-zone-meta {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sp-border);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.sp-zone-footer {
+  margin-top: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Active Reservation Banner & Summary */
+.sp-res-banner {
+  background: var(--sp-text);
+  color: #FFFFFF;
+  border: 2px solid var(--sp-border-strong);
+  box-shadow: var(--sp-shadow-hard-lg);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.sp-res-banner h3 {
+  color: #FFFFFF;
+}
+
+/* Alerts */
+.sp-alert {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  border: 2px solid var(--sp-border-strong);
+  border-radius: var(--sp-radius);
+  box-shadow: var(--sp-shadow-hard);
+  font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.sp-alert-success {
+  background: var(--sp-green-light);
+  color: var(--sp-green-dark);
+}
+
+.sp-alert-warning {
+  background: var(--sp-amber-light);
+  color: #854D0E;
+}
+
+.sp-alert-error, .sp-alert-danger {
+  background: var(--sp-red-light);
+  color: var(--sp-red-dark);
+}
+
+.sp-alert-info {
+  background: #E0F2FE;
+  color: #0369A1;
+}
+
+/* Hero Section */
+.sp-hero {
+  border: 2px solid var(--sp-border-strong);
+  background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-hard-lg);
+  padding: clamp(2rem, 5vw, 3.5rem);
+  margin-bottom: 2.5rem;
+  position: relative;
+}
+
+.sp-hero-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.sp-hero-statboard {
+  background: var(--sp-bg-alt);
+  border: 2px solid var(--sp-border-strong);
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.sp-stat-item {
+  border-left: 3px solid var(--sp-red);
+  padding-left: 0.75rem;
+}
+
+.sp-stat-val {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--sp-text);
+  font-family: var(--sp-font-mono);
+}
+
+.sp-stat-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sp-text-muted);
+  margin-top: 0.35rem;
+}
+
+/* Printable Ticket Card */
+.sp-ticket-sheet {
+  max-width: 650px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  border: 3px solid var(--sp-border-strong);
+  box-shadow: var(--sp-shadow-hard-lg);
+  padding: 2.5rem;
+  position: relative;
+}
+
+.sp-ticket-header {
+  border-bottom: 2px dashed var(--sp-border-strong);
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.sp-ticket-barcode {
+  font-family: var(--sp-font-mono);
+  font-weight: 800;
+  font-size: 1.65rem;
+  letter-spacing: 0.15em;
+  background: var(--sp-bg);
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--sp-border-strong);
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+/* Footer */
+.sp-footer {
+  background: var(--sp-surface);
+  border-top: 2px solid var(--sp-border-strong);
+  padding: 3rem 0 2rem;
+  margin-top: auto;
+}
+
+.sp-footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 2.5rem;
+  margin-bottom: 2.5rem;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 860px) {
+  .sp-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .sp-footer-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .sp-zone-board {
+    grid-template-columns: 1fr;
+  }
+  .sp-nav-links {
+    display: none;
+  }
+  .sp-nav-links.mobile-active {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 72px;
+    left: 0;
+    width: 100%;
+    background: var(--sp-surface);
+    border-bottom: 2px solid var(--sp-border-strong);
+    padding: 1.5rem;
+    box-shadow: var(--sp-shadow-hard);
+  }
+}
+
+/* Print Stylesheet for Physical Parking Receipts */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+  .sp-navbar, .sp-footer, .no-print, .sp-btn {
+    display: none !important;
+  }
+  .sp-ticket-sheet {
+    box-shadow: none !important;
+    border: 2px solid #000000 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1rem !important;
+  }
+}

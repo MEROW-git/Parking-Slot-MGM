@@ -1,0 +1,16 @@
+{% comment %}
+Usage:
+{% include "components/availability_indicator.html" with status=zone.availability_status vacant=zone.vacant_slots total=zone.num_of_slots %}
+{% endcomment %}
+<div class="sp-avail-badge {{ status|default:'available' }}" id="avail-badge-{{ id|default:'ind' }}">
+  <span class="sp-dot" aria-hidden="true"></span>
+  <span>
+    {% if status == 'full' %}
+      FULL (ពេញ)
+    {% elif status == 'limited' %}
+      {{ vacant }} SPOTS LEFT (ជិតពេញ)
+    {% else %}
+      {{ vacant }} / {{ total }} AVAILABLE (ទំនេរ)
+    {% endif %}
+  </span>
+</div>

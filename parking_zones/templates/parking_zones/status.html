@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ parking_zone.name }} | SomPark Phnom Penh{% endblock %}
+
+{% block content %}
+{% include "components/page_header.html" with title=parking_zone.name subtitle=parking_zone.address khmer_tag=parking_zone.khmer_name %}
+
+<div style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:2rem;" id="zone-detail-grid">
+  <!-- Left Column: Overview & Availability -->
+  <div>
+    <!-- Availability Card -->
+    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard-lg); margin-bottom:2rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+        <div>
+          <span style="font-size:0.85rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Current Occupancy</span>
+          <h2 style="font-size:2rem; margin-top:0.25rem;">
+            {{ parking_zone.vacant_slots }} <span style="font-size:1.1rem; font-weight:600; color:var(--sp-text-muted);">/ {{ parking_zone.num_of_slots }} Vacant</span>
+          </h2>
+        </div>
+        {% include "components/availability_indicator.html" with status=parking_zone.availability_status vacant=parking_zone.vacant_slots total=parking_zone.num_of_slots id=parking_zone.slug %}
+      </div>
+
+      <!-- Custom Occupancy Bar -->
+      <div style="background:var(--sp-bg-alt); border:2px solid var(--sp-border-strong); height:24px; border-radius:var(--sp-radius-sm); overflow:hidden; display:flex; margin-bottom:1.5rem;">
+        <div style="background:var(--sp-red); width:{{ parking_zone.occupancy_percentage }}%; height:100%; transition:width 0.3s ease;" title="Occupied: {{ parking_zone.occupied_slots }}"></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; border-top:1px solid var(--sp-border); padding-top:1.25rem; text-align:center;">
+        <div>
+          <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle);">TOTAL SLOTS</div>
+          <div style="font-size:1.5rem; font-weight:800; font-family:var(--sp-font-mono);">{{ parking_zone.num_of_slots }}</div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle);">OCCUPIED</div>
+          <div style="font-size:1.5rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-red);">{{ parking_zone.occupied_slots }}</div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle);">AVAILABLE</div>
+          <div style="font-size:1.5rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-green);">{{ parking_zone.vacant_slots }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Facility Description -->
+    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard);">
+      <h3 style="margin-bottom:0.75rem;">Facility Information (ព័ត៌មានលម្អិត)</h3>
+      <p style="color:var(--sp-text); margin-bottom:1.25rem;">
+        {{ parking_zone.description|default:"Secured municipal parking facility in Phnom Penh, equipped with 24-hour security guards, boom barriers, and high-resolution CCTV." }}
+      </p>
+
+      <h4 style="font-size:0.95rem; margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em;">Amenities & Security</h4>
+      <ul style="list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.9rem; color:var(--sp-text-muted);">
+        <li>✓ 24/7 Security Personnel (សន្តិសុខ)</li>
+        <li>✓ High-Definition CCTV Surveillance</li>
+        <li>✓ Automated Barrier Gates</li>
+        <li>✓ Lighting & Rain Protection</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Right Column: Booking Card -->
+  <div>
+    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard-lg); position:sticky; top:100px;">
+      <div style="border-bottom:2px solid var(--sp-border); padding-bottom:1.25rem; margin-bottom:1.25rem;">
+        <div style="font-size:0.85rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Daily Rate</div>
+        <div style="font-size:2.25rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-text);">
+          {{ parking_zone.price_khr_formatted }}
+        </div>
+        <div style="font-size:0.85rem; color:var(--sp-text-muted);">Per booking / standard day</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:0.85rem; margin-bottom:1.75rem;">
+        <div style="display:flex; justify-content:space-between; font-size:0.95rem;">
+          <span style="color:var(--sp-text-muted);">District:</span>
+          <strong>{{ parking_zone.district }}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.95rem;">
+          <span style="color:var(--sp-text-muted);">Hours:</span>
+          <strong>{{ parking_zone.operating_hours }}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.95rem;">
+          <span style="color:var(--sp-text-muted);">Vehicle Types:</span>
+          <strong>Sedan, SUV, Pickup</strong>
+        </div>
+      </div>
+
+      {% if user_active_res %}
+        <div class="sp-alert sp-alert-warning" style="margin-bottom:1.25rem;">
+          <div>You currently have an active reservation here (#{{ user_active_res.ticket_code }}).</div>
+        </div>
+        <a href="{% url 'ticket_code' user_active_res.ticket_code %}" class="sp-btn sp-btn-secondary" style="width:100%; margin-bottom:0.75rem;" id="btn-view-active">
+          View Active Ticket
+        </a>
+      {% elif parking_zone.is_full %}
+        <div class="sp-alert sp-alert-error" style="margin-bottom:1.25rem;">
+          <div>ចំណតនេះពេញហើយ! Currently full capacity. Please choose another location.</div>
+        </div>
+        <a href="{% url 'home' %}" class="sp-btn sp-btn-secondary" style="width:100%;" id="btn-find-other">
+          Browse Nearby Zones
+        </a>
+      {% else %}
+        <a href="{% url 'book' %}?zone={{ parking_zone.slug }}" class="sp-btn sp-btn-primary" style="width:100%; font-size:1.05rem;" id="btn-reserve-zone">
+          Reserve Spot Now (កក់កន្លែង) →
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

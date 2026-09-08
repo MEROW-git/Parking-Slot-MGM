@@ -1,0 +1,14 @@
+{% comment %}
+Usage:
+{% include "components/button.html" with text="Book Slot" variant="primary" url="/book/" id="btn-book" %}
+Variants: primary, secondary, dark, destructive, sm
+{% endcomment %}
+{% if url %}
+  <a href="{{ url }}" class="sp-btn sp-btn-{{ variant|default:'primary' }} {{ extra_class }}" id="{{ id|default:'sp-btn' }}" {{ extra_attrs }}>
+    {{ text }}
+  </a>
+{% else %}
+  <button type="{{ type|default:'button' }}" class="sp-btn sp-btn-{{ variant|default:'primary' }} {{ extra_class }}" id="{{ id|default:'sp-btn' }}" {{ extra_attrs }}>
+    {{ text }}
+  </button>
+{% endif %}

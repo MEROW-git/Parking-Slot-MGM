@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Reservation History | SomPark Phnom Penh{% endblock %}
+
+{% block content %}
+{% include "components/page_header.html" with title="My Parking Reservations" subtitle="Complete history of all parking sessions and official tickets" khmer_tag="ប្រវត្តិការកក់ចំណត" %}
+
+{% if tickets %}
+  <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); box-shadow:var(--sp-shadow-hard-lg); overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.95rem;" id="tickets-table">
+      <thead>
+        <tr style="background:var(--sp-bg-alt); border-bottom:2px solid var(--sp-border-strong);">
+          <th style="padding:1rem 1.25rem; font-weight:800; font-size:0.85rem; text-transform:uppercase;">Ticket Code</th>
+          <th style="padding:1rem 1.25rem; font-weight:800; font-size:0.85rem; text-transform:uppercase;">Zone (ទីតាំង)</th>
+          <th style="padding:1rem 1.25rem; font-weight:800; font-size:0.85rem; text-transform:uppercase;">Vehicle Plate</th>
+          <th style="padding:1rem 1.25rem; font-weight:800; font-size:0.85rem; text-transform:uppercase;">Duration</th>
+          <th style="padding:1rem 1.25rem; font-weight:800; font-size:0.85rem; text-transform:uppercase;">Status</th>
+          <th style="padding:1rem 1.25rem; font-weight:800; font-size:0.85rem; text-transform:uppercase; text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+          <tr style="border-bottom:1px solid var(--sp-border);" id="row-ticket-{{ ticket.ticket_code }}">
+            <td style="padding:1.1rem 1.25rem; font-family:var(--sp-font-mono); font-weight:700;">
+              <a href="{% url 'ticket_code' ticket.ticket_code %}" style="color:var(--sp-text); text-decoration:underline;">
+                {{ ticket.ticket_code }}
+              </a>
+            </td>
+            <td style="padding:1.1rem 1.25rem;">
+              <strong>{{ ticket.parking_zone.name }}</strong>
+              <div style="font-size:0.8rem; color:var(--sp-text-muted);">{{ ticket.parking_zone.district }}</div>
+            </td>
+            <td style="padding:1.1rem 1.25rem; font-family:var(--sp-font-mono); font-weight:700;">
+              {{ ticket.plate_number }}
+            </td>
+            <td style="padding:1.1rem 1.25rem; font-size:0.85rem;">
+              {{ ticket.start_date|date:"d M Y" }} → {{ ticket.finish_date|date:"d M Y" }}
+            </td>
+            <td style="padding:1.1rem 1.25rem;">
+              {% if ticket.checked_out %}
+                <span class="sp-avail-badge" style="background:var(--sp-bg-alt); color:var(--sp-text-muted);">
+                  COMPLETED
+                </span>
+              {% else %}
+                <span class="sp-avail-badge available">
+                  <span class="sp-dot"></span> ACTIVE
+                </span>
+              {% endif %}
+            </td>
+            <td style="padding:1.1rem 1.25rem; text-align:right;">
+              <div style="display:inline-flex; gap:0.5rem;">
+                <a href="{% url 'ticket_code' ticket.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-view-{{ ticket.ticket_code }}">
+                  View
+                </a>
+                {% if not ticket.checked_out %}
+                  <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-co-{{ ticket.ticket_code }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="ticket_code" value="{{ ticket.ticket_code }}">
+                    <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-co-{{ ticket.ticket_code }}" onclick="return confirm('Check out of {{ ticket.parking_zone.name }}?');">
+                      Check Out
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  {% include "components/empty_state.html" with title="No Reservations Yet" message="You haven't made any parking reservations. Find an available slot in Phnom Penh and book your spot now." action_url="/book/" action_text="Book a Parking Spot" %}
+{% endif %}
+{% endblock %}

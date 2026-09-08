@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Design System & Components | SomPark Phnom Penh{% endblock %}
+
+{% block content %}
+{% include "components/page_header.html" with title="SomPark Design System" subtitle="High-contrast Khmer functional component primitives and design tokens" khmer_tag="ប្រព័ន្ធសមាសភាគ SomPark" %}
+
+<div style="display:flex; flex-direction:column; gap:3rem;" id="component-showcase">
+  <!-- Color & Typography Tokens -->
+  <section>
+    <h2 style="font-size:1.5rem; margin-bottom:1rem; border-bottom:1px solid var(--sp-border); padding-bottom:0.5rem;">
+      1. Design Tokens & Palette (ក្ដារពណ៌)
+    </h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:1rem;">
+      <div style="background:var(--sp-bg); border:2px solid var(--sp-border-strong); padding:1rem;">
+        <div style="height:32px; background:var(--sp-bg); border:1px solid var(--sp-border); margin-bottom:0.5rem;"></div>
+        <strong>Warm Limestone</strong>
+        <div style="font-size:0.8rem; color:var(--sp-text-muted);">#F7F5F0 (Canvas)</div>
+      </div>
+      <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:1rem;">
+        <div style="height:32px; background:var(--sp-text); margin-bottom:0.5rem;"></div>
+        <strong>Midnight Navy</strong>
+        <div style="font-size:0.8rem; color:var(--sp-text-muted);">#0B1726 (Ink)</div>
+      </div>
+      <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:1rem;">
+        <div style="height:32px; background:var(--sp-red); margin-bottom:0.5rem;"></div>
+        <strong>Cambodian Red</strong>
+        <div style="font-size:0.8rem; color:var(--sp-text-muted);">#C92A2A (Accent)</div>
+      </div>
+      <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:1rem;">
+        <div style="height:32px; background:var(--sp-green); margin-bottom:0.5rem;"></div>
+        <strong>Mekong Green</strong>
+        <div style="font-size:0.8rem; color:var(--sp-text-muted);">#2B8A3E (Available)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Buttons -->
+  <section>
+    <h2 style="font-size:1.5rem; margin-bottom:1rem; border-bottom:1px solid var(--sp-border); padding-bottom:0.5rem;">
+      2. Buttons (ប៊ូតុងសកម្មភាព)
+    </h2>
+    <div style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center;">
+      {% include "components/button.html" with text="Primary Action" variant="primary" id="btn-demo-primary" %}
+      {% include "components/button.html" with text="Secondary Action" variant="secondary" id="btn-demo-secondary" %}
+      {% include "components/button.html" with text="Dark Accent" variant="dark" id="btn-demo-dark" %}
+      {% include "components/button.html" with text="Destructive / Reset" variant="destructive" id="btn-demo-dest" %}
+      {% include "components/button.html" with text="Small Control" variant="secondary" extra_class="sp-btn-sm" id="btn-demo-sm" %}
+      <button class="sp-btn sp-btn-primary disabled" disabled>Disabled State</button>
+    </div>
+  </section>
+
+  <!-- Availability Indicators -->
+  <section>
+    <h2 style="font-size:1.5rem; margin-bottom:1rem; border-bottom:1px solid var(--sp-border); padding-bottom:0.5rem;">
+      3. Availability Indicators (សូចនាករស្ថានភាព)
+    </h2>
+    <div style="display:flex; flex-wrap:wrap; gap:1.25rem; align-items:center;">
+      {% include "components/availability_indicator.html" with status="available" vacant=34 total=50 id="demo-avail" %}
+      {% include "components/availability_indicator.html" with status="limited" vacant=4 total=40 id="demo-limited" %}
+      {% include "components/availability_indicator.html" with status="full" vacant=0 total=60 id="demo-full" %}
+    </div>
+  </section>
+
+  <!-- Alerts -->
+  <section>
+    <h2 style="font-size:1.5rem; margin-bottom:1rem; border-bottom:1px solid var(--sp-border); padding-bottom:0.5rem;">
+      4. System Alerts & Notifications (ការជូនដំណឹង)
+    </h2>
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+      {% include "components/alert.html" with type="success" message="Parking reservation confirmed! Ticket code #SPK-849202 generated." id="demo-succ" %}
+      {% include "components/alert.html" with type="warning" message="Attention: This facility has only 3 remaining vacant parking bays." id="demo-warn" %}
+      {% include "components/alert.html" with type="error" message="Reservation failed: Toul Kork Plaza Hub is currently at full capacity (60/60)." id="demo-err" %}
+      {% include "components/alert.html" with type="info" message="Notice: Night rates apply between 22:00 and 06:00 along Sisowath Quay." id="demo-info" %}
+    </div>
+  </section>
+
+  <!-- Sample Parking Zone Card -->
+  <section>
+    <h2 style="font-size:1.5rem; margin-bottom:1rem; border-bottom:1px solid var(--sp-border); padding-bottom:0.5rem;">
+      5. Zone Card Preview
+    </h2>
+    <div style="max-width:440px;">
+      {% if sample_zone %}
+        {% include "components/parking_zone_item.html" with zone=sample_zone %}
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Empty State Preview -->
+  <section>
+    <h2 style="font-size:1.5rem; margin-bottom:1rem; border-bottom:1px solid var(--sp-border); padding-bottom:0.5rem;">
+      6. Empty State Primitive
+    </h2>
+    {% include "components/empty_state.html" with title="No Active Sessions" message="You do not currently have any vehicles checked into Phnom Penh parking facilities." action_url="/book/" action_text="Reserve a Spot" %}
+  </section>
+</div>
+{% endblock %}

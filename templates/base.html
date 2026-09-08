@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="km-KH">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SomPark - Smart Parking Management System for Phnom Penh Capital. Real-time availability, booking, and digital ticketing in KHR.">
+  <meta property="og:title" content="SomPark - Phnom Penh Smart Parking">
+  <meta property="og:description" content="ចំណតឆ្លាតវៃ សម្រាប់រាជធានីភ្នំពេញ - Smart Parking for Phnom Penh Capital">
+  <title>{% block title %}{{ title|default:"SomPark - Smart Parking Phnom Penh" }}{% endblock %}</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+Khmer:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- SomPark Design System -->
+  <link rel="stylesheet" href="/static/css/sompark.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  {% include "components/navigation.html" %}
+
+  <main class="sp-main" id="main-content">
+    <div class="sp-container">
+      <!-- Flash Messages -->
+      {% if messages %}
+        <div class="no-print" id="system-messages" style="margin-bottom:1.5rem;">
+          {% for message in messages %}
+            {% include "components/alert.html" with type=message.tags message=message.message id=forloop.counter %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- Global Active Reservation Banner (if not already on ticket view) -->
+      {% if active_reservation and request.resolver_match.url_name != 'ticket' and request.resolver_match.url_name != 'ticket_code' %}
+        <div class="no-print">
+          {% include "components/reservation_summary.html" with reservation=active_reservation allow_checkout=True %}
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {% include "components/footer.html" %}
+  {% include "components/mobile_menu.html" %}
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

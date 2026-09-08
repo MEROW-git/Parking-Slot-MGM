@@ -1,6 +1,6 @@
 {
   "name": "Parking Slot Management",
-  "description": "A web application for parking slot reservation and management.",
+  "description": "SomPark - Smart Parking Management System for Phnom Penh Capital. Real-time space availability, advance booking, and digital ticketing in KHR.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

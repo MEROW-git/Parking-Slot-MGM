@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found (រកមិនឃើញទំព័រ) | SomPark{% endblock %}
+
+{% block content %}
+<div style="max-width:600px; margin:4rem auto;">
+  {% include "components/empty_state.html" with title="404 - Page Not Found (រកមិនឃើញទំព័រ)" message="The requested parking zone, ticket, or page could not be located on the SomPark network. Please verify the URL or return to the main dashboard." action_url="/" action_text="Return to Availability Dashboard" %}
+</div>
+{% endblock %}

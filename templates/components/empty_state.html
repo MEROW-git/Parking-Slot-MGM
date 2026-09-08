@@ -1,0 +1,12 @@
+{% comment %}
+Usage:
+{% include "components/empty_state.html" with title="No Parking Zones" message="No zones found." action_url="/book/" action_text="Refresh" %}
+{% endcomment %}
+<div style="background:var(--sp-surface); border:2px dashed var(--sp-border-strong); padding:3rem 2rem; text-align:center; border-radius:var(--sp-radius);" id="empty-state-box">
+  <div style="font-size:2.5rem; margin-bottom:0.5rem;">🅿</div>
+  <h3 style="margin-bottom:0.5rem;">{{ title|default:'No Records Found' }}</h3>
+  <p style="color:var(--sp-text-muted); max-width:450px; margin:0 auto 1.5rem;">{{ message }}</p>
+  {% if action_url %}
+    <a href="{{ action_url }}" class="sp-btn sp-btn-primary" id="btn-empty-action">{{ action_text|default:'Continue' }}</a>
+  {% endif %}
+</div>

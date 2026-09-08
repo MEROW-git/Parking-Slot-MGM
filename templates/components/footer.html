@@ -1,0 +1,49 @@
+<footer class="sp-footer" role="contentinfo">
+  <div class="sp-container">
+    <div class="sp-footer-grid">
+      <div>
+        <div class="sp-brand" style="margin-bottom:0.75rem;">
+          <span class="sp-brand-badge">ភ្នំពេញ</span>
+          <span>SomPark</span>
+        </div>
+        <p style="color:var(--sp-text-muted); font-size:0.92rem; max-width:380px;">
+          {{ BRAND_TAGLINE_KHMER }}<br>
+          Next-generation real-time parking slot reservation and occupancy tracking across Phnom Penh districts.
+        </p>
+        <p style="font-size:0.85rem; color:var(--sp-text-subtle); margin-top:0.75rem;">
+          Hotline: +855 23 888 999 • support@sompark.gov.kh
+        </p>
+      </div>
+
+      <div>
+        <h4 style="font-size:0.95rem; margin-bottom:0.85rem; text-transform:uppercase; letter-spacing:0.05em;">Districts (ខណ្ឌ)</h4>
+        <ul style="list-style:none; font-size:0.9rem; display:flex; flex-direction:column; gap:0.4rem; color:var(--sp-text-muted);">
+          <li>Riverside & Daun Penh</li>
+          <li>Boeung Keng Kang 1 (BKK1)</li>
+          <li>Toul Kork & TK Avenue</li>
+          <li>Sen Sok Central</li>
+          <li>Olympic Stadium</li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 style="font-size:0.95rem; margin-bottom:0.85rem; text-transform:uppercase; letter-spacing:0.05em;">Services</h4>
+        <ul style="list-style:none; font-size:0.9rem; display:flex; flex-direction:column; gap:0.4rem;">
+          <li><a href="{% url 'home' %}" style="color:var(--sp-text-muted);">Availability Map</a></li>
+          <li><a href="{% url 'book' %}" style="color:var(--sp-text-muted);">Advance Booking</a></li>
+          <li><a href="{% url 'all_tickets' %}" style="color:var(--sp-text-muted);">Receipt Verification</a></li>
+          <li><a href="{% url 'component_showcase' %}" style="color:var(--sp-text-muted);">Component Showcase</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--sp-border); padding-top:1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; font-size:0.85rem; color:var(--sp-text-muted);">
+      <div>
+        © 2026 SomPark Phnom Penh. រក្សាសិទ្ធិគ្រប់យ៉ាង។ Rates in Cambodian Riel (KHR / ៛).
+      </div>
+      <div>
+        Designed for Phnom Penh Smart City Initiative
+      </div>
+    </div>
+  </div>
+</footer>

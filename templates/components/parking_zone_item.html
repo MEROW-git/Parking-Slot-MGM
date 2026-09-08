@@ -1,0 +1,51 @@
+{% comment %}
+Usage:
+{% include "components/parking_zone_item.html" with zone=zone %}
+{% endcomment %}
+<article class="sp-zone-card {% if zone.is_full %}full-zone{% endif %}" id="zone-card-{{ zone.slug }}">
+  <div>
+    <div class="sp-zone-header">
+      <div>
+        <h3 class="sp-zone-title">
+          <a href="{% url 'zone_detail' zone.slug %}" id="link-zone-{{ zone.slug }}">{{ zone.name }}</a>
+        </h3>
+        {% if zone.khmer_name %}
+          <p class="sp-zone-khmer">{{ zone.khmer_name }}</p>
+        {% endif %}
+      </div>
+      {% include "components/availability_indicator.html" with status=zone.availability_status vacant=zone.vacant_slots total=zone.num_of_slots id=zone.slug %}
+    </div>
+
+    <p style="font-size:0.9rem; color:var(--sp-text-muted); margin-top:0.5rem;">
+      📍 {{ zone.address }}
+    </p>
+
+    <div class="sp-zone-meta">
+      <div>
+        <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Rate</div>
+        <div style="font-size:1.15rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-text);">
+          {{ zone.price_khr_formatted }} <span style="font-size:0.8rem; font-weight:600; color:var(--sp-text-muted);">/ day</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Hours</div>
+        <div style="font-size:0.95rem; font-weight:700;">{{ zone.operating_hours }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sp-zone-footer">
+    <a href="{% url 'zone_detail' zone.slug %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-details-{{ zone.slug }}">
+      View Map & Info
+    </a>
+    {% if zone.is_full %}
+      <span class="sp-btn sp-btn-secondary sp-btn-sm disabled" style="opacity:0.6;">
+        No Space (ពេញ)
+      </span>
+    {% else %}
+      <a href="{% url 'book' %}?zone={{ zone.slug }}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-book-{{ zone.slug }}">
+        Reserve (កក់) →
+      </a>
+    {% endif %}
+  </div>
+</article>
