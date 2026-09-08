@@ -1,5 +1,5 @@
-/* Hallmark · macrostructure: Marquee Hero / Workbench / Long Document · genre: modern-minimal · tone: bold utilitarian · anchor hue: safety orange · design-system: design.md · designed-as-app · nav: N1b · footer: Ft5 · contrast: pass (40–41) · slop: pass (42–49) · mobile: static pass; visual sweep pending */
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 */
+/* Hallmark · macrostructure: Marquee Hero / Workbench / Long Document · genre: modern-minimal · tone: bold utilitarian · anchor hue: safety orange · design-system: design.md · designed-as-app · nav: N1b · footer: Ft5 · enrichment: E8 generated hero photograph · generated: OpenAI built-in ImageGen · post-processed · contrast: pass (40–41) · slop: pass (42–49) · mobile: static pass */
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
 @import url("tokens.css");
 
 :root {
@@ -398,9 +398,12 @@ textarea {
 
 .sp-hero-image {
   z-index: -2;
-  background-image: url("/static/images/lot.jpg");
+  background-image: url("/static/images/sompark-hero-v2.webp");
   background-position: center;
   background-size: cover;
+  opacity: 0.76;
+  transform: scale(1.025);
+  animation: sp-hero-image-enter var(--dur-long) var(--ease-out) var(--dur-short) forwards;
 }
 
 .sp-hero-shade {
@@ -418,6 +421,9 @@ textarea {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(var(--space-xs));
+  animation: sp-hero-copy-enter var(--dur-short) var(--ease-out) forwards;
 }
 
 .sp-hero h1 {
@@ -426,14 +432,27 @@ textarea {
   font-size: var(--text-display);
   line-height: 1;
   text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(var(--space-sm));
+  animation: sp-hero-copy-enter var(--dur-short) var(--ease-out) var(--dur-micro) forwards;
 }
 
 .sp-hero h1 span {
+  position: relative;
+  display: inline-block;
   color: var(--color-ink);
-  text-decoration-line: underline;
-  text-decoration-color: var(--color-accent);
-  text-decoration-thickness: var(--rule-fine);
-  text-underline-offset: var(--rule-fine);
+}
+
+.sp-hero h1 span::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  height: var(--rule-fine);
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: center left;
+  animation: sp-hero-line-enter var(--dur-short) var(--ease-out) calc(var(--dur-long) + var(--dur-micro)) forwards;
 }
 
 .sp-hero-scroll {
@@ -445,6 +464,30 @@ textarea {
   font-family: var(--font-outlier);
   font-size: var(--text-xs);
   writing-mode: vertical-rl;
+  opacity: 0;
+  animation: sp-hero-fade-enter var(--dur-short) var(--ease-out) calc(var(--dur-long) + var(--dur-short)) forwards;
+}
+
+@keyframes sp-hero-image-enter {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-hero-copy-enter {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-hero-line-enter {
+  to { transform: scaleX(1); }
+}
+
+@keyframes sp-hero-fade-enter {
+  to { opacity: 1; }
 }
 
 .sp-intro {
@@ -1114,6 +1157,10 @@ code {
     min-height: 68dvh;
   }
 
+  .sp-hero-image {
+    background-position: 62% center;
+  }
+
   .sp-hero-copy {
     padding: var(--space-lg) var(--space-md) var(--space-2xl);
   }
@@ -1201,6 +1248,16 @@ code {
     animation-duration: var(--dur-micro) !important;
     animation-iteration-count: 1 !important;
     transition-duration: var(--dur-micro) !important;
+    transform: none !important;
+  }
+
+  .sp-hero-image,
+  .sp-hero-location,
+  .sp-hero h1,
+  .sp-hero h1 span::after,
+  .sp-hero-scroll {
+    animation: none !important;
+    opacity: 1;
     transform: none !important;
   }
 }

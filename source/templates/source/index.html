@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}SomPark Phnom Penh | Find and Reserve Parking{% endblock %}
+
+{% block extra_head %}
+  <link rel="preload" as="image" href="{% static 'images/sompark-hero-v2.webp' %}" type="image/webp" fetchpriority="high">
+{% endblock %}
 
 {% block content %}
 <section class="sp-hero sp-hero-marquee" aria-labelledby="hero-heading">

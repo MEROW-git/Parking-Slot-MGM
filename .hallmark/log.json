@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-09-09",
+    "scope": "home hero refinement",
+    "macrostructure": "Marquee Hero",
+    "theme": "custom",
+    "theme_axes": "dark / condensed-sans / warm-orange",
+    "enrichment": "E8 generated hero photograph + one-shot CSS entrance",
+    "brief": "SomPark hero photo and motion refinement"
+  },
+  {
     "date": "2026-09-08",
     "scope": "app",
     "macrostructure": "Marquee Hero / Workbench / Long Document",

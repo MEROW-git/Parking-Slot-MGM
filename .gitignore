@@ -13,6 +13,7 @@ ENV/
 .env
 .env.*
 !.env.example
+certs/*.pem
 
 # Django
 *.log

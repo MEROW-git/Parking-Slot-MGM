@@ -6,8 +6,13 @@ SomPark - Smart Parking for Phnom Penh Capital
 
 import os
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get(
     'SECRET_KEY',
@@ -81,12 +86,55 @@ TEMPLATES = [
 WSGI_APPLICATION = 'parking_management.wsgi.application'
 ASGI_APPLICATION = 'parking_management.asgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+def database_config():
+    """Build the Django database configuration from DATABASE_URL."""
+    database_url = os.environ.get('DATABASE_URL', '').strip()
+    if not database_url:
+        return {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+
+    parsed = urlparse(database_url)
+    if parsed.scheme.lower() == 'sqlite':
+        sqlite_name = unquote(parsed.path.lstrip('/')) or 'db.sqlite3'
+        return {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': sqlite_name if sqlite_name == ':memory:' else BASE_DIR / sqlite_name,
+        }
+
+    if parsed.scheme.lower() not in {'mysql', 'mysql+pymysql'}:
+        raise ImproperlyConfigured(
+            'DATABASE_URL must use mysql://, mysql+pymysql://, or sqlite://.'
+        )
+
+    database_name = unquote(parsed.path.lstrip('/'))
+    if not all((parsed.hostname, parsed.username, database_name)):
+        raise ImproperlyConfigured(
+            'DATABASE_URL must include a host, username, and database name.'
+        )
+
+    options = {'charset': 'utf8mb4'}
+    ssl_ca = os.environ.get('MYSQL_SSL_CA', '').strip()
+    if ssl_ca:
+        ssl_ca_path = Path(ssl_ca).expanduser()
+        if not ssl_ca_path.is_absolute():
+            ssl_ca_path = BASE_DIR / ssl_ca_path
+        options['ssl'] = {'ca': str(ssl_ca_path.resolve())}
+
+    return {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': database_name,
+        'USER': unquote(parsed.username),
+        'PASSWORD': unquote(parsed.password or ''),
+        'HOST': parsed.hostname,
+        'PORT': str(parsed.port or 3306),
+        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
+        'OPTIONS': options,
     }
-}
+
+
+DATABASES = {'default': database_config()}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
