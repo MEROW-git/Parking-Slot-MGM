@@ -22,7 +22,7 @@
       {% if form.non_field_errors %}
         <div class="sp-alert sp-alert-error" role="alert">
           {% for err in form.non_field_errors %}
-            <div>⚠ {{ err }}</div>
+            <div>{{ err }}</div>
           {% endfor %}
         </div>
       {% endif %}

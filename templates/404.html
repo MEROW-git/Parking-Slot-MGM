@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Page Not Found (រកមិនឃើញទំព័រ) | SomPark{% endblock %}
+{% block title %}Page Not Found | SomPark{% endblock %}
 
 {% block content %}
-<div style="max-width:600px; margin:4rem auto;">
-  {% include "components/empty_state.html" with title="404 - Page Not Found (រកមិនឃើញទំព័រ)" message="The requested parking zone, ticket, or page could not be located on the SomPark network. Please verify the URL or return to the main dashboard." action_url="/" action_text="Return to Availability Dashboard" %}
-</div>
+<article class="sp-error-page">
+  <p class="sp-error-code">404</p>
+  <h1>This route does not lead to a parking space.</h1>
+  <p>The page may have moved, or the address may be incorrect. Return to live parking availability and continue from there.</p>
+  <a href="{% url 'home' %}" class="sp-btn sp-btn-primary">View parking availability</a>
+</article>
 {% endblock %}

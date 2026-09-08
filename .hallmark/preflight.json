@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-08",
+  "framework": "Django templates with standalone Express compatibility files",
+  "font_stack": "Plus Jakarta Sans, Noto Sans Khmer, JetBrains Mono",
+  "palette": "existing SomPark custom properties",
+  "motion": "motion-cut; no motion library",
+  "spacing": "custom CSS scale",
+  "preserved": ["Khmer font support", "parking status semantics", "Django routes and forms"]
+}

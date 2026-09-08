@@ -1,18 +1,12 @@
-<!DOCTYPE html>
-<html lang="km-KH">
-<head>
-  <meta charset="UTF-8">
-  <title>Server Error | SomPark Phnom Penh</title>
-  <link rel="stylesheet" href="/static/css/sompark.css">
-</head>
-<body style="display:flex; align-items:center; justify-content:center; min-height:100vh; padding:1.5rem;">
-  <div style="background:#fff; border:2px solid #0B1726; box-shadow:5px 5px 0px #0B1726; padding:3rem; max-width:550px; text-align:center;">
-    <div style="font-size:3rem; margin-bottom:1rem;">⚠</div>
-    <h1 style="font-size:1.75rem; margin-bottom:0.75rem;">500 - Server Error (កំហុសម៉ាស៊ីនបម្រើ)</h1>
-    <p style="color:#526071; margin-bottom:1.75rem;">
-      SomPark encountered an unexpected condition while processing your parking request. Please try again shortly or contact support.
-    </p>
-    <a href="/" class="sp-btn sp-btn-primary">Return to Homepage</a>
-  </div>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Service Unavailable | SomPark{% endblock %}
+
+{% block content %}
+<article class="sp-error-page">
+  <p class="sp-error-code">500</p>
+  <h1>SomPark could not complete that request.</h1>
+  <p>Please try again. If the problem continues, return to live parking availability and start a new request.</p>
+  <a href="{% url 'home' %}" class="sp-btn sp-btn-primary">Return to availability</a>
+</article>
+{% endblock %}

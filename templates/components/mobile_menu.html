@@ -3,12 +3,13 @@
     const toggle = document.getElementById('btn-mobile-toggle');
     const menu = document.getElementById('main-nav-menu');
     if (toggle && menu) {
-      toggle.style.display = window.innerWidth <= 860 ? 'inline-flex' : 'none';
+      toggle.style.display = window.innerWidth <= 960 ? 'inline-flex' : 'none';
       window.addEventListener('resize', () => {
-        toggle.style.display = window.innerWidth <= 860 ? 'inline-flex' : 'none';
+        toggle.style.display = window.innerWidth <= 960 ? 'inline-flex' : 'none';
       });
       toggle.addEventListener('click', () => {
         menu.classList.toggle('mobile-active');
+        toggle.setAttribute('aria-expanded', menu.classList.contains('mobile-active') ? 'true' : 'false');
       });
     }
   });

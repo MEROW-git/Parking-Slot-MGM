@@ -2,14 +2,14 @@
 Usage:
 {% include "components/page_header.html" with title="Book Parking Spot" subtitle="Reserve your slot in central Phnom Penh" khmer_tag="កក់កន្លែងចំណត" %}
 {% endcomment %}
-<header style="margin-bottom:2rem; padding-bottom:1.25rem; border-bottom:2px solid var(--sp-border-strong);" id="page-header">
+<header class="sp-page-header" id="page-header">
   {% if khmer_tag %}
-    <div style="font-weight:700; font-size:0.9rem; color:var(--sp-red); margin-bottom:0.25rem;">
+    <div class="sp-page-khmer">
       {{ khmer_tag }}
     </div>
   {% endif %}
-  <h1 style="margin-bottom:0.35rem;">{{ title }}</h1>
+  <h1>{{ title }}</h1>
   {% if subtitle %}
-    <p style="color:var(--sp-text-muted); font-size:1.05rem; margin-bottom:0;">{{ subtitle }}</p>
+    <p>{{ subtitle }}</p>
   {% endif %}
 </header>

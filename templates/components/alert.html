@@ -3,10 +3,6 @@ Usage:
 {% include "components/alert.html" with type="success" message="Reservation Confirmed" %}
 {% endcomment %}
 <div class="sp-alert sp-alert-{{ type|default:'info' }}" role="alert" id="alert-{{ id|default:'msg' }}">
-  <div style="font-size:1.2rem; line-height:1;">
-    {% if type == 'success' %}✓{% elif type == 'warning' %}⚠{% elif type == 'error' or type == 'danger' %}✕{% else %}ℹ{% endif %}
-  </div>
-  <div>
-    {{ message }}
-  </div>
+  <strong>{% if type == 'success' %}Confirmed{% elif type == 'warning' %}Attention{% elif type == 'error' or type == 'danger' %}Error{% else %}Notice{% endif %}</strong>
+  <div>{{ message }}</div>
 </div>

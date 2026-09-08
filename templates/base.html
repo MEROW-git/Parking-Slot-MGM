@@ -8,23 +8,24 @@
   <meta property="og:description" content="ចំណតឆ្លាតវៃ សម្រាប់រាជធានីភ្នំពេញ - Smart Parking for Phnom Penh Capital">
   <title>{% block title %}{{ title|default:"SomPark - Smart Parking Phnom Penh" }}{% endblock %}</title>
 
-  <!-- Google Fonts -->
+  <!-- SomPark typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+Khmer:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+Khmer:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- SomPark Design System -->
   <link rel="stylesheet" href="/static/css/sompark.css">
   {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="page-{{ request.resolver_match.url_name|default:'unknown' }}">
+  <a class="sp-skip-link" href="#main-content">Skip to main content</a>
   {% include "components/navigation.html" %}
 
   <main class="sp-main" id="main-content">
     <div class="sp-container">
       <!-- Flash Messages -->
       {% if messages %}
-        <div class="no-print" id="system-messages" style="margin-bottom:1.5rem;">
+        <div class="no-print sp-system-messages" id="system-messages">
           {% for message in messages %}
             {% include "components/alert.html" with type=message.tags message=message.message id=forloop.counter %}
           {% endfor %}

@@ -1,36 +1,35 @@
-<nav class="sp-navbar" aria-label="Main Navigation">
+<nav class="sp-navbar" aria-label="Main navigation">
   <div class="sp-container sp-nav-inner">
     <a href="{% url 'home' %}" class="sp-brand" id="brand-logo" aria-label="SomPark Phnom Penh">
-      <span class="sp-brand-badge">ភ្នំពេញ</span>
-      <span>SomPark</span>
+      <span class="sp-brand-mark" aria-hidden="true">P</span>
+      <span class="sp-brand-copy"><strong>SomPark</strong><small>Phnom Penh</small></span>
     </a>
 
     <ul class="sp-nav-links" id="main-nav-menu">
-      <li><a href="{% url 'home' %}" class="sp-nav-link" id="nav-home">Availability (ចំណត)</a></li>
+      <li><a href="{% url 'home' %}#parking-zones" class="sp-nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" id="nav-home">Find parking</a></li>
       {% if user.is_authenticated %}
-        <li><a href="{% url 'book' %}" class="sp-nav-link" id="nav-book">Book Slot (កក់កន្លែង)</a></li>
-        <li><a href="{% url 'all_tickets' %}" class="sp-nav-link" id="nav-tickets">My Tickets (សំបុត្រខ្ញុំ)</a></li>
+        <li><a href="{% url 'book' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'book' %}active{% endif %}" id="nav-book">Reserve</a></li>
+        <li><a href="{% url 'all_tickets' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'all_tickets' or request.resolver_match.url_name == 'ticket' or request.resolver_match.url_name == 'ticket_code' %}active{% endif %}" id="nav-tickets">My tickets</a></li>
+      {% else %}
+        <li><a href="{% url 'login' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" id="nav-login">My tickets</a></li>
       {% endif %}
-      <li><a href="{% url 'component_showcase' %}" class="sp-nav-link" id="nav-components">Design System</a></li>
     </ul>
 
     <div class="sp-nav-auth">
       {% if user.is_authenticated %}
-        <span style="font-weight:700; font-size:0.9rem; color:var(--sp-text-muted);" id="user-greeting">
-          👤 {{ user.username }}
-        </span>
-        <form action="{% url 'logout' %}" method="post" style="display:inline;" id="logout-form">
+        <span class="sp-user-greeting" id="user-greeting">{{ user.username }}</span>
+        <form action="{% url 'logout' %}" method="post" class="sp-inline-form" id="logout-form">
           {% csrf_token %}
           <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-logout" title="Sign out of SomPark">
-            Sign Out
+            Sign out
           </button>
         </form>
       {% else %}
-        <a href="{% url 'login' %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-nav-login">Sign In</a>
-        <a href="{% url 'signup' %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-nav-signup">Register (ចុះឈ្មោះ)</a>
+        <a href="{% url 'login' %}" class="sp-btn sp-btn-secondary sp-btn-sm sp-nav-login" id="btn-nav-login">Sign in</a>
+        <a href="{% url 'signup' %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-nav-signup">Create account</a>
       {% endif %}
-      <button class="sp-btn sp-btn-secondary sp-btn-sm mobile-only" id="btn-mobile-toggle" aria-label="Toggle menu" style="display:none;">
-        ☰
+      <button class="sp-mobile-toggle" id="btn-mobile-toggle" aria-label="Toggle navigation" aria-controls="main-nav-menu" aria-expanded="false">
+        <span aria-hidden="true">Menu</span>
       </button>
     </div>
   </div>

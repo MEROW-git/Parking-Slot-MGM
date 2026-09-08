@@ -9,7 +9,7 @@
   </a>
   <div style="display:flex; gap:0.75rem;">
     <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
-      🖨 Print Ticket (បោះពុម្ព)
+      Print ticket (បោះពុម្ព)
     </button>
     {% if not reservation.checked_out %}
       <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-ticket-checkout">

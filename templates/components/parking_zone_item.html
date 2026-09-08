@@ -3,6 +3,7 @@ Usage:
 {% include "components/parking_zone_item.html" with zone=zone %}
 {% endcomment %}
 <article class="sp-zone-card {% if zone.is_full %}full-zone{% endif %}" id="zone-card-{{ zone.slug }}">
+  <div class="sp-zone-index" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</div>
   <div>
     <div class="sp-zone-header">
       <div>
@@ -16,20 +17,18 @@ Usage:
       {% include "components/availability_indicator.html" with status=zone.availability_status vacant=zone.vacant_slots total=zone.num_of_slots id=zone.slug %}
     </div>
 
-    <p style="font-size:0.9rem; color:var(--sp-text-muted); margin-top:0.5rem;">
-      📍 {{ zone.address }}
-    </p>
+    <p class="sp-zone-address">{{ zone.address }}</p>
 
     <div class="sp-zone-meta">
       <div>
-        <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Rate</div>
-        <div style="font-size:1.15rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-text);">
-          {{ zone.price_khr_formatted }} <span style="font-size:0.8rem; font-weight:600; color:var(--sp-text-muted);">/ day</span>
+        <div class="sp-meta-label">Rate</div>
+        <div class="sp-meta-value">
+          {{ zone.price_khr_formatted }} <span>/ day</span>
         </div>
       </div>
       <div>
-        <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Hours</div>
-        <div style="font-size:0.95rem; font-weight:700;">{{ zone.operating_hours }}</div>
+        <div class="sp-meta-label">Hours</div>
+        <div class="sp-meta-hours">{{ zone.operating_hours }}</div>
       </div>
     </div>
   </div>
@@ -39,12 +38,12 @@ Usage:
       View Map & Info
     </a>
     {% if zone.is_full %}
-      <span class="sp-btn sp-btn-secondary sp-btn-sm disabled" style="opacity:0.6;">
-        No Space (ពេញ)
+      <span class="sp-btn sp-btn-secondary sp-btn-sm disabled">
+        Full (ពេញ)
       </span>
     {% else %}
       <a href="{% url 'book' %}?zone={{ zone.slug }}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-book-{{ zone.slug }}">
-        Reserve (កក់) →
+        Reserve (កក់)
       </a>
     {% endif %}
   </div>
