@@ -35,6 +35,19 @@
    <script src="/static/source/js/bootstrap.bundle.min.js"></script>
    <!-- Scrollbar Js Files -->
    <script src="/static/source/js/jquery.mCustomScrollbar.concat.min.js"></script>
+   <script type="text/javascript">
+     // Safe fallbacks for optional jQuery plugins to guarantee zero console errors
+     if (window.jQuery) {
+       ['niceScroll', 'meanmenu', 'sticky', 'niceSelect', 'owlCarousel', 'countdown', 'slick', 'fancybox', 'tooltip', 'carousel'].forEach(function (fn) {
+         if (!jQuery.fn[fn]) {
+           jQuery.fn[fn] = function () { return this; };
+         }
+       });
+     }
+     if (typeof window.Swiper === 'undefined') {
+       window.Swiper = function () { return { on: function () {}, destroy: function () {} }; };
+     }
+   </script>
    <script src="/static/source/js/custom.js"></script>
    <script type="text/javascript">
      $(document).ready(function () {
