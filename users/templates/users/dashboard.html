@@ -125,7 +125,7 @@
           <form action="{% url 'checkout' %}" method="post" class="sp-inline-form" id="form-active-checkout">
             {% csrf_token %}
             <input type="hidden" name="ticket_code" value="{{ active_reservation.ticket_code }}">
-            <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-active-checkout" onclick="return confirm('Confirm check out from {{ active_reservation.parking_zone.name }}?');">
+            <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-active-checkout">
               Check Out (ចេញពីចំណត)
             </button>
           </form>

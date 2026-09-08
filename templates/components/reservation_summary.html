@@ -22,7 +22,7 @@ Usage:
       <form action="{% url 'checkout' %}" method="post" class="sp-inline-form" id="form-checkout-banner">
         {% csrf_token %}
         <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
-        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-banner" onclick="return confirm('Confirm check out from {{ reservation.parking_zone.name }}?');">
+        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-banner">
           Check Out (ចេញពីចំណត)
         </button>
       </form>

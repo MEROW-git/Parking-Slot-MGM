@@ -1333,6 +1333,65 @@ textarea.sp-input {
   border-block-end: var(--rule-fine) dashed var(--color-print-rule);
 }
 
+/* Ticket Header Branding · Consistent with Navigation */
+.sp-ticket-sheet .sp-ticket-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  text-decoration: none;
+}
+
+.sp-ticket-sheet .sp-brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-card);
+  background: var(--color-accent);
+  color: #000000;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: none;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.sp-ticket-sheet .sp-ticket-brand .sp-brand-copy {
+  display: grid;
+  line-height: 1.05;
+}
+
+.sp-ticket-sheet .sp-ticket-brand .sp-brand-copy strong {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  color: var(--color-paper); /* signature dark graphite: oklch(18% 0.015 255) */
+  line-height: 1;
+}
+
+.sp-ticket-sheet .sp-ticket-brand .sp-brand-copy small {
+  margin-block-start: var(--space-3xs);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-print-rule); /* dark graphite: oklch(18% 0 0) */
+  line-height: 1;
+}
+
+.sp-ticket-sheet .sp-ticket-khmer-tagline {
+  margin-block-start: var(--space-2xs);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-print-rule); /* dark graphite contrast on white sheet */
+  line-height: 1.35;
+}
+
 .sp-ticket-barcode {
   display: inline-block;
   margin-block-start: var(--space-2xs);
@@ -1656,5 +1715,18 @@ code {
     padding: var(--space-sm) !important;
     border-color: var(--color-print-ink) !important;
     box-shadow: none !important;
+  }
+
+  .sp-ticket-sheet .sp-brand-mark {
+    background: var(--color-accent) !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .sp-ticket-sheet .sp-ticket-brand .sp-brand-copy strong,
+  .sp-ticket-sheet .sp-ticket-brand .sp-brand-copy small,
+  .sp-ticket-sheet .sp-ticket-khmer-tagline {
+    color: #000000 !important;
   }
 }

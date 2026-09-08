@@ -56,7 +56,7 @@
                   <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-co-{{ ticket.ticket_code }}">
                     {% csrf_token %}
                     <input type="hidden" name="ticket_code" value="{{ ticket.ticket_code }}">
-                    <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-co-{{ ticket.ticket_code }}" onclick="return confirm('Check out of {{ ticket.parking_zone.name }}?');">
+                    <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-co-{{ ticket.ticket_code }}">
                       Check Out
                     </button>
                   </form>

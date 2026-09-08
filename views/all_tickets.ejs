@@ -57,7 +57,7 @@
                 <% if (!ticket.checked_out) { %>
                   <form action="/checkout/" method="post" style="display:inline;" id="form-co-<%= ticket.ticket_code %>">
                     <input type="hidden" name="ticket_code" value="<%= ticket.ticket_code %>">
-                    <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-co-<%= ticket.ticket_code %>" onclick="return confirm('Check out of <%= ticket.parking_zone %>?');">
+                    <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-co-<%= ticket.ticket_code %>">
                       Check Out
                     </button>
                   </form>

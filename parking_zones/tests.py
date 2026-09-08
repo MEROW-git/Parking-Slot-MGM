@@ -261,3 +261,57 @@ class BookingAndCheckoutWorkflowTests(TestCase):
         self.zone.refresh_from_db()
         self.assertEqual(self.zone.occupied_slots, 0)
         self.assertEqual(self.zone.vacant_slots, 5)
+
+
+class TicketViewBrandingTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='dara', password='secretpassword')
+        self.zone = ParkingZone.objects.create(
+            name='Wat Phnom Riverside Slot',
+            slug='wat-phnom-riverside',
+            num_of_slots=10,
+            occupied_slots=1,
+            vacant_slots=9,
+            address='Street 94, Daun Penh, Phnom Penh',
+            price=2500,
+        )
+        self.today = datetime.date.today()
+        self.reservation = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='2AZ-9999',
+            phone_number='012345678',
+            start_date=self.today,
+            finish_date=self.today,
+            ticket_code='SPK-TESTBRAND',
+            checked_out=False
+        )
+
+    def test_ticket_header_branding(self):
+        self.client.login(username='dara', password='secretpassword')
+        response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
+        self.assertEqual(response.status_code, 200)
+
+        # Confirm new consistent navigation branding
+        self.assertContains(response, 'id="parking-ticket-sheet"')
+        self.assertContains(response, 'id="ticket-brand"')
+        self.assertContains(response, '<span class="sp-brand-mark" aria-hidden="true">P</span>')
+        self.assertContains(response, '<strong>SomPark</strong>')
+        self.assertContains(response, '<small>PHNOM PENH</small>')
+        self.assertContains(response, 'id="ticket-khmer-tagline"')
+        self.assertContains(response, 'ចំណតឆ្លាតវៃ សម្រាប់រាជធានីភ្នំពេញ')
+
+        # Confirm old adult-site-like split badge with Khmer text inside orange rectangle is removed
+        self.assertNotContains(response, '<span class="sp-brand-badge">ភ្នំពេញ</span>')
+
+        # Confirm ticket functionality and layout preserved
+        self.assertContains(response, '* SPK-TESTBRAND *')
+        self.assertContains(response, 'Wat Phnom Riverside Slot')
+        self.assertContains(response, '2AZ-9999')
+        self.assertContains(response, 'Check Out (ចេញពីចំណត)')
+        self.assertContains(response, 'Print ticket (បោះពុម្ព)')
+
+        # Confirm checkout button does not trigger browser confirm popup
+        self.assertNotContains(response, 'confirm(')
+
+

@@ -11,7 +11,7 @@
     <% if (!reservation.checked_out) { %>
       <form action="/checkout/" method="post" style="display:inline;" id="form-ticket-checkout">
         <input type="hidden" name="ticket_code" value="<%= reservation.ticket_code %>">
-        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket" onclick="return confirm('Confirm check out from <%= reservation.parking_zone %>?');">
+        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket">
           Check Out (ចេញពីចំណត)
         </button>
       </form>
@@ -23,12 +23,15 @@
 <div class="sp-ticket-sheet" id="parking-ticket-sheet">
   <div class="sp-ticket-header">
     <div>
-      <div class="sp-brand" style="font-size:1.3rem;">
-        <span class="sp-brand-mark" style="width:28px; height:28px; font-size:0.9rem;">P</span>
-        <span style="font-weight:800;">SomPark</span>
+      <div class="sp-brand sp-ticket-brand" id="ticket-brand">
+        <span class="sp-brand-mark" aria-hidden="true">P</span>
+        <span class="sp-brand-copy">
+          <strong>SomPark</strong>
+          <small>PHNOM PENH</small>
+        </span>
       </div>
-      <div style="font-size:0.85rem; color:var(--sp-text-muted); margin-top:0.25rem;">
-        ចំណតឆ្លាតវៃ រាជធានីភ្នំពេញ · Phnom Penh Smart Parking
+      <div class="sp-ticket-khmer-tagline" id="ticket-khmer-tagline">
+        ចំណតឆ្លាតវៃ សម្រាប់រាជធានីភ្នំពេញ
       </div>
     </div>
     <div style="text-align:right;">
