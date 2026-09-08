@@ -1,0 +1,79 @@
+            </div>
+         </div>
+      </section>
+      <!-- end section -->
+
+      <!-- footer -->
+      <footer>
+         <div class="container">
+         </div>
+      </footer>
+      <!-- end footer -->
+
+      <!-- copyright -->
+      <div class="cpy_right">
+          <div class="container">
+              <div class="row">
+                  <div class="col-md-12">
+                     <div class="full">
+                        <p>© <%= new Date().getFullYear() %> All Rights Reserved. Design by <a href="#">Jeremiah George</a></p>
+                     </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+      <!-- right copyright -->
+
+   </div>
+</div>
+
+   <div class="overlay"></div>
+      
+   <!-- Javascript files-->
+   <script src="/static/source/js/jquery.min.js"></script>
+   <script src="/static/source/js/popper.min.js"></script>
+   <script src="/static/source/js/bootstrap.bundle.min.js"></script>
+   <!-- Scrollbar Js Files -->
+   <script src="/static/source/js/jquery.mCustomScrollbar.concat.min.js"></script>
+   <script src="/static/source/js/custom.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function () {
+         try {
+            $("#sidebar").mCustomScrollbar({
+                theme: "minimal"
+            });
+         } catch(e) {}
+
+         $('#dismiss, .overlay').on('click', function () {
+             $('#sidebar').removeClass('active');
+             $('.overlay').removeClass('active');
+         });
+
+         $('#sidebarCollapse').on('click', function () {
+             $('#sidebar').addClass('active');
+             $('.overlay').addClass('active');
+             $('.collapse.in').toggleClass('in');
+             $('a[aria-expanded=true]').attr('aria-expanded', 'false');
+         });
+     });
+   </script>
+ 
+   <script>
+   function initMap() {
+     var mapEl = document.getElementById('map');
+     if (!mapEl || typeof google === 'undefined' || !google.maps) return;
+     var map = new google.maps.Map(mapEl, {
+       zoom: 11,
+       center: {lat: 40.645037, lng: -73.880224},
+     });
+
+     var image = '/static/source/images/location_point.png';
+     new google.maps.Marker({
+        position: {lat: 40.645037, lng: -73.880224},
+        map: map,
+        icon: image
+     });
+   }
+   </script>
+</body>
+</html>

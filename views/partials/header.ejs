@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <!-- basic -->
+      <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <!-- mobile metas -->
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+      <!-- site metas -->
+      <title><%= typeof title !== 'undefined' ? title + ' | Avalon Parking' : 'Avalon Parking Slot Management' %></title>
+      <meta name="keywords" content="parking, slot, reservation, management">
+      <meta name="description" content="Parking Slot Management Application">
+      <meta name="author" content="Avalon">
+      <!-- bootstrap css -->
+      <link rel="stylesheet" href="/static/source/css/bootstrap.min.css">
+      <!-- style css -->
+      <link rel="stylesheet" href="/static/source/css/style.css">
+      <!-- Responsive-->
+      <link rel="stylesheet" href="/static/source/css/responsive.css">
+      <!-- Scrollbar Custom CSS -->
+      <link rel="stylesheet" href="/static/source/css/jquery.mCustomScrollbar.min.css">
+      <!-- awesome fontfamily -->
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+   </head>
+   <!-- body -->
+   <body class="main-layout">
+      <!-- loader -->
+      <div class="loader_bg">
+         <div class="loader" style="display: flex; align-items: center; justify-content: center; height: 100vh;">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+               <span class="sr-only">Loading...</span>
+            </div>
+         </div>
+      </div>
+      <!-- end loader -->
+   
+   <div class="wrapper">
+      <div class="sidebar">
+         <!-- Sidebar  -->
+         <nav id="sidebar">
+            <div id="dismiss">
+                <i class="fa fa-arrow-left"></i>
+            </div>
+
+            <ul class="list-unstyled components">
+                <li class="active">
+                    <a href="/">Home</a>
+                </li>
+                <% if (user) { %>
+                  <li>
+                     <a href="#">Account: <%= user.username %></a>
+                  </li>
+                  <li>
+                     <a href="/ticket/">Print Ticket</a>
+                  </li>
+                  <li>
+                     <a href="/all_tickets/">All Tickets</a>
+                  </li>
+                  <li>
+                     <a href="/book/">Reserve Parking</a>
+                  </li>
+                  <li>
+                     <a href="/checkout/">Checkout Parking</a>
+                  </li>
+                  <li>
+                     <a href="/user/logout/">Logout</a>
+                  </li>
+               <% } else { %>
+                  <li>
+                     <a href="/user/signup/">Register</a>
+                  </li>
+                  <li>
+                     <a href="/user/login">Login</a>
+                  </li>
+               <% } %>
+            </ul>
+         </nav>
+      </div>
+
+      <div id="content">
+         <!-- section -->
+         <section id="home" class="top_section">
+            <div class="row">
+               <div class="col-lg-12">
+                  <!-- header -->
+                  <%- include('navbar') %>
+
+                  <div class="container mt-2 pt-3">
+                     <% if (messages && messages.length > 0) { %>
+                        <% messages.forEach(function(message) { %>
+                        <div class="alert alert-<%= message.type === 'error' ? 'danger' : (message.type || 'info') %> alert-dismissible fade show" role="alert">
+                           <%= message.text %>
+                           <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                              <span aria-hidden="true">&times;</span>
+                           </button>
+                        </div>
+                        <% }); %>
+                     <% } %>
+                  </div>

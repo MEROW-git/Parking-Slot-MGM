@@ -1,0 +1,46 @@
+<%- include('partials/header') %>
+
+<div class="container py-5">
+  <div class="row">
+    <div class="col-sm-9 col-md-7 col-lg-5 mx-auto">
+      <div class="card card-signin my-4 shadow">
+        <div class="card-body p-4">
+          <h5 class="card-title text-center font-weight-bold mb-4">Create Account</h5>
+
+          <% if (typeof error !== 'undefined' && error) { %>
+             <div class="alert alert-danger" role="alert">
+                <%= error %>
+             </div>
+          <% } %>
+
+          <form class="form-signin" method="POST" action="/user/signup/">
+            <div class="form-group mb-3">
+              <label for="id_username" class="font-weight-bold">Username</label>
+              <input type="text" name="username" id="id_username" class="form-control" placeholder="Choose a username" required minlength="3" autofocus />
+            </div>
+
+            <div class="form-group mb-3">
+              <label for="id_password" class="font-weight-bold">Password</label>
+              <input type="password" name="password" id="id_password" class="form-control" placeholder="Create a password" required minlength="6" />
+            </div>
+
+            <div class="form-group mb-4">
+              <label for="id_password_confirm" class="font-weight-bold">Confirm Password</label>
+              <input type="password" name="password_confirm" id="id_password_confirm" class="form-control" placeholder="Re-enter your password" required minlength="6" />
+            </div>
+
+            <hr class="my-3">
+            <button class="btn btn-lg btn-primary btn-block text-uppercase font-weight-bold" type="submit">Create Account</button>
+            <hr class="my-3">
+          </form>
+
+          <div class="border-top pt-3 text-center">
+            <small class="text-muted">Already have an account? <a href="/user/login" class="font-weight-bold text-primary">Login here</a></small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
