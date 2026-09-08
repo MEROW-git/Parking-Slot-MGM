@@ -8,6 +8,7 @@
     <ul class="sp-nav-links" id="main-nav-menu">
       <li><a href="{% url 'home' %}#parking-zones" class="sp-nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" id="nav-home">Find parking</a></li>
       {% if user.is_authenticated %}
+        <li><a href="{% url 'dashboard' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" id="nav-dashboard">Dashboard</a></li>
         <li><a href="{% url 'book' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'book' %}active{% endif %}" id="nav-book">Reserve</a></li>
         <li><a href="{% url 'all_tickets' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'all_tickets' or request.resolver_match.url_name == 'ticket' or request.resolver_match.url_name == 'ticket_code' %}active{% endif %}" id="nav-tickets">My tickets</a></li>
       {% else %}
@@ -17,7 +18,7 @@
 
     <div class="sp-nav-auth">
       {% if user.is_authenticated %}
-        <span class="sp-user-greeting" id="user-greeting">{{ user.username }}</span>
+        <a href="{% url 'dashboard' %}" class="sp-user-greeting" id="user-greeting" title="Customer Dashboard">{{ user.username }}</a>
         <form action="{% url 'logout' %}" method="post" class="sp-inline-form" id="logout-form">
           {% csrf_token %}
           <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-logout" title="Sign out of SomPark">

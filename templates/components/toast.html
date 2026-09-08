@@ -1,0 +1,77 @@
+{% comment %}
+Usage:
+{% include "components/toast.html" with message=message.message tags=message.tags id=forloop.counter %}
+{% endcomment %}
+{% with tag_lower=tags|default:'info'|lower %}
+  {% if 'error' in tag_lower or 'danger' in tag_lower %}
+    <div class="sp-toast sp-toast-error" id="toast-{{ id|default:'msg' }}" role="alert" aria-live="assertive" data-auto-dismiss="false" tabindex="0">
+      <div class="sp-toast-indicator" aria-hidden="true"></div>
+      <div class="sp-toast-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="sp-toast-content">
+        <span class="sp-toast-title">Notice</span>
+        <div class="sp-toast-body">{{ message }}</div>
+      </div>
+      <button type="button" class="sp-toast-close" aria-label="Dismiss notification" title="Dismiss notification">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+  {% elif 'success' in tag_lower %}
+    <div class="sp-toast sp-toast-success" id="toast-{{ id|default:'msg' }}" role="status" aria-live="polite" data-auto-dismiss="true" data-delay="5000" tabindex="0">
+      <div class="sp-toast-indicator" aria-hidden="true"></div>
+      <div class="sp-toast-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div class="sp-toast-content">
+        <span class="sp-toast-title">Success</span>
+        <div class="sp-toast-body">{{ message }}</div>
+      </div>
+      <button type="button" class="sp-toast-close" aria-label="Dismiss notification" title="Dismiss notification">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+  {% elif 'warning' in tag_lower %}
+    <div class="sp-toast sp-toast-warning" id="toast-{{ id|default:'msg' }}" role="status" aria-live="polite" data-auto-dismiss="false" tabindex="0">
+      <div class="sp-toast-indicator" aria-hidden="true"></div>
+      <div class="sp-toast-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <div class="sp-toast-content">
+        <span class="sp-toast-title">Attention</span>
+        <div class="sp-toast-body">{{ message }}</div>
+      </div>
+      <button type="button" class="sp-toast-close" aria-label="Dismiss notification" title="Dismiss notification">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+  {% else %}
+    <div class="sp-toast sp-toast-info" id="toast-{{ id|default:'msg' }}" role="status" aria-live="polite" data-auto-dismiss="true" data-delay="5000" tabindex="0">
+      <div class="sp-toast-indicator" aria-hidden="true"></div>
+      <div class="sp-toast-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+      </div>
+      <div class="sp-toast-content">
+        <span class="sp-toast-title">Information</span>
+        <div class="sp-toast-body">{{ message }}</div>
+      </div>
+      <button type="button" class="sp-toast-close" aria-label="Dismiss notification" title="Dismiss notification">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+  {% endif %}
+{% endwith %}

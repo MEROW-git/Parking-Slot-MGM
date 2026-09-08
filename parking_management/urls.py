@@ -24,6 +24,7 @@ urlpatterns = [
     path('all_tickets/', pz_views.all_tickets, name='all_tickets'),
 
     # Users & Auth
+    path('dashboard/', user_views.dashboard, name='dashboard'),
     path('user/login/', user_views.login_user, name='login'),
     path('user/signup/', user_views.register_user, name='signup'),
     path('user/logout/', user_views.logout_user, name='logout'),

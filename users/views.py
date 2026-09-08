@@ -1,15 +1,17 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.http import require_POST, require_http_methods
 from django.utils.http import url_has_allowed_host_and_scheme
+from parking_zones.models import Reservation
 from .forms import UserRegistrationForm, SomParkLoginForm
 
 
 def register_user(request):
     """Register a new customer account."""
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect('dashboard')
 
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
@@ -20,7 +22,7 @@ def register_user(request):
 
             messages.success(
                 request,
-                f'សូមស្វាគមន៍! Welcome, {user.username}! Account created successfully. You can now log in.'
+                'Account created successfully. Sign in to continue.'
             )
             return redirect('login')
     else:
@@ -35,9 +37,9 @@ def register_user(request):
 def login_user(request):
     """Authenticate existing customer with safe next-redirect."""
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect('dashboard')
 
-    next_url = request.GET.get('next') or request.POST.get('next') or 'home'
+    next_url = request.GET.get('next') or request.POST.get('next')
 
     if request.method == 'POST':
         form = SomParkLoginForm(request, data=request.POST)
@@ -46,20 +48,44 @@ def login_user(request):
             login(request, user)
             messages.success(
                 request,
-                f'ស្វាគមន៍មកកាន់ SomPark! Welcome back, {user.username}.'
+                f'Welcome back, {user.username}.'
             )
 
             # Validate next URL safety
-            if not url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
-                next_url = 'home'
-            return redirect(next_url)
+            if next_url and url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
+            return redirect('dashboard')
     else:
         form = SomParkLoginForm(request)
 
     return render(request, 'users/login.html', {
         'form': form,
-        'next': next_url,
+        'next': next_url or '',
         'title': 'Sign In | SomPark Phnom Penh',
+    })
+
+
+@login_required
+def dashboard(request):
+    """
+    Dedicated authenticated customer dashboard.
+    Displays real Django data: greeting, active reservation, quick actions,
+    recent reservations, and appropriate empty state.
+    """
+    user_reservations = Reservation.objects.filter(
+        customer=request.user
+    ).select_related('parking_zone').order_by('-created_on')
+
+    active_reservation = user_reservations.filter(checked_out=False).first()
+    recent_reservations = user_reservations[:5]
+    has_reservations = user_reservations.exists()
+
+    return render(request, 'users/dashboard.html', {
+        'active_reservation': active_reservation,
+        'recent_reservations': recent_reservations,
+        'has_reservations': has_reservations,
+        'total_reservations': user_reservations.count(),
+        'title': f'Dashboard - {request.user.username} | SomPark Phnom Penh',
     })
 
 
@@ -74,3 +100,4 @@ def logout_user(request):
         logout(request)
         messages.info(request, f'អ្នកបានចាកចេញដោយជោគជ័យ។ You have been signed out. Have a safe drive, {username}!')
     return redirect('home')
+

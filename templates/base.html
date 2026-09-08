@@ -21,19 +21,19 @@
   <a class="sp-skip-link" href="#main-content">Skip to main content</a>
   {% include "components/navigation.html" %}
 
+  <!-- Toast Notification System -->
+  {% if messages %}
+    <div class="sp-toast-container no-print" id="toast-container" aria-label="Notifications">
+      {% for message in messages %}
+        {% include "components/toast.html" with message=message.message tags=message.tags id=forloop.counter %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <main class="sp-main" id="main-content">
     <div class="sp-container">
-      <!-- Flash Messages -->
-      {% if messages %}
-        <div class="no-print sp-system-messages" id="system-messages">
-          {% for message in messages %}
-            {% include "components/alert.html" with type=message.tags message=message.message id=forloop.counter %}
-          {% endfor %}
-        </div>
-      {% endif %}
-
-      <!-- Global Active Reservation Banner (if not already on ticket view) -->
-      {% if active_reservation and request.resolver_match.url_name != 'ticket' and request.resolver_match.url_name != 'ticket_code' %}
+      <!-- Global Active Reservation Banner (if not already on ticket view or dashboard) -->
+      {% if active_reservation and request.resolver_match.url_name != 'ticket' and request.resolver_match.url_name != 'ticket_code' and request.resolver_match.url_name != 'dashboard' %}
         <div class="no-print">
           {% include "components/reservation_summary.html" with reservation=active_reservation allow_checkout=True %}
         </div>
@@ -45,6 +45,7 @@
 
   {% include "components/footer.html" %}
   {% include "components/mobile_menu.html" %}
+  <script src="/static/js/sompark-toast.js"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>
