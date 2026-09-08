@@ -5,6 +5,7 @@ SomPark - Smart Parking for Phnom Penh Capital
 """
 
 import os
+import re
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -19,22 +20,32 @@ SECRET_KEY = os.environ.get(
     'django-insecure-sompark-khmer-parking-phnom-penh-2026-safe-key'
 )
 
-# Robust debug parsing: handles non-boolean env values (e.g. Windows DEBUG=release)
-_debug_env = os.environ.get('DEBUG', 'True').strip().lower()
+# Robust debug parsing: defaults to False for safe production deployment
+_debug_env = os.environ.get('DEBUG', 'False').strip().lower()
 DEBUG = _debug_env in ('true', '1', 't', 'yes')
 
-_allowed_hosts = os.environ.get('ALLOWED_HOSTS', '*')
-if _allowed_hosts == '*':
+_allowed_hosts = os.environ.get('ALLOWED_HOSTS', '*').strip()
+if not _allowed_hosts or _allowed_hosts == '*':
     ALLOWED_HOSTS = ['*']
 else:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(',') if h.strip()]
+    for host_entry in ('localhost', '127.0.0.1', '0.0.0.0', 'testserver', '.run.app', '.aistudio.google.com'):
+        if host_entry not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host_entry)
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
 
 CSRF_TRUSTED_ORIGINS = [
     'https://*.run.app',
+    'https://*.aistudio.google.com',
+    'https://ai.studio',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
 ]
 
 INSTALLED_APPS = [
@@ -51,6 +62,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -116,11 +128,43 @@ def database_config():
 
     options = {'charset': 'utf8mb4'}
     ssl_ca = os.environ.get('MYSQL_SSL_CA', '').strip()
-    if ssl_ca:
+    ssl_ca_pem = os.environ.get('MYSQL_SSL_CA_PEM', '').strip()
+
+    def _normalize_pem(pem_str: str) -> str:
+        if not pem_str:
+            return ''
+        pem_str = pem_str.replace('\\n', '\n')
+        m = re.search(r'-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----', pem_str, re.DOTALL)
+        if m:
+            b64 = ''.join(m.group(1).split())
+            chunks = [b64[i:i+64] for i in range(0, len(b64), 64)]
+            return '-----BEGIN CERTIFICATE-----\n' + '\n'.join(chunks) + '\n-----END CERTIFICATE-----\n'
+        return pem_str
+
+    # Safely accept the PEM certificate from an environment variable
+    raw_pem = None
+    if 'BEGIN CERTIFICATE' in ssl_ca:
+        raw_pem = _normalize_pem(ssl_ca)
+    elif ssl_ca_pem and 'BEGIN CERTIFICATE' in ssl_ca_pem:
+        raw_pem = _normalize_pem(ssl_ca_pem)
+
+    ca_file_path = BASE_DIR / 'certs' / 'aiven-ca.pem'
+    ca_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if raw_pem:
+        if not ca_file_path.exists() or ca_file_path.read_text().strip() != raw_pem.strip():
+            ca_file_path.write_text(raw_pem.strip() + '\n')
+        options['ssl'] = {'ca': str(ca_file_path.resolve())}
+    elif ssl_ca:
         ssl_ca_path = Path(ssl_ca).expanduser()
         if not ssl_ca_path.is_absolute():
             ssl_ca_path = BASE_DIR / ssl_ca_path
-        options['ssl'] = {'ca': str(ssl_ca_path.resolve())}
+        if ssl_ca_path.exists():
+            options['ssl'] = {'ca': str(ssl_ca_path.resolve())}
+        elif ca_file_path.exists():
+            options['ssl'] = {'ca': str(ca_file_path.resolve())}
+    elif ca_file_path.exists():
+        options['ssl'] = {'ca': str(ca_file_path.resolve())}
 
     return {
         'ENGINE': 'django.db.backends.mysql',
@@ -155,10 +199,20 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 
-X_FRAME_OPTIONS = 'SAMEORIGIN'
+X_FRAME_OPTIONS = 'ALLOWALL'
+
