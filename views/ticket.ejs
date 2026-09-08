@@ -1,161 +1,84 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ticket Details - <%= reservation.ticket_code %></title>
-    <link rel="stylesheet" href="/static/source/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <style type="text/css">
-        @page {
-            size: A6;
-            margin: 1cm;
-        }
+<%- include('partials/header', { current_page: 'ticket', title: 'Ticket #' + reservation.ticket_code + ' | SomPark Phnom Penh' }) %>
 
-        body {
-            background-color: #f8f9fa;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            padding: 20px;
-        }
-
-        .ticket-box {
-            max-width: 550px;
-            margin: 0 auto;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            overflow: hidden;
-            border: 2px dashed #007bff;
-        }
-
-        .ticket-header {
-            background-color: #007bff;
-            color: #fff;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .ticket-header h3 {
-            margin: 0;
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-
-        .ticket-header .sub {
-            font-size: 0.85rem;
-            opacity: 0.9;
-            margin-top: 5px;
-        }
-
-        .ticket-body {
-            padding: 25px;
-        }
-
-        .list-group-custom {
-            margin-bottom: 20px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 15px;
-        }
-
-        .list-group-custom p {
-            margin-bottom: 6px;
-            font-size: 1rem;
-        }
-
-        .table-ticket th {
-            background-color: #f1f3f5;
-            font-size: 0.85rem;
-            text-align: center;
-        }
-
-        .table-ticket td {
-            text-align: center;
-            font-size: 0.9rem;
-            vertical-align: middle;
-        }
-
-        @media print {
-            body {
-                background: none;
-                padding: 0;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .ticket-box {
-                box-shadow: none;
-                border: 1px solid #000;
-                max-width: 100%;
-            }
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <div class="ticket-box">
-        <div class="ticket-header">
-            <h3><i class="fa fa-ticket mr-2"></i>PARKING TICKET</h3>
-            <div class="mt-2" style="font-size: 1.2rem; font-family: monospace; font-weight: bold; background: rgba(255,255,255,0.2); display: inline-block; padding: 4px 12px; border-radius: 4px;">
-                CODE: <%= reservation.ticket_code %>
-            </div>
-            <div class="sub">Reserved On: <%= reservation.created_on %></div>
-        </div>
-
-        <div class="ticket-body">
-            <div class="list-group-custom">
-                <p><strong>Customer:</strong> <%= user.username %></p>
-                <p><strong>Parking Status:</strong> 
-                    <% if (reservation.checked_out) { %>
-                        <span class="badge badge-secondary">Checked Out</span>
-                    <% } else { %>
-                        <span class="badge badge-success">Active</span>
-                    <% } %>
-                </p>
-            </div>
-
-            <div class="table-responsive mb-4">
-                <table class="table table-bordered table-ticket">
-                    <thead>
-                        <tr>
-                            <th>Start Date</th>
-                            <th>Finish Date</th>
-                            <th>Zone</th>
-                            <th>Plate</th>
-                            <th>Phone</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><%= reservation.start_date %></td>
-                            <td><%= reservation.finish_date %></td>
-                            <td><strong><%= reservation.parking_zone %></strong></td>
-                            <td><%= reservation.plate_number %></td>
-                            <td><%= reservation.phone_number %></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="alert alert-info text-center py-2 mb-4" style="font-size: 0.85rem;">
-                <i class="fa fa-info-circle mr-1"></i> Please display this ticket code or keep your ticket safe upon entry and exit.
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center no-print pt-2">
-                <a href="/" class="btn btn-outline-secondary">
-                    <i class="fa fa-arrow-left mr-1"></i> Back to Home
-                </a>
-                <div>
-                    <a href="/all_tickets/" class="btn btn-outline-primary mr-2">All Tickets</a>
-                    <button onclick="window.print()" class="btn btn-primary">
-                        <i class="fa fa-print mr-1"></i> Print Ticket
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="no-print" style="max-width:650px; margin:0 auto 1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+  <a href="/all_tickets/" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-back-history">
+    ← Ticket History
+  </a>
+  <div style="display:flex; gap:0.75rem;">
+    <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
+      Print ticket (បោះពុម្ព)
+    </button>
+    <% if (!reservation.checked_out) { %>
+      <form action="/checkout/" method="post" style="display:inline;" id="form-ticket-checkout">
+        <input type="hidden" name="ticket_code" value="<%= reservation.ticket_code %>">
+        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket" onclick="return confirm('Confirm check out from <%= reservation.parking_zone %>?');">
+          Check Out (ចេញពីចំណត)
+        </button>
+      </form>
+    <% } %>
+  </div>
 </div>
 
-</body>
-</html>
+<!-- Printable Parking Ticket Sheet -->
+<div class="sp-ticket-sheet" id="parking-ticket-sheet">
+  <div class="sp-ticket-header">
+    <div>
+      <div class="sp-brand" style="font-size:1.3rem;">
+        <span class="sp-brand-mark" style="width:28px; height:28px; font-size:0.9rem;">P</span>
+        <span style="font-weight:800;">SomPark</span>
+      </div>
+      <div style="font-size:0.85rem; color:var(--sp-text-muted); margin-top:0.25rem;">
+        ចំណតឆ្លាតវៃ រាជធានីភ្នំពេញ · Phnom Penh Smart Parking
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <% if (reservation.checked_out) { %>
+        <span style="background:var(--sp-bg-alt); color:var(--sp-text-muted); font-size:0.75rem; font-weight:800; padding:0.25rem 0.65rem; border:1px solid var(--sp-border-strong);">
+          CHECKED OUT (បានចេញ)
+        </span>
+      <% } else { %>
+        <span style="background:var(--sp-green-light); color:var(--sp-green-dark); font-size:0.75rem; font-weight:800; padding:0.25rem 0.65rem; border:1px solid var(--sp-border-strong);">
+          ACTIVE RESERVATION (កំពុងចត)
+        </span>
+      <% } %>
+      <div style="font-size:0.75rem; color:var(--sp-text-muted); margin-top:0.35rem;">
+        Issued: <%= reservation.created_on %>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center; margin:1.5rem 0 2rem;">
+    <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">
+      TICKET REFERENCE CODE (លេខកូដសំបុត្រ)
+    </div>
+    <div class="sp-ticket-barcode" id="ticket-barcode-val" style="font-size:2rem; font-weight:800; font-family:var(--sp-font-mono); letter-spacing:0.15em; margin:0.5rem 0; color:var(--sp-text);">
+      * <%= reservation.ticket_code %> *
+    </div>
+  </div>
+
+  <div class="sp-ticket-details" style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; border-top:2px dashed var(--sp-border-strong); border-bottom:2px dashed var(--sp-border-strong); padding:1.5rem 0; margin-bottom:1.5rem;">
+    <div>
+      <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">PARKING FACILITY (ទីតាំង)</div>
+      <div style="font-weight:700; font-size:1.05rem; color:var(--sp-text);"><%= reservation.parking_zone %></div>
+    </div>
+    <div>
+      <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">VEHICLE PLATE (ស្លាកលេខ)</div>
+      <div style="font-weight:700; font-size:1.05rem; font-family:var(--sp-font-mono); color:var(--sp-text);"><%= reservation.plate_number %></div>
+    </div>
+    <div>
+      <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">DATES (កាលបរិច្ឆេទ)</div>
+      <div style="font-size:0.95rem; font-family:var(--sp-font-mono); color:var(--sp-text);"><%= reservation.start_date %> → <%= reservation.finish_date %></div>
+    </div>
+    <div>
+      <div style="font-size:0.75rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">CONTACT PHONE (ទូរស័ព្ទ)</div>
+      <div style="font-size:0.95rem; font-family:var(--sp-font-mono); color:var(--sp-text);"><%= reservation.phone_number %></div>
+    </div>
+  </div>
+
+  <div style="font-size:0.8rem; color:var(--sp-text-muted); line-height:1.5; text-align:center;">
+    Please present this digital pass or printed QR to the parking attendant at the gate entrance and exit.
+    Rates are settled in Cambodian Riel (KHR / ៛).
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,44 +1,47 @@
-<%- include('partials/header') %>
+<%- include('partials/header', { current_page: 'signup', title: 'Create Account | SomPark Phnom Penh' }) %>
 
-<div class="container py-5">
-  <div class="row">
-    <div class="col-sm-9 col-md-7 col-lg-5 mx-auto">
-      <div class="card card-signin my-4 shadow">
-        <div class="card-body p-4">
-          <h5 class="card-title text-center font-weight-bold mb-4">Create Account</h5>
-
-          <% if (typeof error !== 'undefined' && error) { %>
-             <div class="alert alert-danger" role="alert">
-                <%= error %>
-             </div>
-          <% } %>
-
-          <form class="form-signin" method="POST" action="/user/signup/">
-            <div class="form-group mb-3">
-              <label for="id_username" class="font-weight-bold">Username</label>
-              <input type="text" name="username" id="id_username" class="form-control" placeholder="Choose a username" required minlength="3" autofocus />
-            </div>
-
-            <div class="form-group mb-3">
-              <label for="id_password" class="font-weight-bold">Password</label>
-              <input type="password" name="password" id="id_password" class="form-control" placeholder="Create a password" required minlength="6" />
-            </div>
-
-            <div class="form-group mb-4">
-              <label for="id_password_confirm" class="font-weight-bold">Confirm Password</label>
-              <input type="password" name="password_confirm" id="id_password_confirm" class="form-control" placeholder="Re-enter your password" required minlength="6" />
-            </div>
-
-            <hr class="my-3">
-            <button class="btn btn-lg btn-primary btn-block text-uppercase font-weight-bold" type="submit">Create Account</button>
-            <hr class="my-3">
-          </form>
-
-          <div class="border-top pt-3 text-center">
-            <small class="text-muted">Already have an account? <a href="/user/login" class="font-weight-bold text-primary">Login here</a></small>
-          </div>
-        </div>
+<div style="max-width:480px; margin:2rem auto;" id="signup-container">
+  <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2.5rem; box-shadow:var(--sp-shadow-hard-lg);">
+    <div style="text-align:center; margin-bottom:2rem;">
+      <div class="sp-brand" style="justify-content:center; margin-bottom:0.5rem;">
+        <span class="sp-brand-mark">P</span>
+        <span style="font-weight:800; font-size:1.4rem;">SomPark</span>
       </div>
+      <h2 style="font-size:1.75rem; margin-bottom:0.25rem;">Create Account (ចុះឈ្មោះ)</h2>
+      <p style="color:var(--sp-text-muted); font-size:0.95rem; margin-bottom:0;">
+        Join SomPark to reserve spaces and save digital parking passes
+      </p>
+    </div>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="sp-alert sp-alert-error" role="alert" style="margin-bottom:1.25rem;">
+        <div><%= error %></div>
+      </div>
+    <% } %>
+
+    <form action="/user/signup/" method="post" id="signup-form">
+      <div class="sp-form-group" id="group_username" style="margin-bottom:1.25rem;">
+        <label for="username" class="sp-label">Username (ឈ្មោះគណនី) <span class="sp-required">*</span></label>
+        <input type="text" name="username" id="username" class="sp-input" placeholder="Choose a username" required autocomplete="username">
+      </div>
+
+      <div class="sp-form-group" id="group_password" style="margin-bottom:1.25rem;">
+        <label for="password" class="sp-label">Password (ពាក្យសម្ងាត់) <span class="sp-required">*</span></label>
+        <input type="password" name="password" id="password" class="sp-input" placeholder="At least 6 characters" required autocomplete="new-password">
+      </div>
+
+      <div class="sp-form-group" id="group_password_confirm" style="margin-bottom:1.25rem;">
+        <label for="password_confirm" class="sp-label">Confirm Password (បញ្ជាក់ពាក្យសម្ងាត់) <span class="sp-required">*</span></label>
+        <input type="password" name="password_confirm" id="password_confirm" class="sp-input" placeholder="Repeat your password" required autocomplete="new-password">
+      </div>
+
+      <button type="submit" class="sp-btn sp-btn-primary" style="width:100%; margin-top:1.5rem; font-size:1.05rem;" id="btn-submit-signup">
+        Create SomPark Account →
+      </button>
+    </form>
+
+    <div style="border-top:1px solid var(--sp-border); margin-top:2rem; padding-top:1.25rem; text-align:center; font-size:0.9rem; color:var(--sp-text-muted);">
+      Already have an account? <a href="/user/login" style="font-weight:700; color:var(--sp-red);" id="link-goto-login">Sign in here (ចូលប្រើ)</a>
     </div>
   </div>
 </div>

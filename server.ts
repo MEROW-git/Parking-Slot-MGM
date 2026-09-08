@@ -23,14 +23,15 @@ app.use(express.json());
 app.use(cookieParser() as any);
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'parking-secret-key-avalon-2026',
+    secret: process.env.SESSION_SECRET || 'parking-secret-key-sompark-2026',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 24 * 60 * 60 * 1000 },
   }) as any
 );
 
-// Static assets (serve from public)
+// Static assets: serve /static from ./static AND ./public
+app.use('/static', express.static(path.join(process.cwd(), 'static')));
 app.use(express.static(path.join(process.cwd(), 'public')));
 app.use('/static/source', express.static(path.join(process.cwd(), 'public')));
 
@@ -50,6 +51,14 @@ app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
   res.locals.messages = req.session.messages || [];
   req.session.messages = [];
+
+  // Provide active reservation to all views if user is logged in
+  if (req.session.user) {
+    res.locals.active_reservation = dbStore.getActiveReservation(req.session.user.username) || null;
+  } else {
+    res.locals.active_reservation = null;
+  }
+
   next();
 });
 
@@ -62,7 +71,7 @@ function flash(req: express.Request, type: string, text: string) {
 
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!req.session || !req.session.user) {
-    flash(req, 'warning', 'Please login to access this page');
+    flash(req, 'warning', 'Please sign in to access your reservations');
     return res.redirect('/user/login');
   }
   next();
@@ -70,15 +79,25 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', service: 'SomPark Phnom Penh' });
 });
 
-// Home page
+// Home page with search, district filtering, and stats
 app.get('/', (req, res) => {
-  const all_parking_zones = dbStore.getAllParkingZones();
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const district = typeof req.query.district === 'string' ? req.query.district.trim() : '';
+
+  const all_parking_zones = dbStore.getFilteredParkingZones(q, district);
+  const aggregates = dbStore.getAggregates();
+  const districts = dbStore.getDistricts();
+
   res.render('index', {
     all_parking_zones,
-    title: 'Home',
+    aggregates,
+    districts,
+    search_query: q,
+    selected_district: district,
+    title: 'SomPark - Phnom Penh Smart Parking',
   });
 });
 
@@ -87,11 +106,11 @@ app.get('/zone/:slug/', (req, res) => {
   const parking_zone = dbStore.getParkingZoneBySlug(req.params.slug);
   if (!parking_zone) {
     flash(req, 'warning', 'Parking Zone not found');
-    return res.redirect('/');
+    return res.redirect('/#parking-zones');
   }
   res.render('status', {
     parking_zone,
-    title: `${parking_zone.name} Details`,
+    title: `${parking_zone.name} Details | SomPark`,
   });
 });
 
@@ -100,7 +119,7 @@ app.get('/user/signup/', (req, res) => {
   if (req.session.user) {
     return res.redirect('/');
   }
-  res.render('signup', { title: 'Create Account' });
+  res.render('signup', { title: 'Create Account | SomPark' });
 });
 
 app.post('/user/signup/', (req, res) => {
@@ -108,21 +127,26 @@ app.post('/user/signup/', (req, res) => {
 
   if (!username || !password) {
     flash(req, 'warning', 'Please fill in all required fields');
-    return res.render('signup', { title: 'Create Account', error: 'Please fill in all fields' });
+    return res.render('signup', { title: 'Create Account | SomPark', error: 'Please fill in all fields' });
+  }
+
+  if (password.length < 6) {
+    flash(req, 'warning', 'Password must be at least 6 characters long');
+    return res.render('signup', { title: 'Create Account | SomPark', error: 'Password must be at least 6 characters' });
   }
 
   if (password !== password_confirm) {
     flash(req, 'warning', 'Passwords do not match');
-    return res.render('signup', { title: 'Create Account', error: 'Passwords do not match' });
+    return res.render('signup', { title: 'Create Account | SomPark', error: 'Passwords do not match' });
   }
 
   if (dbStore.getUserByUsername(username)) {
     flash(req, 'warning', 'Username already taken');
-    return res.render('signup', { title: 'Create Account', error: 'Username already taken' });
+    return res.render('signup', { title: 'Create Account | SomPark', error: 'Username already taken' });
   }
 
   dbStore.createUser(username.trim(), password);
-  flash(req, 'success', `Succesfully Created user ${username}. You can now login`);
+  flash(req, 'success', `Successfully created user ${username}. You can now sign in.`);
   res.redirect('/user/login');
 });
 
@@ -131,7 +155,7 @@ app.get('/user/login', (req, res) => {
   if (req.session.user) {
     return res.redirect('/');
   }
-  res.render('login', { title: 'Login' });
+  res.render('login', { title: 'Sign In | SomPark' });
 });
 
 app.post('/user/login', (req, res) => {
@@ -139,8 +163,8 @@ app.post('/user/login', (req, res) => {
   const user = dbStore.getUserByUsername(username || '');
 
   if (!user || !bcrypt.compareSync(password || '', user.passwordHash)) {
-    flash(req, 'warning', 'invalid Credentials');
-    return res.render('login', { title: 'Login', error: 'Invalid credentials' });
+    flash(req, 'warning', 'Invalid username or password');
+    return res.render('login', { title: 'Sign In | SomPark', error: 'Invalid credentials. Try demo / password123' });
   }
 
   req.session.user = {
@@ -148,13 +172,13 @@ app.post('/user/login', (req, res) => {
     username: user.username,
   };
 
-  flash(req, 'success', `User ${user.username} Successfully Logged in`);
+  flash(req, 'success', `Welcome back, ${user.username}!`);
   res.redirect('/');
 });
 
 // User logout
 app.get('/user/logout/', (req, res) => {
-  req.session.destroy((err) => {
+  req.session.destroy(() => {
     res.redirect('/user/login');
   });
 });
@@ -164,18 +188,16 @@ app.get('/book/', requireAuth, (req, res) => {
   const username = req.session.user!.username;
   const activeReservation = dbStore.getActiveReservation(username);
 
-  if (activeReservation) {
-    flash(req, 'warning', 'Please Check Out Your Previous Reservation');
-    return res.redirect('/');
-  }
-
   const today = new Date().toISOString().split('T')[0];
   const parking_zones = dbStore.getAllParkingZones();
+  const selected_zone = typeof req.query.zone === 'string' ? req.query.zone : '';
 
   res.render('booking', {
     parking_zones,
+    selected_zone,
+    active_reservation: activeReservation,
     minDate: today,
-    title: 'Book Parking Spot',
+    title: 'Reserve Parking Spot | SomPark',
   });
 });
 
@@ -184,8 +206,8 @@ app.post('/book/', requireAuth, (req, res) => {
   const activeReservation = dbStore.getActiveReservation(username);
 
   if (activeReservation) {
-    flash(req, 'warning', 'Please Check Out Your Previous Reservation');
-    return res.redirect('/');
+    flash(req, 'warning', `You already have an active spot at ${activeReservation.parking_zone}. Please check out first.`);
+    return res.redirect(`/ticket/${activeReservation.ticket_code}`);
   }
 
   const { start_date, finish_date, parking_zone, plate_number, phone_number } = req.body;
@@ -197,12 +219,12 @@ app.post('/book/', requireAuth, (req, res) => {
   }
 
   if (start_date > finish_date) {
-    flash(req, 'warning', 'Wrong start and finish dates.');
+    flash(req, 'warning', 'Finish date cannot be before start date.');
     return res.redirect('/book/');
   }
 
   if (start_date < today) {
-    flash(req, 'warning', 'Start date in the past.');
+    flash(req, 'warning', 'Start date cannot be in the past.');
     return res.redirect('/book/');
   }
 
@@ -215,26 +237,38 @@ app.post('/book/', requireAuth, (req, res) => {
     phone_number
   );
 
-  if (!result.success) {
+  if (!result.success || !result.reservation) {
     flash(req, 'warning', result.message);
-    return res.redirect('/');
+    return res.redirect('/book/');
   }
 
-  flash(req, 'info', 'Successfully Booked');
-  res.redirect('/ticket/');
+  flash(req, 'success', `Parking spot booked successfully! Reference code: ${result.reservation.ticket_code}`);
+  res.redirect(`/ticket/${result.reservation.ticket_code}`);
 });
 
-// Ticket View
+// Ticket View by code or latest
 app.get('/ticket/', requireAuth, (req, res) => {
   const username = req.session.user!.username;
   const reservations = dbStore.getUserReservations(username);
 
   if (!reservations || reservations.length === 0) {
-    flash(req, 'warning', `No Parking reservation exists for ${username}`);
-    return res.redirect('/');
+    flash(req, 'warning', `No parking reservations found for ${username}`);
+    return res.redirect('/#parking-zones');
   }
 
-  const latestReservation = reservations[0];
+  res.redirect(`/ticket/${reservations[0].ticket_code}`);
+});
+
+app.get('/ticket/:code', requireAuth, (req, res) => {
+  const username = req.session.user!.username;
+  const ticketCode = req.params.code;
+  const reservation = dbStore.getReservationByTicketCode(ticketCode);
+
+  if (!reservation || reservation.customer.toLowerCase() !== username.toLowerCase()) {
+    flash(req, 'warning', 'Ticket not found or unauthorized');
+    return res.redirect('/all_tickets/');
+  }
+
   const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
     month: '2-digit',
@@ -242,21 +276,16 @@ app.get('/ticket/', requireAuth, (req, res) => {
   });
 
   res.render('ticket', {
-    reservation: latestReservation,
+    reservation,
     today,
-    title: 'Ticket Details',
+    title: `Ticket #${reservation.ticket_code} | SomPark`,
   });
 });
 
-// All Tickets
+// All Tickets History
 app.get('/all_tickets/', requireAuth, (req, res) => {
   const username = req.session.user!.username;
   const reservations = dbStore.getUserReservations(username);
-
-  if (!reservations || reservations.length === 0) {
-    flash(req, 'warning', `No Parking reservation exists for ${username}`);
-    return res.redirect('/');
-  }
 
   const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -267,23 +296,28 @@ app.get('/all_tickets/', requireAuth, (req, res) => {
   res.render('all_tickets', {
     reservations,
     today,
-    title: 'All Tickets',
+    title: 'All Tickets | SomPark',
   });
 });
 
-// Checkout
-app.get('/checkout/', requireAuth, (req, res) => {
+// Checkout (support both GET and POST)
+const handleCheckout = (req: express.Request, res: express.Response) => {
   const username = req.session.user!.username;
-  const result = dbStore.checkOutReservation(username);
+  const ticketCode = (req.body?.ticket_code || req.query?.ticket_code || '') as string;
+
+  const result = dbStore.checkOutReservation(username, ticketCode || undefined);
 
   if (result.success) {
-    flash(req, 'info', result.message);
+    flash(req, 'success', result.message);
   } else {
     flash(req, 'warning', result.message);
   }
 
-  res.redirect('/');
-});
+  res.redirect('/all_tickets/');
+};
+
+app.post('/checkout/', requireAuth, handleCheckout);
+app.get('/checkout/', requireAuth, handleCheckout);
 
 // Fallback route
 app.use((req, res) => {
@@ -292,5 +326,5 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
+  console.log(`SomPark server running on http://${HOST}:${PORT}`);
 });

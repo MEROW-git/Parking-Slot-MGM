@@ -1,65 +1,94 @@
-<%- include('partials/header') %>
+<%- include('partials/header', { current_page: 'book', title: 'Reserve Parking Spot | SomPark Phnom Penh' }) %>
 
-<div class="container py-4">
-    <div class="row">
-      <div class="col-sm-10 col-md-8 col-lg-6 mx-auto">
-        <div class="card card-signin my-4 shadow">
-          <div class="card-header bg-primary text-white text-center py-3">
-             <h5 class="card-title mb-0 text-white"><i class="fa fa-car mr-2"></i>Book Parking Spot</h5>
-          </div>
-          <div class="card-body p-4">
-            <% if (typeof error !== 'undefined' && error) { %>
-               <div class="alert alert-danger" role="alert">
-                  <%= error %>
-               </div>
-            <% } %>
+<header class="sp-page-header" id="page-header">
+  <div class="sp-page-khmer">
+    កក់កន្លែងចំណតទុកជាមុន
+  </div>
+  <h1>Reserve a Parking Slot</h1>
+  <p>Lock in your guaranteed parking space in central Phnom Penh</p>
+</header>
 
-            <form class="form-signin" method="POST" action="/book/">
-              <div class="form-group mb-3">
-                <label for="id_parking_zone" class="font-weight-bold">Select Parking Zone</label>
-                <select name="parking_zone" id="id_parking_zone" class="form-control" required>
-                  <option value="" disabled selected>-- Choose a Parking Zone --</option>
-                  <% parking_zones.forEach(function(zone) { %>
-                    <option value="<%= zone.name %>" <%= (zone.vacant_slots <= 0) ? 'disabled' : '' %>>
-                      <%= zone.name %> (<%= zone.vacant_slots %> available) - $<%= zone.price %>/day
-                    </option>
-                  <% }); %>
-                </select>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group col-md-6 mb-3">
-                  <label for="id_start_date" class="font-weight-bold">Start Date</label>
-                  <input type="date" name="start_date" id="id_start_date" class="form-control" required min="<%= minDate %>" />
-                </div>
-                <div class="form-group col-md-6 mb-3">
-                  <label for="id_finish_date" class="font-weight-bold">Finish Date</label>
-                  <input type="date" name="finish_date" id="id_finish_date" class="form-control" required min="<%= minDate %>" />
-                </div>
-              </div>
-
-              <div class="form-group mb-3">
-                <label for="id_plate_number" class="font-weight-bold">Vehicle Plate Number</label>
-                <input type="text" name="plate_number" id="id_plate_number" class="form-control" placeholder="e.g. KAA123B" required title="Enter vehicle plate number" />
-              </div>
-
-              <div class="form-group mb-4">
-                <label for="id_phone_number" class="font-weight-bold">Contact Phone Number</label>
-                <input type="tel" name="phone_number" id="id_phone_number" class="form-control" placeholder="e.g. 0712345678" pattern="[0-9+ -]+" required title="Enter digits only" />
-              </div>
-
-              <button class="btn btn-lg btn-primary btn-block text-uppercase font-weight-bold" type="submit">
-                 <i class="fa fa-check-circle mr-1"></i> Confirm Booking
-              </button>
-            </form>
-
-            <div class="text-center mt-3">
-               <a href="/" class="text-muted"><i class="fa fa-arrow-left"></i> Cancel & Return to Dashboard</a>
-            </div>
-          </div>
-        </div>
+<div style="max-width:760px; margin:0 auto;" id="booking-container">
+  <% if (typeof active_reservation !== 'undefined' && active_reservation) { %>
+    <div class="sp-alert sp-alert-warning" style="margin-bottom:1.5rem;">
+      <div>
+        <strong>Active Reservation Detected:</strong> You currently have an active parking spot at <strong><%= active_reservation.parking_zone %></strong> (Ticket #<%= active_reservation.ticket_code %>). Please check out before booking a new slot.
       </div>
     </div>
+    <div style="display:flex; gap:1rem;">
+      <a href="/ticket/<%= active_reservation.ticket_code %>" class="sp-btn sp-btn-secondary" id="btn-booking-view-ticket">
+        View Current Ticket
+      </a>
+      <form action="/checkout/" method="post" style="display:inline;">
+        <input type="hidden" name="ticket_code" value="<%= active_reservation.ticket_code %>">
+        <button type="submit" class="sp-btn sp-btn-primary" id="btn-booking-checkout">
+          Check Out Now (ចេញពីចំណត)
+        </button>
+      </form>
+    </div>
+  <% } else { %>
+    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2.5rem; box-shadow:var(--sp-shadow-hard-lg);">
+      <form action="/book/" method="post" id="reservation-form">
+        <div class="sp-form-group" id="group_parking_zone">
+          <label for="parking_zone" class="sp-label">
+            Parking Zone (ទីតាំងចំណត) <span class="sp-required" aria-hidden="true">*</span>
+          </label>
+          <select name="parking_zone" id="parking_zone" class="sp-input" required>
+            <option value="">-- Choose Parking Location --</option>
+            <% parking_zones.forEach(function(zone) { %>
+              <option value="<%= zone.slug %>" <%= (typeof selected_zone !== 'undefined' && selected_zone === zone.slug) ? 'selected' : '' %> <%= zone.is_full ? 'disabled' : '' %>>
+                <%= zone.name %> (<%= zone.district %>) — <%= zone.price_khr_formatted %>/day <%= zone.is_full ? '[FULL (ពេញ)]' : `[${zone.vacant_slots} spots left]` %>
+              </option>
+            <% }); %>
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-top:1.25rem;">
+          <div class="sp-form-group" id="group_start_date">
+            <label for="start_date" class="sp-label">
+              Start Date (ថ្ងៃចូលចត) <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <input type="date" name="start_date" id="start_date" class="sp-input" value="<%= minDate %>" min="<%= minDate %>" required>
+          </div>
+          <div class="sp-form-group" id="group_finish_date">
+            <label for="finish_date" class="sp-label">
+              Finish Date (ថ្ងៃចេញ) <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <input type="date" name="finish_date" id="finish_date" class="sp-input" value="<%= minDate %>" min="<%= minDate %>" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-top:1.25rem;">
+          <div class="sp-form-group" id="group_plate_number">
+            <label for="plate_number" class="sp-label">
+              License Plate (ស្លាកលេខរថយន្ត) <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <input type="text" name="plate_number" id="plate_number" class="sp-input" placeholder="e.g. 2BT-8899" style="text-transform:uppercase;" required>
+          </div>
+          <div class="sp-form-group" id="group_phone_number">
+            <label for="phone_number" class="sp-label">
+              Phone Number (លេខទូរស័ព្ទ) <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <input type="tel" name="phone_number" id="phone_number" class="sp-input" placeholder="e.g. 012 345 678" required>
+          </div>
+        </div>
+
+        <!-- Local Guidance Note -->
+        <div style="background:var(--sp-bg-alt); border-left:3px solid var(--sp-red); padding:1rem 1.25rem; margin:1.75rem 0; font-size:0.9rem; color:var(--sp-text);">
+          <strong>ចំណាំ (Note):</strong> Parking fees are paid in Cambodian Riel (KHR / ៛) upon entry or digital validation. Please present your digital or printed ticket code to the facility attendant upon arrival.
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-top:2rem;">
+          <a href="/#parking-zones" class="sp-btn sp-btn-secondary" id="btn-cancel-booking">
+            ← Cancel & Return
+          </a>
+          <button type="submit" class="sp-btn sp-btn-primary" id="btn-submit-booking" style="font-size:1.05rem; padding:0.75rem 1.75rem;">
+            Confirm Reservation (កក់កន្លែង) →
+          </button>
+        </div>
+      </form>
+    </div>
+  <% } %>
 </div>
 
 <%- include('partials/footer') %>

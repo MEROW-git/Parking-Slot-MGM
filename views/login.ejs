@@ -1,41 +1,49 @@
-<%- include('partials/header') %>
+<%- include('partials/header', { current_page: 'login', title: 'Sign In | SomPark Phnom Penh' }) %>
 
-<div class="container py-5">
-    <div class="row">
-      <div class="col-sm-9 col-md-7 col-lg-5 mx-auto">
-        <div class="card card-signin my-4 shadow">
-          <div class="card-body p-4">
-            <h5 class="card-title text-center font-weight-bold mb-4">Account Login</h5>
-            
-            <% if (typeof error !== 'undefined' && error) { %>
-               <div class="alert alert-danger" role="alert">
-                  <%= error %>
-               </div>
-            <% } %>
-
-            <form class="form-signin" method="POST" action="/user/login">
-              <div class="form-group mb-3">
-                <label for="id_username" class="font-weight-bold">Username</label>
-                <input type="text" name="username" id="id_username" class="form-control" placeholder="Enter your username" required autofocus />
-              </div>
-
-              <div class="form-group mb-4">
-                <label for="id_password" class="font-weight-bold">Password</label>
-                <input type="password" name="password" id="id_password" class="form-control" placeholder="Enter your password" required />
-              </div>
-
-              <hr class="my-3">
-              <button class="btn btn-lg btn-primary btn-block text-uppercase font-weight-bold" type="submit">Log in</button>
-              <hr class="my-3">
-            </form>
-
-            <div class="border-top pt-3 text-center">
-              <small class="text-muted">Need an account? <a href="/user/signup/" class="font-weight-bold text-primary">Register here</a></small>
-            </div>
-          </div>
-        </div>
+<div style="max-width:480px; margin:2rem auto;" id="login-container">
+  <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2.5rem; box-shadow:var(--sp-shadow-hard-lg);">
+    <div style="text-align:center; margin-bottom:2rem;">
+      <div class="sp-brand" style="justify-content:center; margin-bottom:0.5rem;">
+        <span class="sp-brand-mark">P</span>
+        <span style="font-weight:800; font-size:1.4rem;">SomPark</span>
       </div>
+      <h2 style="font-size:1.75rem; margin-bottom:0.25rem;">Sign In (ចូលប្រើ)</h2>
+      <p style="color:var(--sp-text-muted); font-size:0.95rem; margin-bottom:0;">
+        Access your reservations and digital parking tickets
+      </p>
     </div>
+
+    <!-- Demo Credentials Notice -->
+    <div style="background:var(--sp-bg-alt); border-left:3px solid var(--sp-green); padding:0.75rem 1rem; margin-bottom:1.5rem; font-size:0.85rem; color:var(--sp-text);">
+      <strong>Demo Account:</strong> Username: <code style="font-weight:700;">demo</code> • Password: <code style="font-weight:700;">password123</code>
+    </div>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="sp-alert sp-alert-error" role="alert" style="margin-bottom:1.25rem;">
+        <div><%= error %></div>
+      </div>
+    <% } %>
+
+    <form action="/user/login" method="post" id="login-form">
+      <div class="sp-form-group" id="group_username" style="margin-bottom:1.25rem;">
+        <label for="username" class="sp-label">Username (ឈ្មោះគណនី) <span class="sp-required">*</span></label>
+        <input type="text" name="username" id="username" class="sp-input" placeholder="e.g. demo" required autocomplete="username">
+      </div>
+
+      <div class="sp-form-group" id="group_password" style="margin-bottom:1.25rem;">
+        <label for="password" class="sp-label">Password (ពាក្យសម្ងាត់) <span class="sp-required">*</span></label>
+        <input type="password" name="password" id="password" class="sp-input" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+
+      <button type="submit" class="sp-btn sp-btn-primary" style="width:100%; margin-top:1.5rem; font-size:1.05rem;" id="btn-submit-login">
+        Sign In to SomPark →
+      </button>
+    </form>
+
+    <div style="border-top:1px solid var(--sp-border); margin-top:2rem; padding-top:1.25rem; text-align:center; font-size:0.9rem; color:var(--sp-text-muted);">
+      Don't have an account? <a href="/user/signup/" style="font-weight:700; color:var(--sp-red);" id="link-goto-signup">Register here (ចុះឈ្មោះ)</a>
+    </div>
+  </div>
 </div>
 
 <%- include('partials/footer') %>

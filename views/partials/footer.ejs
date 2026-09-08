@@ -1,92 +1,36 @@
-            </div>
-         </div>
-      </section>
-      <!-- end section -->
+    </div>
+  </main>
 
-      <!-- footer -->
-      <footer>
-         <div class="container">
-         </div>
-      </footer>
-      <!-- end footer -->
-
-      <!-- copyright -->
-      <div class="cpy_right">
-          <div class="container">
-              <div class="row">
-                  <div class="col-md-12">
-                     <div class="full">
-                        <p>© <%= new Date().getFullYear() %> All Rights Reserved. Design by <a href="#">Jeremiah George</a></p>
-                     </div>
-                  </div>
-              </div>
-          </div>
+  <footer class="sp-footer" role="contentinfo">
+    <div class="sp-container">
+      <p class="sp-footer-statement">Park first.<br>Enjoy the city.</p>
+      <div class="sp-footer-meta">
+        <a href="/" class="sp-footer-wordmark">SomPark</a>
+        <div class="sp-footer-links" aria-label="Footer navigation">
+          <a href="/#parking-zones">Availability</a>
+          <a href="/book/">Reserve</a>
+          <a href="/all_tickets/">Tickets</a>
+        </div>
+        <p>© <%= new Date().getFullYear() %> · Phnom Penh · Rates in KHR / ៛</p>
       </div>
-      <!-- right copyright -->
+    </div>
+  </footer>
 
-   </div>
-</div>
-
-   <div class="overlay"></div>
-      
-   <!-- Javascript files-->
-   <script src="/static/source/js/jquery.min.js"></script>
-   <script src="/static/source/js/popper.min.js"></script>
-   <script src="/static/source/js/bootstrap.bundle.min.js"></script>
-   <!-- Scrollbar Js Files -->
-   <script src="/static/source/js/jquery.mCustomScrollbar.concat.min.js"></script>
-   <script type="text/javascript">
-     // Safe fallbacks for optional jQuery plugins to guarantee zero console errors
-     if (window.jQuery) {
-       ['niceScroll', 'meanmenu', 'sticky', 'niceSelect', 'owlCarousel', 'countdown', 'slick', 'fancybox', 'tooltip', 'carousel'].forEach(function (fn) {
-         if (!jQuery.fn[fn]) {
-           jQuery.fn[fn] = function () { return this; };
-         }
-       });
-     }
-     if (typeof window.Swiper === 'undefined') {
-       window.Swiper = function () { return { on: function () {}, destroy: function () {} }; };
-     }
-   </script>
-   <script src="/static/source/js/custom.js"></script>
-   <script type="text/javascript">
-     $(document).ready(function () {
-         try {
-            $("#sidebar").mCustomScrollbar({
-                theme: "minimal"
-            });
-         } catch(e) {}
-
-         $('#dismiss, .overlay').on('click', function () {
-             $('#sidebar').removeClass('active');
-             $('.overlay').removeClass('active');
-         });
-
-         $('#sidebarCollapse').on('click', function () {
-             $('#sidebar').addClass('active');
-             $('.overlay').addClass('active');
-             $('.collapse.in').toggleClass('in');
-             $('a[aria-expanded=true]').attr('aria-expanded', 'false');
-         });
-     });
-   </script>
- 
-   <script>
-   function initMap() {
-     var mapEl = document.getElementById('map');
-     if (!mapEl || typeof google === 'undefined' || !google.maps) return;
-     var map = new google.maps.Map(mapEl, {
-       zoom: 11,
-       center: {lat: 40.645037, lng: -73.880224},
-     });
-
-     var image = '/static/source/images/location_point.png';
-     new google.maps.Marker({
-        position: {lat: 40.645037, lng: -73.880224},
-        map: map,
-        icon: image
-     });
-   }
-   </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const toggle = document.getElementById('btn-mobile-toggle');
+      const menu = document.getElementById('main-nav-menu');
+      if (toggle && menu) {
+        toggle.style.display = window.innerWidth <= 960 ? 'inline-flex' : 'none';
+        window.addEventListener('resize', () => {
+          toggle.style.display = window.innerWidth <= 960 ? 'inline-flex' : 'none';
+        });
+        toggle.addEventListener('click', () => {
+          menu.classList.toggle('mobile-active');
+          toggle.setAttribute('aria-expanded', menu.classList.contains('mobile-active') ? 'true' : 'false');
+        });
+      }
+    });
+  </script>
 </body>
 </html>

@@ -9,12 +9,24 @@ export interface User {
 export interface ParkingZone {
   id: string;
   name: string;
+  khmer_name: string;
   slug: string;
   num_of_slots: number;
   occupied_slots: number;
   vacant_slots: number;
   address: string;
+  district: string;
   price: number;
+  operating_hours: string;
+  description: string;
+}
+
+export interface ParkingZoneView extends ParkingZone {
+  price_khr_formatted: string;
+  is_full: boolean;
+  is_nearly_full: boolean;
+  availability_status: 'full' | 'limited' | 'available';
+  occupancy_percentage: number;
 }
 
 export interface Reservation {
@@ -24,6 +36,7 @@ export interface Reservation {
   start_date: string;
   finish_date: string;
   parking_zone: string; // zone name
+  parking_zone_slug?: string;
   plate_number: string;
   phone_number: string;
   checked_out: boolean;
@@ -31,12 +44,35 @@ export interface Reservation {
 }
 
 export function generateTicketCode(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < 7; i++) {
+    suffix += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return result;
+  return `SPK-${suffix}`;
+}
+
+export function toZoneView(zone: ParkingZone): ParkingZoneView {
+  const is_full = zone.vacant_slots <= 0;
+  const is_nearly_full =
+    !is_full && zone.vacant_slots <= Math.max(3, Math.floor(zone.num_of_slots * 0.15));
+  const availability_status: 'full' | 'limited' | 'available' = is_full
+    ? 'full'
+    : is_nearly_full
+    ? 'limited'
+    : 'available';
+  const occupancy_percentage = zone.num_of_slots
+    ? Math.round((zone.occupied_slots / zone.num_of_slots) * 100)
+    : 0;
+
+  return {
+    ...zone,
+    price_khr_formatted: `${zone.price.toLocaleString()} ៛`,
+    is_full,
+    is_nearly_full,
+    availability_status,
+    occupancy_percentage,
+  };
 }
 
 // In-Memory Database Store
@@ -58,47 +94,97 @@ class DatabaseStore {
       passwordHash: demoPasswordHash,
     });
 
-    // Seed Parking Zones
+    // Seed Phnom Penh Parking Zones matching SomPark database
     const initialZones: ParkingZone[] = [
       {
         id: '1',
-        name: 'Downtown Plaza Parking',
-        slug: 'downtown-plaza',
-        num_of_slots: 40,
-        occupied_slots: 12,
-        vacant_slots: 28,
-        address: '100 Main Street, Downtown',
-        price: 15,
+        name: 'BKK1 Commercial Plaza',
+        khmer_name: 'ចំណតពាណិជ្ជកម្ម បឹងកេងកង១',
+        slug: 'bkk1-commercial-plaza',
+        num_of_slots: 50,
+        occupied_slots: 38,
+        vacant_slots: 12,
+        address: 'Street 282 (Corner St 51), Sangkat BKK1, Khan Boeung Keng Kang',
+        district: 'BKK1',
+        price: 4000,
+        operating_hours: '24/7 Covered Access',
+        description:
+          'Central multi-level covered parking in the vibrant BKK1 business, cafe, and dining district.',
       },
       {
         id: '2',
-        name: 'Central Station Garage',
-        slug: 'central-station',
-        num_of_slots: 60,
-        occupied_slots: 45,
-        vacant_slots: 15,
-        address: '450 5th Avenue, Midtown',
-        price: 20,
+        name: 'City Center Vattanac & Canadia',
+        khmer_name: 'ចំណតមជ្ឈមណ្ឌល វឌ្ឍនៈ-កាណាឌីយ៉ា',
+        slug: 'city-center-vattanac',
+        num_of_slots: 70,
+        occupied_slots: 52,
+        vacant_slots: 18,
+        address: 'Preah Monivong Blvd, Sangkat Srah Chak, Khan Daun Penh',
+        district: 'Phnom Penh City Center',
+        price: 5000,
+        operating_hours: '24/7 Security Patrol',
+        description:
+          'Premium financial district parking featuring automated boom gates and 24-hour security.',
       },
       {
         id: '3',
-        name: 'Harbor View Parking',
-        slug: 'harbor-view',
-        num_of_slots: 25,
-        occupied_slots: 5,
-        vacant_slots: 20,
-        address: '88 Bay Street, Waterfront',
-        price: 10,
+        name: 'Olympic Stadium Complex',
+        khmer_name: 'ចំណតពហុកីឡដ្ឋានជាតិអូឡាំពិក',
+        slug: 'olympic-stadium-complex',
+        num_of_slots: 80,
+        occupied_slots: 72,
+        vacant_slots: 8,
+        address: 'Preah Sihanouk Blvd, Sangkat Olympic, Khan Boeng Keng Kang',
+        district: 'Olympic',
+        price: 2000,
+        operating_hours: '05:30 - 22:00',
+        description:
+          'Convenient parking for sports events, fitness activities, and nearby Olympic Market shoppers.',
       },
       {
         id: '4',
-        name: 'Airport Express Lot',
-        slug: 'airport-express',
-        num_of_slots: 100,
-        occupied_slots: 82,
-        vacant_slots: 18,
-        address: 'Terminal 2 Blvd, Airport',
-        price: 25,
+        name: 'Riverside Promenade Parking',
+        khmer_name: 'ចំណតមាត់ទន្លេ ស៊ីសុវត្ថិ',
+        slug: 'riverside-promenade',
+        num_of_slots: 45,
+        occupied_slots: 14,
+        vacant_slots: 31,
+        address: 'Preah Sisowath Quay, Sangkat Chey Chumneah, Khan Daun Penh',
+        district: 'Riverside',
+        price: 3000,
+        operating_hours: '06:00 - 23:30',
+        description:
+          'Scenic parking along Phnom Penh riverside, convenient for restaurants, river cruises, and Royal Palace visitors.',
+      },
+      {
+        id: '5',
+        name: 'Toul Kork Plaza Hub',
+        khmer_name: 'ចំណតផ្សារទួលគោក ផ្លូវ៣១៥',
+        slug: 'toul-kork-plaza',
+        num_of_slots: 60,
+        occupied_slots: 22,
+        vacant_slots: 38,
+        address: 'Street 315, Sangkat Boeung Kak 1, Khan Toul Kork',
+        district: 'Toul Kork',
+        price: 2500,
+        operating_hours: '06:00 - 22:00',
+        description:
+          'Spacious parking lot with direct access to TK Avenue and commercial shopping in Toul Kork.',
+      },
+      {
+        id: '6',
+        name: 'Sen Sok Central Lot',
+        khmer_name: 'ចំណតសែនសុខ កណ្តាលក្រុង',
+        slug: 'sen-sok-central',
+        num_of_slots: 90,
+        occupied_slots: 40,
+        vacant_slots: 50,
+        address: 'Street 1003, Sangkat Phnom Penh Thmey, Khan Sen Sok',
+        district: 'Sen Sok',
+        price: 3000,
+        operating_hours: '08:00 - 22:30',
+        description:
+          'High-capacity parking facility serving the growing Sen Sok retail and entertainment area.',
       },
     ];
 
@@ -124,12 +210,57 @@ class DatabaseStore {
   }
 
   // Parking Zones
-  getAllParkingZones(): ParkingZone[] {
-    return Array.from(this.parkingZones.values());
+  getAllParkingZones(): ParkingZoneView[] {
+    return Array.from(this.parkingZones.values()).map(toZoneView);
   }
 
-  getParkingZoneBySlug(slug: string): ParkingZone | undefined {
-    return this.parkingZones.get(slug);
+  getFilteredParkingZones(query?: string, district?: string): ParkingZoneView[] {
+    let zones = Array.from(this.parkingZones.values());
+
+    if (district && district.trim()) {
+      const d = district.trim().toLowerCase();
+      zones = zones.filter((z) => z.district.toLowerCase() === d);
+    }
+
+    if (query && query.trim()) {
+      const q = query.trim().toLowerCase();
+      zones = zones.filter(
+        (z) =>
+          z.name.toLowerCase().includes(q) ||
+          z.khmer_name.toLowerCase().includes(q) ||
+          z.address.toLowerCase().includes(q) ||
+          z.district.toLowerCase().includes(q)
+      );
+    }
+
+    return zones.map(toZoneView);
+  }
+
+  getDistricts(): string[] {
+    const set = new Set<string>();
+    for (const zone of this.parkingZones.values()) {
+      set.add(zone.district);
+    }
+    return Array.from(set);
+  }
+
+  getAggregates() {
+    let total_slots = 0;
+    let total_occupied = 0;
+    let total_vacant = 0;
+
+    for (const zone of this.parkingZones.values()) {
+      total_slots += zone.num_of_slots;
+      total_occupied += zone.occupied_slots;
+      total_vacant += zone.vacant_slots;
+    }
+
+    return { total_slots, total_occupied, total_vacant };
+  }
+
+  getParkingZoneBySlug(slug: string): ParkingZoneView | undefined {
+    const zone = this.parkingZones.get(slug);
+    return zone ? toZoneView(zone) : undefined;
   }
 
   getParkingZoneByName(name: string): ParkingZone | undefined {
@@ -154,28 +285,38 @@ class DatabaseStore {
     );
   }
 
+  getReservationByTicketCode(ticketCode: string): Reservation | undefined {
+    return this.reservations.find(
+      (r) => r.ticket_code.toUpperCase() === ticketCode.toUpperCase()
+    );
+  }
+
   createReservation(
     username: string,
-    zoneName: string,
+    zoneIdentifier: string, // name or slug
     startDate: string,
     finishDate: string,
     plateNumber: string,
     phoneNumber: string
   ): { success: boolean; message: string; reservation?: Reservation } {
-    const zone = this.getParkingZoneByName(zoneName);
+    let zone = this.parkingZones.get(zoneIdentifier);
+    if (!zone) {
+      zone = this.getParkingZoneByName(zoneIdentifier);
+    }
+
     if (!zone) {
       return { success: false, message: 'Parking Zone not found!' };
     }
 
     if (zone.vacant_slots <= 0) {
-      return { success: false, message: 'Parking Zone Full!' };
+      return { success: false, message: 'Sorry, this parking zone is full (ពេញ)!' };
     }
 
     const existing = this.getActiveReservation(username);
     if (existing) {
       return {
         success: false,
-        message: 'Please Check Out Your Previous Reservation',
+        message: `You already have an active reservation at ${existing.parking_zone} (Ticket: ${existing.ticket_code}). Please check out first.`,
       };
     }
 
@@ -186,6 +327,7 @@ class DatabaseStore {
       start_date: startDate,
       finish_date: finishDate,
       parking_zone: zone.name,
+      parking_zone_slug: zone.slug,
       plate_number: plateNumber.toUpperCase(),
       phone_number: phoneNumber,
       checked_out: false,
@@ -199,18 +341,35 @@ class DatabaseStore {
     this.reservations.unshift(reservation);
 
     // Update parking zone counts
-    zone.occupied_slots += 1;
+    zone.occupied_slots = Math.min(zone.num_of_slots, zone.occupied_slots + 1);
     zone.vacant_slots = Math.max(0, zone.num_of_slots - zone.occupied_slots);
 
     return { success: true, message: 'Successfully Booked', reservation };
   }
 
-  checkOutReservation(username: string): { success: boolean; message: string } {
-    const reservation = this.getActiveReservation(username);
+  checkOutReservation(username: string, ticketCode?: string): { success: boolean; message: string } {
+    let reservation: Reservation | undefined;
+
+    if (ticketCode) {
+      reservation = this.getReservationByTicketCode(ticketCode);
+      if (reservation && reservation.customer.toLowerCase() !== username.toLowerCase()) {
+        return { success: false, message: 'Unauthorized ticket access' };
+      }
+    } else {
+      reservation = this.getActiveReservation(username);
+    }
+
     if (!reservation) {
       return {
         success: false,
-        message: `No Parking reservation exists for ${username}`,
+        message: `No active parking reservation exists`,
+      };
+    }
+
+    if (reservation.checked_out) {
+      return {
+        success: false,
+        message: `Ticket ${reservation.ticket_code} has already been checked out.`,
       };
     }
 
@@ -219,11 +378,12 @@ class DatabaseStore {
     const zone = this.getParkingZoneByName(reservation.parking_zone);
     if (zone) {
       zone.occupied_slots = Math.max(0, zone.occupied_slots - 1);
-      zone.vacant_slots = Math.min(zone.num_of_slots, zone.vacant_slots + 1);
+      zone.vacant_slots = Math.min(zone.num_of_slots, zone.num_of_slots - zone.occupied_slots);
     }
 
-    return { success: true, message: 'Successfully Checked Out' };
+    return { success: true, message: `Successfully checked out of ${reservation.parking_zone}` };
   }
 }
 
 export const dbStore = new DatabaseStore();
+
