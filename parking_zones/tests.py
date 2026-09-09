@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from parking_zones.models import ParkingZone, Reservation
-from parking_zones.forms import ReservationForm
+from parking_zones.forms import ReservationForm, CAMBODIA_PROVINCES
 
 
 class ParkingZoneModelTests(TestCase):
@@ -313,5 +313,284 @@ class TicketViewBrandingTests(TestCase):
 
         # Confirm checkout button does not trigger browser confirm popup
         self.assertNotContains(response, 'confirm(')
+
+
+class VehiclePlateAndBookingFormTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='customer1', password='pass1234')
+        self.staff_user = User.objects.create_user(username='staff1', password='pass1234', is_staff=True)
+        self.zone = ParkingZone.objects.create(
+            name='Wat Botum Park Spot',
+            khmer_name='ចំណតវត្តបទុម',
+            slug='wat-botum-park-spot',
+            num_of_slots=5,
+            occupied_slots=0,
+            vacant_slots=5,
+            address='Oknha Suor Srun St 7, Phnom Penh',
+            district='Daun Penh',
+            price=2000,
+        )
+        self.today = datetime.date.today()
+        self.tomorrow = self.today + datetime.timedelta(days=1)
+
+    def test_cambodia_provinces_constant(self):
+        # 1 capital + 24 provinces = 25 total
+        self.assertEqual(len(CAMBODIA_PROVINCES), 25)
+        self.assertEqual(CAMBODIA_PROVINCES[0][0], 'Phnom Penh')
+
+    def test_booking_page_renders_province_and_code_fields(self):
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('book'))
+        self.assertEqual(response.status_code, 200)
+
+        # Date input elements present
+        self.assertContains(response, 'id="id_start_date"')
+        self.assertContains(response, 'id="id_finish_date"')
+
+        # Form group and legend
+        self.assertContains(response, 'Vehicle Plate Number (ស្លាកលេខយានយន្ត)')
+        self.assertContains(response, 'City / Province (រាជធានី / ខេត្ត)')
+        self.assertContains(response, 'Plate Number (លេខផ្លាក)')
+
+        # Province selector and code input
+        self.assertContains(response, 'name="plate_province"')
+        self.assertContains(response, 'id="id_plate_province"')
+        self.assertContains(response, 'name="plate_code"')
+        self.assertContains(response, 'id="id_plate_code"')
+
+        # Phnom Penh option present
+        self.assertContains(response, 'Phnom Penh / ភ្នំពេញ')
+        self.assertContains(response, 'Siem Reap / សៀមរាប')
+
+        # Live preview element
+        self.assertContains(response, 'id="plate-preview-box"')
+        self.assertContains(response, 'Saved as (រក្សាទុកជា):')
+        self.assertContains(response, 'id="plate-preview-text"')
+
+        # Accessibility attributes
+        self.assertContains(response, 'autocapitalize="characters"')
+        self.assertContains(response, 'spellcheck="false"')
+        self.assertContains(response, 'autocomplete="off"')
+
+    def test_unbound_form_defaults_to_phnom_penh(self):
+        form = ReservationForm()
+        self.assertEqual(form.fields['plate_province'].initial, 'Phnom Penh')
+
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('book'))
+        self.assertContains(response, '<option value="Phnom Penh" selected>Phnom Penh / ភ្នំពេញ</option>')
+
+    def test_valid_split_input_saves_combined_plate(self):
+        self.client.login(username='customer1', password='pass1234')
+        post_data = {
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2AZ-1234',
+            'phone_number': '012345678',
+        }
+        response = self.client.post(reverse('book'), post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        reservation = Reservation.objects.filter(customer=self.user).first()
+        self.assertIsNotNone(reservation)
+        self.assertEqual(reservation.plate_number, 'Phnom Penh 2AZ-1234')
+
+    def test_province_and_code_remain_bound_when_another_field_fails(self):
+        self.client.login(username='customer1', password='pass1234')
+        # Submitting with an invalid phone number to force form failure
+        post_data = {
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Siem Reap',
+            'plate_code': '2az-1234',
+            'phone_number': 'invalid-phone',
+        }
+        response = self.client.post(reverse('book'), post_data)
+        self.assertEqual(response.status_code, 200)
+
+        form = response.context['form']
+        self.assertEqual(form['plate_province'].value(), 'Siem Reap')
+        self.assertEqual(form['plate_code'].value(), '2az-1234')
+        self.assertContains(response, 'value="2az-1234"')
+
+    def test_missing_province_is_rejected(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': '',
+            'plate_code': '2AZ-1234',
+            'phone_number': '012345678',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('plate_province', form.errors)
+
+    def test_missing_plate_code_is_rejected(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '',
+            'phone_number': '012345678',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('plate_code', form.errors)
+
+    def test_lowercase_plate_letters_normalized_to_uppercase(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Battambang',
+            'plate_code': '2az-9999',
+            'phone_number': '012345678',
+        })
+        self.assertTrue(form.is_valid(), f"Errors: {form.errors}")
+        self.assertEqual(form.cleaned_data['plate_number'], 'Battambang 2AZ-9999')
+
+    def test_extra_spaces_are_normalized(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Kandal',
+            'plate_code': '   2AZ    1234   ',
+            'phone_number': '012345678',
+        })
+        self.assertTrue(form.is_valid(), f"Errors: {form.errors}")
+        self.assertEqual(form.cleaned_data['plate_number'], 'Kandal 2AZ 1234')
+
+    def test_invalid_characters_are_rejected(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2AZ@1234#',
+            'phone_number': '012345678',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('plate_code', form.errors)
+
+    def test_code_without_digit_is_rejected(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Phnom Penh',
+            'plate_code': 'ABC-XYZ',
+            'phone_number': '012345678',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('plate_code', form.errors)
+
+    def test_existing_legacy_plate_values_and_reservations_continue_to_work(self):
+        # Direct submission using legacy plate_number
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_number': '2AZ-5555',
+            'phone_number': '012345678',
+        })
+        self.assertTrue(form.is_valid(), f"Errors: {form.errors}")
+        self.assertEqual(form.cleaned_data['plate_number'], '2AZ-5555')
+
+        # Existing reservation created directly with legacy plate
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='LEGACY-1234',
+            phone_number='012345678',
+            start_date=self.today,
+            finish_date=self.tomorrow,
+            ticket_code='SPK-LEGACY1',
+            checked_out=False
+        )
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('ticket_code', args=[res.ticket_code]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'LEGACY-1234')
+
+    def test_booking_decrements_available_parking_capacity_correctly(self):
+        self.assertEqual(self.zone.vacant_slots, 5)
+        self.assertEqual(self.zone.occupied_slots, 0)
+
+        self.client.login(username='customer1', password='pass1234')
+        post_data = {
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Kampot',
+            'plate_code': '3A-5678',
+            'phone_number': '012345678',
+        }
+        response = self.client.post(reverse('book'), post_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.vacant_slots, 4)
+        self.assertEqual(self.zone.occupied_slots, 1)
+
+    def test_existing_date_validation_still_passes(self):
+        # Past start date rejected
+        past_date = self.today - datetime.timedelta(days=2)
+        form_past = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': past_date,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2AZ-1234',
+            'phone_number': '012345678',
+        })
+        self.assertFalse(form_past.is_valid())
+        self.assertIn('start_date', form_past.errors)
+
+        # Finish date before start date rejected
+        form_reversed = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.tomorrow,
+            'finish_date': self.today,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2AZ-1234',
+            'phone_number': '012345678',
+        })
+        self.assertFalse(form_reversed.is_valid())
+        self.assertIn('finish_date', form_reversed.errors)
+
+    def test_ticket_dashboard_and_admin_pages_display_combined_plate(self):
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Siem Reap 2AZ-7777',
+            phone_number='012345678',
+            start_date=self.today,
+            finish_date=self.tomorrow,
+            ticket_code='SPK-SR7777',
+            checked_out=False
+        )
+
+        # 1. Customer Ticket page
+        self.client.login(username='customer1', password='pass1234')
+        ticket_res = self.client.get(reverse('ticket_code', args=[res.ticket_code]))
+        self.assertEqual(ticket_res.status_code, 200)
+        self.assertContains(ticket_res, 'Siem Reap 2AZ-7777')
+
+        # 2. Customer Dashboard page
+        dash_res = self.client.get(reverse('dashboard'))
+        self.assertEqual(dash_res.status_code, 200)
+        self.assertContains(dash_res, 'Siem Reap 2AZ-7777')
+
+        # 3. Staff Admin Operations Dashboard page
+        self.client.login(username='staff1', password='pass1234')
+        admin_res = self.client.get(reverse('admin_dashboard'))
+        self.assertEqual(admin_res.status_code, 200)
+        self.assertContains(admin_res, 'Siem Reap 2AZ-7777')
+
 
 

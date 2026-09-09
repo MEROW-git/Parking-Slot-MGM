@@ -2721,9 +2721,9 @@ code {
   }
 }
 
-.sp-ticket-rate-panel {
-  background: var(--color-paper-3);
-  border: var(--rule-hair) solid var(--color-rule-2);
+.sp-ticket-sheet .sp-ticket-rate-panel {
+  background: #f3f4f6;
+  border: var(--rule-hair) solid var(--color-print-rule);
   border-radius: var(--radius-card);
   padding: var(--space-sm) var(--space-md);
   margin-block-end: var(--space-lg);
@@ -2733,6 +2733,12 @@ code {
   flex-wrap: wrap;
   gap: var(--space-sm);
   min-width: 0;
+  color: var(--color-print-ink);
+}
+
+.sp-ticket-sheet .sp-ticket-rate-panel strong,
+.sp-ticket-sheet .sp-ticket-rate-panel > div {
+  color: var(--color-print-ink);
 }
 
 .sp-ticket-barcode {
