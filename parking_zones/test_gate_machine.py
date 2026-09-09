@@ -80,22 +80,28 @@ class VirtualGateTests(TestCase):
         self.assertIsNone(self.reservation.checked_in_at)
 
     def test_expired_permit_rejected_on_server(self):
-        # Create permit with past timestamp (> 120 seconds)
-        expired_permit = signing.dumps(
-            [self.staff.pk, self.reservation.pk, self.zone.pk, 'entry'],
-            salt='virtual-gate'
-        )
-        # Verify that signing loads with max_age=0 fails as expired
-        time.sleep(1)
-        response = self.client.post(
+        # Generate genuine cryptographically signed permit with timestamp 200s in the past
+        from django.core.signing import TimestampSigner, b62_encode, b64_encode, JSONSerializer
+        val = [self.staff.pk, self.reservation.pk, self.zone.pk, 'entry']
+        signer = TimestampSigner(salt='virtual-gate')
+        base_data = b64_encode(JSONSerializer().dumps(val)).decode()
+        old_ts = b62_encode(int(time.time()) - 200)
+        value_with_ts = f'{base_data}:{old_ts}'
+        expired_token = f'{value_with_ts}:{signer.signature(value_with_ts)}'
+
+        resp = self.client.post(
             self.url,
-            {**self.data, 'action': 'pass', 'permit': expired_permit}
+            {**self.data, 'action': 'pass', 'permit': expired_token}
         )
-        # With normal token, test an invalid/expired token explicitly
-        tampered_permit = expired_permit + "tampered"
+        self.assertContains(resp, 'Gate authorization expired or invalid')
+        self.reservation.refresh_from_db()
+        self.assertIsNone(self.reservation.checked_in_at)
+        self.assertEqual(self.zone.occupied_slots, 0)
+
+        # Test tampered/corrupted signature
         resp_tampered = self.client.post(
             self.url,
-            {**self.data, 'action': 'pass', 'permit': tampered_permit}
+            {**self.data, 'action': 'pass', 'permit': 'tampered-signature-data'}
         )
         self.assertContains(resp_tampered, 'Gate authorization expired or invalid')
         self.reservation.refresh_from_db()
