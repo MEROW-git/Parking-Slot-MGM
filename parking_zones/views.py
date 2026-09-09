@@ -64,7 +64,7 @@ def booking(request):
     if active_reservation:
         messages.warning(
             request,
-            f'You already have an active parking session at {active_reservation.parking_zone.name} '
+            f'You already have an active reservation at {active_reservation.parking_zone.name} '
             f'(Ticket: {active_reservation.ticket_code}). Please check out before booking another space.'
         )
         return redirect('ticket_code', ticket_code=active_reservation.ticket_code)
@@ -426,19 +426,31 @@ def checkout(request):
     Routes to gate preparation/bill view instead of arbitrary unverified release.
     """
     ticket_code = request.POST.get('ticket_code', '').strip()
-    reservation = get_object_or_404(Reservation, ticket_code=ticket_code, customer=request.user)
+    if ticket_code and Reservation.objects.filter(ticket_code=ticket_code).exclude(customer=request.user).exists() and not request.user.is_staff:
+        raise PermissionDenied('You do not have permission to check out another user’s ticket.')
 
-    if reservation.status == 'CHECKED_OUT':
+    reservation = get_object_or_404(Reservation, ticket_code=ticket_code)
+    if reservation.customer != request.user and not request.user.is_staff:
+        raise PermissionDenied('You do not have permission to check out another user’s ticket.')
+
+    if reservation.checked_out or reservation.status == 'CHECKED_OUT':
         messages.info(request, 'This parking ticket is already checked out.')
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
-    if reservation.status == 'CHECKED_IN':
-        # Show ticket detail with exit bill breakdown and QR to scan at the gate
-        messages.info(request, 'Please present this digital pass or QR at the gate barrier to settle balance and exit.')
-        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+    with transaction.atomic():
+        zone = ParkingZone.objects.select_for_update().get(id=reservation.parking_zone_id)
+        reservation.status = 'CHECKED_OUT'
+        reservation.checked_out = True
+        reservation.checked_out_at = timezone.now()
+        reservation.save(update_fields=['status', 'checked_out', 'checked_out_at'])
+        if zone.occupied_slots > 0:
+            zone.increment_slot()
 
-    # If never checked in (unpaid hold or deposit hold), allow cancellation
-    return cancel_booking(request, ticket_code=reservation.ticket_code)
+    messages.success(
+        request,
+        f'ចេញពីចំណតដោយជោគជ័យ! Checked out from {reservation.parking_zone.name}. Ticket #{reservation.ticket_code} completed.'
+    )
+    return redirect('dashboard')
 
 
 @staff_required

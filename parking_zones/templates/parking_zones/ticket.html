@@ -15,16 +15,15 @@
       Print ticket (បោះពុម្ព)
     </button>
     {% if not reservation.checked_out %}
-      {% if reservation.status == 'CHECKED_IN' %}
-        <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-ticket-checkout">
-          {% csrf_token %}
-          <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
-          <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket">
-            Proceed to Gate Exit (ចេញពីចំណត)
-          </button>
-        </form>
-      {% else %}
-        <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" style="display:inline;" id="form-ticket-cancel" onsubmit="return confirm('Cancel this parking reservation?');">
+      <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-ticket-checkout">
+        {% csrf_token %}
+        <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
+        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket">
+          Check Out (ចេញពីចំណត)
+        </button>
+      </form>
+      {% if reservation.status != 'CHECKED_IN' %}
+        <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" style="display:inline;" id="form-ticket-cancel">
           {% csrf_token %}
           <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#ef4444;" id="btn-cancel-ticket">
             Cancel Hold (បោះបង់)

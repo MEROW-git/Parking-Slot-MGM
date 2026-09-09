@@ -178,8 +178,9 @@ class BookingAndCheckoutWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.zone.refresh_from_db()
-        self.assertEqual(self.zone.occupied_slots, 2)
-        self.assertEqual(self.zone.vacant_slots, 3)
+        # Creating a reservation holds capacity for arrival, but does not mark physically occupied until gate entry
+        self.assertEqual(self.zone.occupied_slots, 1)
+        self.assertEqual(self.zone.available_capacity_now, 3)
 
         reservation = Reservation.objects.get(customer=self.user, checked_out=False)
         self.assertEqual(reservation.plate_number, '2AZ-9988')
@@ -539,8 +540,9 @@ class VehiclePlateAndBookingFormTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         self.zone.refresh_from_db()
-        self.assertEqual(self.zone.vacant_slots, 4)
-        self.assertEqual(self.zone.occupied_slots, 1)
+        # Reservation holds spot for arrival without incrementing physical occupancy before gate check-in
+        self.assertEqual(self.zone.occupied_slots, 0)
+        self.assertEqual(self.zone.available_capacity_now, 4)
 
     def test_existing_date_validation_still_passes(self):
         # Past start date rejected
