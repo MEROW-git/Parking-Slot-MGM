@@ -283,3 +283,48 @@ class VirtualGateTests(TestCase):
         self.assertEqual(payload['ticket_code'], self.reservation.ticket_code)
         self.assertEqual(payload['status'], 'CONFIRMED')
 
+    def test_missing_required_fields_in_passage_request_rejected(self):
+        """
+        Verify that if controls are disabled before FormData creation (causing zone,
+        code, or mode to be missing), the server rejects the request with a 400 error.
+        """
+        open_resp = self.client.post(self.url, self.data)
+        permit = open_resp.context['permit']
+
+        # Missing 'code'
+        bad_payload = {'zone': self.zone.pk, 'mode': 'entry', 'action': 'pass', 'permit': permit}
+        resp = self.client.post(self.url, bad_payload, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()['success'])
+
+        # Missing 'zone'
+        bad_payload2 = {'code': self.reservation.ticket_code, 'mode': 'entry', 'action': 'pass', 'permit': permit}
+        resp2 = self.client.post(self.url, bad_payload2, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp2.status_code, 400)
+        self.assertFalse(resp2.json()['success'])
+
+    def test_template_renders_car_track_and_asset_versioning(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertIn('virtual-gate.css?v=2.1.0', content)
+        self.assertIn('virtual-gate.js?v=2.1.0', content)
+        self.assertIn('vg-car-track', content)
+        self.assertIn('data-direction="entry"', content)
+        self.assertIn('data-just-passed="false"', content)
+
+    def test_html_fallback_sets_just_passed_and_renders_replay_button(self):
+        open_resp = self.client.post(self.url, self.data)
+        permit = open_resp.context['permit']
+
+        # Normal HTML POST passage
+        pass_data = {**self.data, 'action': 'pass', 'permit': permit}
+        resp = self.client.post(self.url, pass_data)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['passed'])
+        self.assertTrue(resp.context['just_passed'])
+        content = resp.content.decode()
+        self.assertIn('data-just-passed="true"', content)
+        self.assertIn('vg-replay-animation', content)
+
+

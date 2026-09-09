@@ -2,7 +2,8 @@
  * SomPark Virtual Parking Gate Terminal — Controller
  * Handles optical QR camera scanning, USB barcode scanner input,
  * absolute server-issued permit countdown with tab-resume synchronization,
- * authorization invalidation, and asynchronous passage animation choreography.
+ * authorization invalidation, asynchronous passage animation choreography,
+ * HTML fallback animation, and visual-only replay.
  */
 (() => {
   'use strict';
@@ -30,6 +31,7 @@
   let countdownInterval = null;
   let permitExpiresAt = null;
   let isCrossing = false;
+  let isPassageInFlight = false;
 
   // Stop camera tracks cleanly
   function stopCamera() {
@@ -265,6 +267,10 @@
       statusBanner.className = 'vg-status-indicator status-closed';
       statusText.textContent = reason || 'BARRIER CLOSED — TICKET RE-CHECK REQUIRED';
     }
+    const replayBox = document.getElementById('vg-replay-box');
+    if (replayBox) {
+      replayBox.hidden = true;
+    }
   }
 
   document.querySelectorAll('#id_zone, #id_code').forEach(input => {
@@ -306,13 +312,40 @@
   if (passBtn && form) {
     passBtn.addEventListener('click', async (e) => {
       e.preventDefault();
-      if (isCrossing) return;
+      // Immediate guard against re-entry while in-flight or animating
+      if (isCrossing || isPassageInFlight) return;
+      isPassageInFlight = true;
 
       const checkBtn = document.getElementById('btn-check-open');
       const zoneSelect = document.getElementById('id_zone');
       const modeRadios = document.querySelectorAll('input[name="mode"]');
 
-      // 1. Passage pending: disable conflicting controls and cancel idle timer
+      // 1. CRITICAL: Snapshot FormData BEFORE disabling any form controls!
+      // In HTML standard, disabled form elements are omitted from FormData.
+      const formData = new FormData(form);
+      formData.set('action', 'pass');
+
+      // Explicitly guarantee required fields are included in the payload
+      const permitInput = document.getElementById('vg-permit-input');
+      if (permitInput && !formData.get('permit')) {
+        formData.set('permit', permitInput.value);
+      }
+      const selectedMode = form.querySelector('input[name="mode"]:checked');
+      if (selectedMode && !formData.get('mode')) {
+        formData.set('mode', selectedMode.value);
+      }
+      if (zoneSelect && !formData.get('zone')) {
+        formData.set('zone', zoneSelect.value);
+      }
+      if (codeInput && !formData.get('code')) {
+        formData.set('code', codeInput.value.trim());
+      }
+      const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+      if (csrfInput && !formData.get('csrfmiddlewaretoken')) {
+        formData.set('csrfmiddlewaretoken', csrfInput.value);
+      }
+
+      // 2. NOW disable conflicting controls to prevent duplicate submissions
       passBtn.disabled = true;
       if (closeBtn) closeBtn.disabled = true;
       if (checkBtn) checkBtn.disabled = true;
@@ -324,12 +357,10 @@
 
       if (statusText) statusText.textContent = 'CONFIRMING PASSAGE WITH SERVER...';
 
-      const formData = new FormData(form);
-      formData.set('action', 'pass');
-
       let result = null;
       try {
-        const response = await fetch(form.action || window.location.href, {
+        const postUrl = form.getAttribute('action') || window.location.pathname || window.location.href;
+        const response = await fetch(postUrl, {
           method: 'POST',
           headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -340,12 +371,44 @@
 
         if (response.ok) {
           result = await response.json();
-        } else {
+        } else if (response.status >= 400 && response.status < 500) {
+          // Explicit client/validation rejection (e.g. 400 Bad Request, expired permit, capacity full)
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.notice || `Server error (${response.status})`);
+
+          // Remove open visual state: lower barrier immediately so an open gate doesn't sit next to closed text
+          if (sceneEl) sceneEl.classList.remove('is-open');
+          if (statusBanner && statusText) {
+            statusBanner.className = 'vg-status-indicator status-closed';
+            statusText.textContent = 'BARRIER CLOSED — PASSAGE REJECTED';
+          }
+
+          // Show rejection notice
+          let noticeBox = document.querySelector('.vg-notice');
+          if (!noticeBox && statusBanner && statusBanner.parentNode) {
+            noticeBox = document.createElement('div');
+            statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
+          }
+          if (noticeBox) {
+            noticeBox.className = 'vg-notice vg-alert-error';
+            noticeBox.textContent = errData.notice || 'Passage authorization rejected. Re-check ticket.';
+          }
+
+          // Restore controls
+          passBtn.disabled = false;
+          if (closeBtn) closeBtn.disabled = false;
+          if (checkBtn) checkBtn.disabled = false;
+          if (codeInput) codeInput.disabled = false;
+          if (zoneSelect) zoneSelect.disabled = false;
+          modeRadios.forEach(r => r.disabled = false);
+
+          isPassageInFlight = false;
+          return;
+        } else {
+          throw new Error(`Server returned error status ${response.status}`);
         }
       } catch (err) {
-        // Ambiguous network failure: query server state before retrying or giving up
+        // Genuine network drop or server connection lost
+        // Only reconcile if there is recent evidence within the last 20 seconds
         const zoneVal = document.getElementById('id_zone')?.value;
         const codeVal = codeInput?.value?.trim();
         const modeVal = document.querySelector('input[name="mode"]:checked')?.value || 'entry';
@@ -359,16 +422,19 @@
             });
             if (checkResp.ok) {
               const checkData = await checkResp.json();
-              if ((modeVal === 'entry' && checkData.status === 'CHECKED_IN') ||
-                  (modeVal === 'exit' && checkData.status === 'CHECKED_OUT')) {
-                result = {
-                  success: true,
-                  passed: true,
-                  notice: 'Vehicle passage reconciled with server status.',
-                  status: checkData.status,
-                  status_display: checkData.status_display
-                };
-                reconciled = true;
+              const ts = modeVal === 'entry' ? checkData.checked_in_at : checkData.checked_out_at;
+              if (ts) {
+                const ageSec = (Date.now() - new Date(ts).getTime()) / 1000;
+                if (ageSec >= 0 && ageSec <= 20) {
+                  result = {
+                    success: true,
+                    passed: true,
+                    notice: 'Vehicle passage reconciled via recent server timestamp.',
+                    status: checkData.status,
+                    status_display: checkData.status_display
+                  };
+                  reconciled = true;
+                }
               }
             }
           } catch (_) {}
@@ -376,6 +442,7 @@
 
         if (!reconciled) {
           // Rejection or failure: DO NOT animate passage
+          if (sceneEl) sceneEl.classList.remove('is-open');
           passBtn.disabled = false;
           if (closeBtn) closeBtn.disabled = false;
           if (checkBtn) checkBtn.disabled = false;
@@ -385,14 +452,15 @@
 
           if (statusBanner && statusText) {
             statusBanner.className = 'vg-status-indicator status-closed';
-            statusText.textContent = 'PASSAGE NOT RECORDED — RE-CHECK REQUIRED';
+            statusText.textContent = 'NETWORK UNCERTAINTY — PASSAGE NOT VERIFIED';
           }
-          alert(err.message || 'Passage confirmation failed.');
+          isPassageInFlight = false;
+          alert('Network connection error. Passage could not be verified. Please re-check ticket status.');
           return;
         }
       }
 
-      // 2. Server confirmed passage: execute visible crossing animation
+      // 3. Server confirmed passage: execute visible crossing animation
       isCrossing = true;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -409,7 +477,7 @@
         await new Promise(r => setTimeout(r, 20));
       }
 
-      // 3. Closing stage: car cleared barrier arm; now lower the arm
+      // 4. Closing stage: car cleared barrier arm; now lower the arm
       if (statusText) statusText.textContent = 'VEHICLE CLEARED — CLOSING BARRIER...';
       if (sceneEl) sceneEl.classList.remove('is-open');
 
@@ -419,7 +487,7 @@
         await new Promise(r => setTimeout(r, 20));
       }
 
-      // 4. Complete stage: mark passed and show final status
+      // 5. Complete stage: mark passed and show final status
       if (sceneEl) {
         sceneEl.classList.remove('is-moving');
         sceneEl.classList.add('is-passed');
@@ -433,6 +501,10 @@
       // Hide pass action controls
       const passBox = document.getElementById('vg-pass-actions-box');
       if (passBox) passBox.style.display = 'none';
+
+      // Show replay box
+      const replayBox = document.getElementById('vg-replay-box');
+      if (replayBox) replayBox.hidden = false;
 
       // Update or create notice banner
       let noticeBox = document.querySelector('.vg-notice');
@@ -462,6 +534,88 @@
       if (zoneSelect) zoneSelect.disabled = false;
       modeRadios.forEach(r => r.disabled = false);
 
+      isCrossing = false;
+      isPassageInFlight = false;
+    });
+  }
+
+  // =========================================================================
+  // Controlled Completion Animation for HTML Fallback Response
+  // =========================================================================
+  if (sceneEl && sceneEl.dataset.justPassed === 'true') {
+    const runFallbackAnimation = async () => {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const carTrack = document.getElementById('vg-car-track');
+      const armEl = document.getElementById('vg-barrier-arm');
+
+      // Ensure barrier starts visually raised
+      sceneEl.classList.add('is-open');
+      sceneEl.classList.remove('is-passed');
+
+      // Wait for paint
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      // Animate crossing
+      sceneEl.classList.add('is-moving');
+      if (!reducedMotion && carTrack) {
+        await waitForTransition(carTrack, 'transform', 1500);
+      }
+
+      // Lower arm
+      sceneEl.classList.remove('is-open');
+      if (!reducedMotion && armEl) {
+        await waitForTransition(armEl, 'transform', 900);
+      }
+
+      sceneEl.classList.remove('is-moving');
+      sceneEl.classList.add('is-passed');
+    };
+
+    runFallbackAnimation();
+  }
+
+  // =========================================================================
+  // Visual-only Replay Animation Handler (No database updates)
+  // =========================================================================
+  const replayBtn = document.getElementById('vg-replay-animation');
+  if (replayBtn) {
+    replayBtn.addEventListener('click', async () => {
+      if (isCrossing || isPassageInFlight) return;
+      isCrossing = true;
+
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const carTrack = document.getElementById('vg-car-track');
+      const armEl = document.getElementById('vg-barrier-arm');
+
+      replayBtn.disabled = true;
+
+      // 1. Reset to initial raised position
+      sceneEl.classList.remove('is-passed', 'is-moving');
+      sceneEl.classList.add('is-open');
+
+      await new Promise(r => setTimeout(r, 150));
+
+      // 2. Animate vehicle crossing
+      sceneEl.classList.add('is-moving');
+      if (!reducedMotion && carTrack) {
+        await waitForTransition(carTrack, 'transform', 1500);
+      } else {
+        await new Promise(r => setTimeout(r, 20));
+      }
+
+      // 3. Lower barrier arm
+      sceneEl.classList.remove('is-open');
+      if (!reducedMotion && armEl) {
+        await waitForTransition(armEl, 'transform', 900);
+      } else {
+        await new Promise(r => setTimeout(r, 20));
+      }
+
+      // 4. Return to completed state
+      sceneEl.classList.remove('is-moving');
+      sceneEl.classList.add('is-passed');
+
+      replayBtn.disabled = false;
       isCrossing = false;
     });
   }

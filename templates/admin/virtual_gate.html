@@ -5,7 +5,7 @@
 
 {% block extrastyle %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'css/virtual-gate.css' %}">
+<link rel="stylesheet" href="{% static 'css/virtual-gate.css' %}?v=2.1.0">
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -40,7 +40,7 @@
         Opening the barrier does not change capacity; only confirmed vehicle passage updates physical occupancy.
       </p>
 
-      <form method="post" id="gate-machine-form" novalidate>
+      <form method="post" id="gate-machine-form" action="{% url 'admin_virtual_gate' %}" novalidate>
         {% csrf_token %}
 
         {% if form.non_field_errors %}
@@ -160,7 +160,7 @@
       </div>
 
       <!-- Animated SVG / CSS Barrier Scene -->
-      <div class="vg-scene {% if gate_open %}is-open{% endif %} {% if passed %}is-passed{% endif %}" id="vg-scene-viewport" aria-label="Barrier simulation graphic" data-direction="{{ form.mode.value|default:'entry' }}" data-gate-open="{% if gate_open %}true{% else %}false{% endif %}" data-passed="{% if passed %}true{% else %}false{% endif %}">
+      <div class="vg-scene {% if gate_open %}is-open{% endif %} {% if passed and not just_passed %}is-passed{% elif just_passed %}is-open{% endif %}" id="vg-scene-viewport" aria-label="Barrier simulation graphic" data-direction="{{ form.mode.value|default:'entry' }}" data-gate-open="{% if gate_open %}true{% else %}false{% endif %}" data-passed="{% if passed %}true{% else %}false{% endif %}" data-just-passed="{% if just_passed %}true{% else %}false{% endif %}">
         <div class="vg-sky"></div>
         <div class="vg-road">
           <div class="vg-road-curb left"></div>
@@ -194,6 +194,12 @@
             BARRIER CLOSED
           {% endif %}
         </span>
+      </div>
+
+      <div class="vg-replay-box" id="vg-replay-box" {% if not passed %}hidden{% endif %} style="margin-bottom: 14px; text-align: center;">
+        <button type="button" class="vg-btn vg-btn-secondary" id="vg-replay-animation" style="width: 100%;">
+          &#x21bb; Replay Vehicle Crossing Animation (Visual only)
+        </button>
       </div>
 
       <!-- Operational Notice Message -->
@@ -331,5 +337,5 @@
   </div>
 </div>
 
-<script src="{% static 'js/virtual-gate.js' %}" defer></script>
+<script src="{% static 'js/virtual-gate.js' %}?v=2.1.0" defer></script>
 {% endblock %}

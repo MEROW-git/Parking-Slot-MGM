@@ -72,6 +72,7 @@ def virtual_gate(request):
         'now': timezone.now(),
         'gate_open': False,
         'passed': False,
+        'just_passed': False,
         'permit_expires_at': None,
     }
 
@@ -200,7 +201,7 @@ def virtual_gate(request):
                     if allowed:
                         operation = GateService.confirm_entry if mode == 'entry' else GateService.confirm_physical_exit
                         success, reservation, notice = operation(reservation.pk, staff_user=request.user)
-                        context.update(reservation=reservation, notice=notice, passed=success, gate_open=False)
+                        context.update(reservation=reservation, notice=notice, passed=success, gate_open=False, just_passed=success)
                         if success:
                             zone.refresh_from_db()
                             context['notice'] = 'Vehicle passage recorded. Barrier closed.'
