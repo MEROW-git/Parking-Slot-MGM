@@ -44,10 +44,62 @@
           {% include "components/form_field.html" with field=form.finish_date %}
         </div>
 
-        <div class="sp-form-row">
-          {% include "components/form_field.html" with field=form.plate_number %}
-          {% include "components/form_field.html" with field=form.phone_number %}
-        </div>
+        <!-- Vehicle Plate Number Grouped Field -->
+        <fieldset class="sp-form-group sp-plate-group" id="group_plate_number" aria-labelledby="legend_plate_number">
+          <legend class="sp-label" id="legend_plate_number">
+            Vehicle Plate Number (ស្លាកលេខយានយន្ត)
+            <span class="sp-required" aria-hidden="true">*</span>
+          </legend>
+
+          <div class="sp-plate-inputs">
+            <div class="sp-plate-subfield">
+              <label for="id_plate_province" class="sp-sublabel">
+                City / Province (រាជធានី / ខេត្ត)
+                <span class="sp-required" aria-hidden="true">*</span>
+              </label>
+              {{ form.plate_province }}
+              {% if form.plate_province.errors %}
+                <div class="sp-field-feedback" id="error_plate_province">
+                  {% for error in form.plate_province.errors %}
+                    <p class="sp-field-error" role="alert">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="sp-plate-subfield">
+              <label for="id_plate_code" class="sp-sublabel">
+                Plate Number (លេខផ្លាក)
+                <span class="sp-required" aria-hidden="true">*</span>
+              </label>
+              {{ form.plate_code }}
+              {% if form.plate_code.errors %}
+                <div class="sp-field-feedback" id="error_plate_code">
+                  {% for error in form.plate_code.errors %}
+                    <p class="sp-field-error" role="alert">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          {{ form.plate_number }}
+
+          {% if form.plate_number.errors %}
+            <div class="sp-field-feedback" id="error_plate_number">
+              {% for error in form.plate_number.errors %}
+                <p class="sp-field-error" role="alert">{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="sp-plate-preview" id="plate-preview-box" aria-live="polite">
+            <span class="sp-plate-preview-label">Saved as (រក្សាទុកជា):</span>
+            <span class="sp-plate-preview-val" id="plate-preview-text">{% if form.plate_code.value %}{{ form.plate_province.value|default:"Phnom Penh" }} {{ form.plate_code.value|upper }}{% else %}Phnom Penh 2AZ-1234{% endif %}</span>
+          </div>
+        </fieldset>
+
+        {% include "components/form_field.html" with field=form.phone_number %}
 
         <!-- Local Guidance Note -->
         <div class="sp-form-note">
@@ -66,4 +118,36 @@
     </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function() {
+    var provEl = document.getElementById('id_plate_province');
+    var codeEl = document.getElementById('id_plate_code');
+    var prevValEl = document.getElementById('plate-preview-text');
+
+    if (!provEl || !codeEl || !prevValEl) return;
+
+    function updatePreview() {
+      var prov = provEl.value || 'Phnom Penh';
+      var raw = codeEl.value ? codeEl.value.trim().replace(/\s+/g, ' ') : '';
+      var code = raw ? raw.toUpperCase() : '2AZ-1234';
+      prevValEl.textContent = prov + ' ' + code;
+    }
+
+    codeEl.addEventListener('input', function() {
+      updatePreview();
+    });
+
+    codeEl.addEventListener('blur', function() {
+      if (codeEl.value) {
+        codeEl.value = codeEl.value.trim().replace(/\s+/g, ' ').toUpperCase();
+        updatePreview();
+      }
+    });
+
+    provEl.addEventListener('change', updatePreview);
+  })();
+</script>
 {% endblock %}
