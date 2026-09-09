@@ -92,13 +92,13 @@
   </section>
 
   <!-- 2. Parking Zone Status Section -->
-  <section class="sp-workbench-section" id="admin-zone-status-section" aria-labelledby="heading-zone-status" style="margin-top:var(--space-2xl);">
+  <section class="sp-workbench-section" id="admin-zone-status-section" aria-labelledby="heading-zone-status">
     <div class="sp-section-bar">
       <div>
-        <h2 id="heading-zone-status" style="font-size:clamp(1.75rem, 3vw, 2.25rem); margin-bottom:0.25rem;">
+        <h2 id="heading-zone-status" class="sp-section-heading">
           Parking Zone Status (ស្ថានភាពចំណត)
         </h2>
-        <p style="color:var(--color-ink-2); font-size:var(--text-sm); margin:0;">
+        <p class="sp-section-desc">
           Live status ordered by highest occupancy first. Direct link to edit in Django Admin.
         </p>
       </div>
@@ -112,20 +112,20 @@
         <table class="sp-table" id="admin-zones-table">
           <thead>
             <tr>
-              <th scope="col">Zone & District (ទីតាំង)</th>
-              <th scope="col" style="text-align:center;">Capacity</th>
-              <th scope="col" style="text-align:center;">Occupied</th>
-              <th scope="col" style="text-align:center;">Vacant</th>
-              <th scope="col" style="min-width:180px;">Occupancy Rate</th>
-              <th scope="col">Daily Rate</th>
-              <th scope="col">Status</th>
-              <th scope="col" style="text-align:right;">Actions</th>
+              <th scope="col" class="col-zone">Zone & District (ទីតាំង)</th>
+              <th scope="col" class="col-capacity">Capacity</th>
+              <th scope="col" class="col-occupied">Occupied</th>
+              <th scope="col" class="col-vacant">Vacant</th>
+              <th scope="col" class="col-occupancy">Occupancy Rate</th>
+              <th scope="col" class="col-rate">Daily Rate</th>
+              <th scope="col" class="col-status">Status</th>
+              <th scope="col" class="col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for zone in zones %}
               <tr id="zone-row-{{ zone.id }}">
-                <td>
+                <td class="col-zone">
                   <div class="sp-cell-zone">
                     <strong class="sp-zone-name">{{ zone.name }}</strong>
                     {% if zone.khmer_name %}
@@ -134,16 +134,16 @@
                     <small class="sp-zone-district">{{ zone.district }} · {{ zone.address }}</small>
                   </div>
                 </td>
-                <td style="text-align:center; font-family:var(--font-outlier); font-weight:700;">
+                <td class="col-capacity" style="text-align:center; font-family:var(--font-outlier); font-weight:700;">
                   {{ zone.num_of_slots }}
                 </td>
-                <td style="text-align:center; font-family:var(--font-outlier); font-weight:700; color:var(--color-warning);">
+                <td class="col-occupied" style="text-align:center; font-family:var(--font-outlier); font-weight:700; color:var(--color-warning);">
                   {{ zone.occupied_slots }}
                 </td>
-                <td style="text-align:center; font-family:var(--font-outlier); font-weight:700; color:var(--color-success);">
+                <td class="col-vacant" style="text-align:center; font-family:var(--font-outlier); font-weight:700; color:var(--color-success);">
                   {{ zone.vacant_slots }}
                 </td>
-                <td>
+                <td class="col-occupancy">
                   <div class="sp-progress-container">
                     <div class="sp-progress-bar" role="progressbar" aria-valuenow="{{ zone.occupancy_percentage }}" aria-valuemin="0" aria-valuemax="100" title="{{ zone.occupancy_percentage }}% Occupied">
                       <div class="sp-progress-fill {% if zone.is_full %}full{% elif zone.is_nearly_full %}limited{% else %}available{% endif %}" style="width: {{ zone.occupancy_percentage }}%;"></div>
@@ -151,10 +151,10 @@
                     <span class="sp-progress-text">{{ zone.occupancy_percentage }}%</span>
                   </div>
                 </td>
-                <td style="font-family:var(--font-outlier); font-weight:700;">
+                <td class="col-rate" style="font-family:var(--font-outlier); font-weight:700;">
                   {{ zone.price_khr_formatted }}
                 </td>
-                <td>
+                <td class="col-status">
                   {% if zone.availability_status == 'available' %}
                     <span class="sp-avail-badge available">
                       <span class="sp-dot"></span> AVAILABLE
@@ -169,7 +169,7 @@
                     </span>
                   {% endif %}
                 </td>
-                <td style="text-align:right;">
+                <td class="col-actions" style="text-align:right;">
                   <a href="{% url 'admin:parking_zones_parkingzone_change' zone.id %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-edit-zone-{{ zone.id }}" title="Edit zone in Django Admin">
                     Edit in Admin ↗
                   </a>
@@ -188,13 +188,13 @@
   </section>
 
   <!-- 3. Recent Active Reservations Section -->
-  <section class="sp-workbench-section" id="admin-active-reservations-section" aria-labelledby="heading-active-res" style="margin-top:var(--space-2xl);">
+  <section class="sp-workbench-section" id="admin-active-reservations-section" aria-labelledby="heading-active-res">
     <div class="sp-section-bar">
       <div>
-        <h2 id="heading-active-res" style="font-size:clamp(1.75rem, 3vw, 2.25rem); margin-bottom:0.25rem;">
+        <h2 id="heading-active-res" class="sp-section-heading">
           Recent Active Reservations (ការកក់កំពុងដំណើរការ)
         </h2>
-        <p style="color:var(--color-ink-2); font-size:var(--text-sm); margin:0;">
+        <p class="sp-section-desc">
           Live active parking sessions. Click "Check Out" to release space and complete pass.
         </p>
       </div>
@@ -208,47 +208,47 @@
         <table class="sp-table" id="admin-active-reservations-table">
           <thead>
             <tr>
-              <th scope="col">Ticket Code</th>
-              <th scope="col">Customer</th>
-              <th scope="col">Parking Zone</th>
-              <th scope="col">Vehicle Plate</th>
-              <th scope="col">Phone</th>
-              <th scope="col">Valid Dates</th>
-              <th scope="col">Booked On</th>
-              <th scope="col" style="text-align:right;">Admin Actions</th>
+              <th scope="col" class="col-ticket">Ticket Code</th>
+              <th scope="col" class="col-customer">Customer</th>
+              <th scope="col" class="col-res-zone">Parking Zone</th>
+              <th scope="col" class="col-plate">Vehicle Plate</th>
+              <th scope="col" class="col-phone">Phone</th>
+              <th scope="col" class="col-dates">Valid Dates</th>
+              <th scope="col" class="col-created">Booked On</th>
+              <th scope="col" class="col-actions-active">Admin Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for res in active_reservations %}
               <tr id="row-active-res-{{ res.ticket_code }}">
-                <td>
+                <td class="col-ticket">
                   <a href="{% url 'ticket_code' res.ticket_code %}" class="sp-ticket-link" target="_blank" title="View Customer Pass">
                     #{{ res.ticket_code }}
                   </a>
                 </td>
-                <td>
+                <td class="col-customer">
                   <strong>{{ res.customer.username }}</strong>
                   {% if res.customer.email %}
                     <div style="font-size:var(--text-xs); color:var(--color-ink-2);">{{ res.customer.email }}</div>
                   {% endif %}
                 </td>
-                <td>
+                <td class="col-res-zone">
                   <strong>{{ res.parking_zone.name }}</strong>
                   <div style="font-size:var(--text-xs); color:var(--color-ink-2);">{{ res.parking_zone.district }}</div>
                 </td>
-                <td>
+                <td class="col-plate">
                   <span class="sp-plate-badge">{{ res.plate_number }}</span>
                 </td>
-                <td style="font-family:var(--font-outlier); font-size:var(--text-xs);">
+                <td class="col-phone" style="font-family:var(--font-outlier); font-size:var(--text-xs);">
                   {{ res.phone_number }}
                 </td>
-                <td style="font-size:var(--text-xs); color:var(--color-ink-2);">
+                <td class="col-dates" style="font-size:var(--text-xs); color:var(--color-ink-2);">
                   {{ res.start_date|date:"d M Y" }} → {{ res.finish_date|date:"d M Y" }}
                 </td>
-                <td style="font-size:var(--text-xs); color:var(--color-muted);">
+                <td class="col-created" style="font-size:var(--text-xs); color:var(--color-muted);">
                   {{ res.created_on|date:"d M Y, H:i" }}
                 </td>
-                <td style="text-align:right;">
+                <td class="col-actions-active" style="text-align:right;">
                   <div class="sp-action-btn-group">
                     <a href="{% url 'admin:parking_zones_reservation_change' res.id %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-admin-view-{{ res.ticket_code }}" title="View or edit in Django Admin">
                       Admin
@@ -300,13 +300,13 @@
   </section>
 
   <!-- 4. Recently Completed Reservations Section -->
-  <section class="sp-workbench-section" id="admin-completed-reservations-section" aria-labelledby="heading-completed-res" style="margin-top:var(--space-2xl);">
+  <section class="sp-workbench-section" id="admin-completed-reservations-section" aria-labelledby="heading-completed-res">
     <div class="sp-section-bar">
       <div>
-        <h2 id="heading-completed-res" style="font-size:clamp(1.75rem, 3vw, 2.25rem); margin-bottom:0.25rem;">
+        <h2 id="heading-completed-res" class="sp-section-heading">
           Recently Completed Reservations (បានចេញរួចរាល់)
         </h2>
-        <p style="color:var(--color-ink-2); font-size:var(--text-sm); margin:0;">
+        <p class="sp-section-desc">
           Historical log of finished parking sessions and released spaces.
         </p>
       </div>
@@ -320,46 +320,46 @@
         <table class="sp-table" id="admin-completed-reservations-table">
           <thead>
             <tr>
-              <th scope="col">Ticket Code</th>
-              <th scope="col">Customer</th>
-              <th scope="col">Parking Zone</th>
-              <th scope="col">Vehicle Plate</th>
-              <th scope="col">Phone</th>
-              <th scope="col">Session Period</th>
-              <th scope="col">Status</th>
-              <th scope="col" style="text-align:right;">Actions</th>
+              <th scope="col" class="col-ticket">Ticket Code</th>
+              <th scope="col" class="col-customer">Customer</th>
+              <th scope="col" class="col-res-zone">Parking Zone</th>
+              <th scope="col" class="col-plate">Vehicle Plate</th>
+              <th scope="col" class="col-phone">Phone</th>
+              <th scope="col" class="col-dates">Session Period</th>
+              <th scope="col" class="col-status">Status</th>
+              <th scope="col" class="col-actions-completed">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for res in completed_reservations %}
               <tr id="row-completed-res-{{ res.ticket_code }}">
-                <td>
+                <td class="col-ticket">
                   <a href="{% url 'ticket_code' res.ticket_code %}" class="sp-ticket-link" target="_blank" title="View Customer Receipt">
                     #{{ res.ticket_code }}
                   </a>
                 </td>
-                <td>
+                <td class="col-customer">
                   <strong>{{ res.customer.username }}</strong>
                 </td>
-                <td>
+                <td class="col-res-zone">
                   <strong>{{ res.parking_zone.name }}</strong>
                   <div style="font-size:var(--text-xs); color:var(--color-ink-2);">{{ res.parking_zone.district }}</div>
                 </td>
-                <td>
+                <td class="col-plate">
                   <span class="sp-plate-badge">{{ res.plate_number }}</span>
                 </td>
-                <td style="font-family:var(--font-outlier); font-size:var(--text-xs);">
+                <td class="col-phone" style="font-family:var(--font-outlier); font-size:var(--text-xs);">
                   {{ res.phone_number }}
                 </td>
-                <td style="font-size:var(--text-xs); color:var(--color-ink-2);">
+                <td class="col-dates" style="font-size:var(--text-xs); color:var(--color-ink-2);">
                   {{ res.start_date|date:"d M Y" }} → {{ res.finish_date|date:"d M Y" }}
                 </td>
-                <td>
+                <td class="col-status">
                   <span class="sp-avail-badge" style="background:var(--color-paper-3); color:var(--color-muted);">
                     COMPLETED
                   </span>
                 </td>
-                <td style="text-align:right;">
+                <td class="col-actions-completed" style="text-align:right;">
                   <a href="{% url 'admin:parking_zones_reservation_change' res.id %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-admin-completed-{{ res.ticket_code }}" title="View in Django Admin">
                     Admin View ↗
                   </a>
