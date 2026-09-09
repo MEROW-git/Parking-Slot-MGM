@@ -40,9 +40,13 @@ The project uses a named 4-point scale from `--space-3xs` through `--space-4xl`.
 ## Motion
 
 - Easings: `--ease-out`, `--ease-in`, and `--ease-in-out` from `tokens.css`.
-- Reveal pattern: none; operational information is immediately visible.
-- Hover motion: transform and opacity only.
-- Reduced motion: spatial motion is removed and remaining transitions are capped at 120ms.
+- Page entrance: subtle fade and short upward movement (12–20px).
+- Scroll reveal: once per element via IntersectionObserver; unobserved after revealing.
+- Card groups: restrained stagger (40–70ms, capped at 300ms maximum delay).
+- Hover interaction: transform and opacity only, applied exclusively on fine-pointer hover devices.
+- Dialogs, menus, and toasts: short functional transitions.
+- Reduced motion: content immediately visible with no spatial movement; transitions capped at 120ms.
+- Guardrails: no bouncing, spinning, rubber-band, flashing, or decorative looping.
 
 ## Microinteractions stance
 

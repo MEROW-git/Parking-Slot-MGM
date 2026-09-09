@@ -7,12 +7,12 @@
 
 <div class="sp-booking-container" id="booking-container">
   {% if active_reservation %}
-    <div class="sp-alert sp-alert-warning">
+    <div class="sp-alert sp-alert-warning" data-reveal="up">
       <div>
         <strong>Active Reservation Detected:</strong> You currently have an active parking spot at <strong>{{ active_reservation.parking_zone.name }}</strong> (Ticket #{{ active_reservation.ticket_code }}). Please check out before booking a new slot.
       </div>
     </div>
-    <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+    <div style="display:flex; gap:1rem; flex-wrap:wrap;" data-reveal="up" data-reveal-delay="60">
       <a href="{% url 'ticket_code' active_reservation.ticket_code %}" class="sp-btn sp-btn-secondary" id="btn-booking-view-ticket">
         View Current Ticket
       </a>
@@ -25,7 +25,7 @@
       </form>
     </div>
   {% else %}
-    <div class="sp-booking-card">
+    <div class="sp-booking-card" data-reveal="up" data-reveal-delay="50">
       <form action="{% url 'book' %}" method="post" id="reservation-form" novalidate>
         {% csrf_token %}
 

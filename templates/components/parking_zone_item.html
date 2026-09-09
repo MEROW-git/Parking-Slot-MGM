@@ -2,7 +2,7 @@
 Usage:
 {% include "components/parking_zone_item.html" with zone=zone %}
 {% endcomment %}
-<article class="sp-zone-card {% if zone.is_full %}full-zone{% endif %}" id="zone-card-{{ zone.slug }}">
+<article class="sp-zone-card {% if zone.is_full %}full-zone{% endif %}" id="zone-card-{{ zone.slug }}" data-reveal="up" data-reveal-delay="{% cycle '40' '80' '120' '160' '200' '240' %}">
   <div class="sp-zone-index" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</div>
   <div>
     <div class="sp-zone-header">

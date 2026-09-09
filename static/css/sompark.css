@@ -1590,6 +1590,7 @@ code {
     -webkit-overflow-scrolling: touch;
     box-shadow: var(--shadow-lift);
     z-index: 99;
+    animation: sp-menu-enter var(--dur-short) var(--ease-out);
   }
 
   .sp-nav-link {
@@ -1744,10 +1745,13 @@ code {
   .sp-hero-location,
   .sp-hero h1,
   .sp-hero h1 span::after,
-  .sp-hero-scroll {
+  .sp-hero-scroll,
+  .sp-nav-links.mobile-active,
+  :root.js-motion [data-reveal] {
     animation: none !important;
-    opacity: 1;
+    opacity: 1 !important;
     transform: none !important;
+    transition: none !important;
   }
 }
 
@@ -2660,6 +2664,98 @@ code {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ==================================================
+   SomPark Native Motion System · Accessible & Restrained
+   ================================================== */
+
+@keyframes sp-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Microinteractions: Buttons and Fine-Pointer Cards */
+@media (hover: hover) and (pointer: fine) {
+  .sp-btn:hover {
+    transform: translateY(-1px);
+  }
+  .sp-btn:active,
+  .sp-btn.is-active {
+    transform: translateY(0);
+  }
+  .sp-zone-card:hover,
+  .sp-action-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-rule-2);
+    box-shadow: var(--shadow-lift);
+  }
+  .sp-btn svg,
+  .sp-nav-link svg,
+  .sp-arrow-link .sp-arrow {
+    transition: transform var(--dur-short) var(--ease-out);
+  }
+  .sp-btn:hover svg,
+  .sp-nav-link:hover svg,
+  .sp-arrow-link:hover .sp-arrow {
+    transform: translateX(2px);
+  }
+}
+
+.sp-btn:focus-visible {
+  transform: none !important;
+}
+
+/* Progressive Scroll & Entrance Reveals */
+:root.js-motion [data-reveal] {
+  opacity: 0;
+  transition: opacity var(--dur-long) var(--ease-out), transform var(--dur-long) var(--ease-out);
+  will-change: opacity, transform;
+}
+
+:root.js-motion [data-reveal="up"],
+:root.js-motion [data-reveal=""] {
+  transform: translateY(16px);
+}
+
+:root.js-motion [data-reveal="left"] {
+  transform: translateX(-16px);
+}
+
+:root.js-motion [data-reveal="right"] {
+  transform: translateX(16px);
+}
+
+:root.js-motion [data-reveal="scale"] {
+  transform: scale(0.98) translateY(12px);
+}
+
+:root.js-motion [data-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* Restrained Stagger Delays (capped at 300ms) */
+:root.js-motion [data-reveal-delay="40"] { transition-delay: 40ms; }
+:root.js-motion [data-reveal-delay="50"] { transition-delay: 50ms; }
+:root.js-motion [data-reveal-delay="60"] { transition-delay: 60ms; }
+:root.js-motion [data-reveal-delay="80"] { transition-delay: 80ms; }
+:root.js-motion [data-reveal-delay="100"] { transition-delay: 100ms; }
+:root.js-motion [data-reveal-delay="120"] { transition-delay: 120ms; }
+:root.js-motion [data-reveal-delay="140"] { transition-delay: 140ms; }
+:root.js-motion [data-reveal-delay="150"] { transition-delay: 150ms; }
+:root.js-motion [data-reveal-delay="160"] { transition-delay: 160ms; }
+:root.js-motion [data-reveal-delay="180"] { transition-delay: 180ms; }
+:root.js-motion [data-reveal-delay="200"] { transition-delay: 200ms; }
+:root.js-motion [data-reveal-delay="240"] { transition-delay: 240ms; }
+:root.js-motion [data-reveal-delay="250"] { transition-delay: 250ms; }
+:root.js-motion [data-reveal-delay="300"] { transition-delay: 300ms; }
+
 @media print {
   body {
     background: var(--color-print-paper) !important;
@@ -2699,5 +2795,11 @@ code {
   .sp-ticket-sheet .sp-ticket-brand .sp-brand-copy small,
   .sp-ticket-sheet .sp-ticket-khmer-tagline {
     color: #000000 !important;
+  }
+
+  :root.js-motion [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
 }

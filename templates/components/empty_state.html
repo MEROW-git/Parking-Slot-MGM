@@ -2,7 +2,7 @@
 Usage:
 {% include "components/empty_state.html" with title="No Parking Zones" message="No zones found." action_url="/book/" action_text="Refresh" %}
 {% endcomment %}
-<div class="sp-empty-state" id="empty-state-box">
+<div class="sp-empty-state" id="empty-state-box" data-reveal="up">
   <span class="sp-empty-mark" aria-hidden="true">P</span>
   <h3>{{ title|default:'No Records Found' }}</h3>
   <p>{{ message }}</p>

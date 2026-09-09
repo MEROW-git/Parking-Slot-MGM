@@ -5,7 +5,7 @@
 {% block content %}
 <div class="sp-dashboard sp-admin-workbench" id="admin-dashboard-container">
   <!-- Workbench Header -->
-  <header class="sp-dashboard-greeting sp-admin-header" id="admin-dashboard-header">
+  <header class="sp-dashboard-greeting sp-admin-header" id="admin-dashboard-header" data-reveal="up">
     <div>
       <div class="sp-dashboard-welcome-badge sp-admin-badge">
         <span>រដ្ឋបាល SOMPARK</span> · <span>Central Operations Workbench</span>
@@ -32,56 +32,56 @@
     <h2 id="section-stats-heading" class="sr-only">Live Operations Summary</h2>
     <div class="sp-stat-grid" id="admin-stat-grid">
       <!-- 1. Total parking zones -->
-      <div class="sp-stat-card" id="card-stat-zones">
+      <div class="sp-stat-card" id="card-stat-zones" data-reveal="up" data-reveal-delay="40">
         <span class="sp-stat-label">Total Zones (ទីតាំង)</span>
         <span class="sp-stat-number" id="stat-total-zones">{{ total_zones }}</span>
         <span class="sp-stat-meta">Managed across Phnom Penh</span>
       </div>
 
       <!-- 2. Total parking capacity -->
-      <div class="sp-stat-card" id="card-stat-capacity">
+      <div class="sp-stat-card" id="card-stat-capacity" data-reveal="up" data-reveal-delay="80">
         <span class="sp-stat-label">Total Capacity</span>
         <span class="sp-stat-number" id="stat-total-capacity">{{ total_capacity }}</span>
         <span class="sp-stat-meta">Configured parking spaces</span>
       </div>
 
       <!-- 3. Currently occupied spaces -->
-      <div class="sp-stat-card" id="card-stat-occupied">
+      <div class="sp-stat-card" id="card-stat-occupied" data-reveal="up" data-reveal-delay="120">
         <span class="sp-stat-label">Occupied Spaces</span>
         <span class="sp-stat-number sp-stat-amber" id="stat-occupied-slots">{{ total_occupied }}</span>
         <span class="sp-stat-meta">Vehicles currently parked</span>
       </div>
 
       <!-- 4. Currently vacant spaces -->
-      <div class="sp-stat-card" id="card-stat-vacant">
+      <div class="sp-stat-card" id="card-stat-vacant" data-reveal="up" data-reveal-delay="160">
         <span class="sp-stat-label">Vacant Spaces</span>
         <span class="sp-stat-number sp-stat-green" id="stat-vacant-slots">{{ total_vacant }}</span>
         <span class="sp-stat-meta">Ready for immediate booking</span>
       </div>
 
       <!-- 5. Active reservations -->
-      <div class="sp-stat-card" id="card-stat-active-res">
+      <div class="sp-stat-card" id="card-stat-active-res" data-reveal="up" data-reveal-delay="200">
         <span class="sp-stat-label">Active Passes</span>
         <span class="sp-stat-number sp-stat-accent" id="stat-active-reservations">{{ active_reservations_count }}</span>
         <span class="sp-stat-meta">Currently in session</span>
       </div>
 
       <!-- 6. Completed reservations -->
-      <div class="sp-stat-card" id="card-stat-completed-res">
+      <div class="sp-stat-card" id="card-stat-completed-res" data-reveal="up" data-reveal-delay="240">
         <span class="sp-stat-label">Completed Passes</span>
         <span class="sp-stat-number" id="stat-completed-reservations">{{ completed_reservations_count }}</span>
         <span class="sp-stat-meta">Successfully checked out</span>
       </div>
 
       <!-- 7. Registered customers (excluding staff) -->
-      <div class="sp-stat-card" id="card-stat-customers">
+      <div class="sp-stat-card" id="card-stat-customers" data-reveal="up" data-reveal-delay="280">
         <span class="sp-stat-label">Registered Drivers</span>
         <span class="sp-stat-number" id="stat-registered-customers">{{ registered_customers_count }}</span>
         <span class="sp-stat-meta">Customer accounts (excl. staff)</span>
       </div>
 
       <!-- 8. Overall occupancy percentage -->
-      <div class="sp-stat-card" id="card-stat-occupancy-rate">
+      <div class="sp-stat-card" id="card-stat-occupancy-rate" data-reveal="up" data-reveal-delay="300">
         <span class="sp-stat-label">Overall Occupancy</span>
         <span class="sp-stat-number {% if overall_occupancy_pct >= 90 %}sp-stat-red{% elif overall_occupancy_pct >= 70 %}sp-stat-amber{% else %}sp-stat-green{% endif %}" id="stat-occupancy-percentage">
           {{ overall_occupancy_pct }}%
@@ -92,7 +92,7 @@
   </section>
 
   <!-- 2. Parking Zone Status Section -->
-  <section class="sp-workbench-section" id="admin-zone-status-section" aria-labelledby="heading-zone-status">
+  <section class="sp-workbench-section" id="admin-zone-status-section" aria-labelledby="heading-zone-status" data-reveal="up">
     <div class="sp-section-bar">
       <div>
         <h2 id="heading-zone-status" class="sp-section-heading">
@@ -188,7 +188,7 @@
   </section>
 
   <!-- 3. Recent Active Reservations Section -->
-  <section class="sp-workbench-section" id="admin-active-reservations-section" aria-labelledby="heading-active-res">
+  <section class="sp-workbench-section" id="admin-active-reservations-section" aria-labelledby="heading-active-res" data-reveal="up">
     <div class="sp-section-bar">
       <div>
         <h2 id="heading-active-res" class="sp-section-heading">
@@ -300,7 +300,7 @@
   </section>
 
   <!-- 4. Recently Completed Reservations Section -->
-  <section class="sp-workbench-section" id="admin-completed-reservations-section" aria-labelledby="heading-completed-res">
+  <section class="sp-workbench-section" id="admin-completed-reservations-section" aria-labelledby="heading-completed-res" data-reveal="up">
     <div class="sp-section-bar">
       <div>
         <h2 id="heading-completed-res" class="sp-section-heading">

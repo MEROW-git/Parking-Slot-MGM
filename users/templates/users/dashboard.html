@@ -5,7 +5,7 @@
 {% block content %}
 <div class="sp-dashboard" style="margin-block: var(--space-lg);" id="customer-dashboard">
   <!-- Welcome Greeting -->
-  <header class="sp-dashboard-greeting" id="dashboard-header">
+  <header class="sp-dashboard-greeting" id="dashboard-header" data-reveal="up">
     <div>
       <div class="sp-dashboard-welcome-badge">
         <span>ភ្នំពេញ</span> · <span>Phnom Penh Capital</span>
@@ -32,7 +32,7 @@
     <h2 class="sr-only">Quick Actions</h2>
     <div class="sp-dashboard-actions">
       <!-- 1. Find parking -->
-      <a href="{% url 'home' %}#parking-zones" class="sp-action-card" id="quick-action-find">
+      <a href="{% url 'home' %}#parking-zones" class="sp-action-card" id="quick-action-find" data-reveal="up" data-reveal-delay="50">
         <div>
           <div class="sp-action-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -47,7 +47,7 @@
       </a>
 
       <!-- 2. Reserve a space -->
-      <a href="{% url 'book' %}" class="sp-action-card" id="quick-action-reserve">
+      <a href="{% url 'book' %}" class="sp-action-card" id="quick-action-reserve" data-reveal="up" data-reveal-delay="100">
         <div>
           <div class="sp-action-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -66,7 +66,7 @@
       </a>
 
       <!-- 3. My tickets -->
-      <a href="{% url 'all_tickets' %}" class="sp-action-card" id="quick-action-tickets">
+      <a href="{% url 'all_tickets' %}" class="sp-action-card" id="quick-action-tickets" data-reveal="up" data-reveal-delay="150">
         <div>
           <div class="sp-action-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -86,7 +86,7 @@
 
   <!-- Current Active Reservation (if one exists) -->
   {% if active_reservation %}
-    <section class="sp-dashboard-active-box" id="dashboard-active-reservation" aria-labelledby="active-res-heading">
+    <section class="sp-dashboard-active-box" id="dashboard-active-reservation" aria-labelledby="active-res-heading" data-reveal="up">
       <div class="sp-dashboard-active-header">
         <div>
           <span class="sp-avail-badge available" style="margin-bottom:0.35rem; display:inline-flex;">
@@ -135,7 +135,7 @@
 
   <!-- Recent Reservations or Empty State -->
   {% if has_reservations %}
-    <section class="sp-dashboard-section" id="dashboard-recent-reservations" style="margin-top:var(--space-xl);">
+    <section class="sp-dashboard-section" id="dashboard-recent-reservations" style="margin-top:var(--space-xl);" data-reveal="up">
       <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:var(--space-sm); margin-bottom:var(--space-md);">
         <div>
           <h2 style="font-size:1.75rem; margin-bottom:0.25rem;">Recent Reservations</h2>
@@ -202,7 +202,7 @@
     </section>
   {% else %}
     <!-- Empty State for account with no reservations -->
-    <section class="sp-empty-state" id="dashboard-empty-state" style="margin-top:var(--space-xl);">
+    <section class="sp-empty-state" id="dashboard-empty-state" style="margin-top:var(--space-xl);" data-reveal="up">
       <span class="sp-empty-mark" aria-hidden="true">P</span>
       <h2 style="font-size:var(--text-2xl); margin-bottom:var(--space-2xs);">No Parking Reservations Yet</h2>
       <p>

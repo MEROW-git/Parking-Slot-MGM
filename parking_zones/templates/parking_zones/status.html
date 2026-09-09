@@ -9,7 +9,7 @@
   <!-- Left Column: Overview & Availability -->
   <div class="sp-zone-detail-main">
     <!-- Availability Card -->
-    <div class="sp-zone-status-card">
+    <div class="sp-zone-status-card" data-reveal="up">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
         <div>
           <span style="font-size:0.85rem; font-weight:700; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.05em;">Current Occupancy</span>
@@ -22,7 +22,7 @@
 
       <!-- Custom Occupancy Bar -->
       <div style="background:var(--color-paper-3); border:var(--rule-fine) solid var(--color-rule-2); height:24px; border-radius:var(--radius-input); overflow:hidden; display:flex; margin-bottom:1.5rem;">
-        <div style="background:var(--color-accent); width:{{ parking_zone.occupancy_percentage }}%; height:100%; transition:width 0.3s ease;" title="Occupied: {{ parking_zone.occupied_slots }}"></div>
+        <div style="background:var(--color-accent); width:{{ parking_zone.occupancy_percentage }}%; height:100%; transition:width var(--dur-long) var(--ease-out);" title="Occupied: {{ parking_zone.occupied_slots }}"></div>
       </div>
 
       <div class="sp-zone-metrics-grid">
@@ -42,7 +42,7 @@
     </div>
 
     <!-- Facility Description -->
-    <div class="sp-zone-facility-card">
+    <div class="sp-zone-facility-card" data-reveal="up" data-reveal-delay="80">
       <h3 style="margin-bottom:0.75rem; line-height:1.25;">Facility Information (ព័ត៌មានលម្អិត)</h3>
       <p style="color:var(--color-ink-2); margin-bottom:1.25rem; line-height:1.55;">
         {{ parking_zone.description|default:"Secured municipal parking facility in Phnom Penh, equipped with 24-hour security guards, boom barriers, and high-resolution CCTV." }}
@@ -60,7 +60,7 @@
 
   <!-- Right Column: Booking Card -->
   <div class="sp-zone-detail-sidebar">
-    <div class="sp-zone-sidebar-card">
+    <div class="sp-zone-sidebar-card" data-reveal="up" data-reveal-delay="120">
       <div style="border-bottom:var(--rule-fine) solid var(--color-rule); padding-bottom:1.25rem; margin-bottom:1.25rem;">
         <div style="font-size:0.85rem; font-weight:700; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.04em;">Daily Rate</div>
         <div style="font-size:2.25rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-ink); line-height:1.15; margin-block:0.25rem;">

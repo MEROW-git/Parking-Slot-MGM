@@ -3,7 +3,7 @@
 {% block title %}Ticket #{{ reservation.ticket_code }} | SomPark Phnom Penh{% endblock %}
 
 {% block content %}
-<div class="no-print sp-ticket-actions-bar" id="ticket-actions-bar">
+<div class="no-print sp-ticket-actions-bar" id="ticket-actions-bar" data-reveal="up">
   <a href="{% url 'all_tickets' %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-back-history">
     ← Ticket History
   </a>
@@ -24,7 +24,7 @@
 </div>
 
 <!-- Printable Parking Ticket Sheet -->
-<div class="sp-ticket-sheet" id="parking-ticket-sheet">
+<div class="sp-ticket-sheet" id="parking-ticket-sheet" data-reveal="scale" data-reveal-delay="50">
   <div class="sp-ticket-header">
     <div>
       <div class="sp-brand sp-ticket-brand" id="ticket-brand">
