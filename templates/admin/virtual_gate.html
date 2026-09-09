@@ -110,7 +110,7 @@
         {% if gate_open %}
           <div class="vg-pass-actions" id="vg-pass-actions-box">
             <input type="hidden" name="permit" id="vg-permit-input" value="{{ permit }}">
-            <div class="vg-permit-banner" id="vg-permit-timer" role="status">
+            <div class="vg-permit-banner" id="vg-permit-timer" role="status" data-expires-at="{{ permit_expires_at|default:'' }}">
               Barrier is OPEN. Authorization permit valid for <span id="vg-timer-seconds">120</span>s.
             </div>
             <p class="vg-pass-note">
@@ -160,7 +160,7 @@
       </div>
 
       <!-- Animated SVG / CSS Barrier Scene -->
-      <div class="vg-scene {% if gate_open %}is-open{% endif %} {% if passed %}is-passed{% endif %}" id="vg-scene-viewport" aria-label="Barrier simulation graphic">
+      <div class="vg-scene {% if gate_open %}is-open{% endif %} {% if passed %}is-passed{% endif %}" id="vg-scene-viewport" aria-label="Barrier simulation graphic" data-direction="{{ form.mode.value|default:'entry' }}" data-gate-open="{% if gate_open %}true{% else %}false{% endif %}" data-passed="{% if passed %}true{% else %}false{% endif %}">
         <div class="vg-sky"></div>
         <div class="vg-road">
           <div class="vg-road-curb left"></div>
@@ -174,9 +174,11 @@
         <div class="vg-arm" id="vg-barrier-arm">
           <div class="vg-arm-stripe"></div>
         </div>
-        <div class="vg-car" id="vg-vehicle-object" title="Vehicle on sensor">
-          <div class="vg-car-windshield"></div>
-          <div class="vg-car-roof"></div>
+        <div class="vg-car-track" id="vg-car-track">
+          <div class="vg-car" id="vg-vehicle-object" title="Vehicle on sensor">
+            <div class="vg-car-windshield"></div>
+            <div class="vg-car-roof"></div>
+          </div>
         </div>
       </div>
 

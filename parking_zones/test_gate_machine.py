@@ -225,3 +225,61 @@ class VirtualGateTests(TestCase):
         client = Client(enforce_csrf_checks=True)
         client.force_login(self.staff)
         self.assertEqual(client.post(self.url, self.data).status_code, 403)
+
+    def test_open_provides_permit_expires_at_timestamp(self):
+        resp = self.client.post(self.url, self.data)
+        self.assertTrue(resp.context['gate_open'])
+        self.assertIsNotNone(resp.context['permit_expires_at'])
+        self.assertGreater(resp.context['permit_expires_at'], int(time.time()))
+
+    def test_ajax_passage_returns_structured_json_and_updates_occupancy(self):
+        open_resp = self.client.post(self.url, self.data)
+        permit = open_resp.context['permit']
+
+        # Send AJAX passage confirmation
+        pass_data = {**self.data, 'action': 'pass', 'permit': permit}
+        ajax_resp = self.client.post(
+            self.url,
+            pass_data,
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(ajax_resp.status_code, 200)
+        self.assertEqual(ajax_resp['Content-Type'], 'application/json')
+        payload = ajax_resp.json()
+        self.assertTrue(payload['success'])
+        self.assertTrue(payload['passed'])
+        self.assertFalse(payload['gate_open'])
+        self.assertEqual(payload['status'], 'CHECKED_IN')
+        self.assertEqual(payload['occupied_slots'], 1)
+        self.assertEqual(payload['ticket_code'], self.reservation.ticket_code)
+
+        self.reservation.refresh_from_db()
+        self.zone.refresh_from_db()
+        self.assertEqual(self.reservation.status, 'CHECKED_IN')
+        self.assertEqual(self.zone.occupied_slots, 1)
+
+    def test_ajax_passage_invalid_permit_returns_400_json(self):
+        ajax_resp = self.client.post(
+            self.url,
+            {**self.data, 'action': 'pass', 'permit': 'invalid-permit-token'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(ajax_resp.status_code, 400)
+        payload = ajax_resp.json()
+        self.assertFalse(payload['success'])
+        self.assertFalse(payload['passed'])
+        self.assertIn('expired or invalid', payload['notice'])
+
+        self.reservation.refresh_from_db()
+        self.assertIsNone(self.reservation.checked_in_at)
+        self.assertEqual(self.zone.occupied_slots, 0)
+
+    def test_ajax_telemetry_get_reconciliation(self):
+        get_url = f"{self.url}?zone={self.zone.pk}&code={self.reservation.ticket_code}&mode=entry"
+        resp = self.client.get(get_url, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        self.assertTrue(payload['success'])
+        self.assertEqual(payload['ticket_code'], self.reservation.ticket_code)
+        self.assertEqual(payload['status'], 'CONFIRMED')
+

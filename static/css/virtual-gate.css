@@ -397,14 +397,14 @@
   50% { opacity: 0.4; transform: scale(0.8); }
 }
 
-/* Animated CSS/SVG Barrier Scene */
+/* Animated CSS Barrier Scene */
 .vg-scene {
   position: relative;
-  height: 260px;
+  height: 440px;
   border-radius: 8px;
   overflow: hidden;
-  background: #111827;
-  border: 2px solid #1f2937;
+  background: #0b0f19;
+  border: 2px solid #1e293b;
   margin-bottom: 14px;
 }
 .vg-sky {
@@ -412,17 +412,35 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 70px;
-  background: linear-gradient(180deg, #0b0f17 0%, #1f2937 100%);
+  height: 80px;
+  background: linear-gradient(180deg, #020617 0%, #0b0f19 100%);
+  pointer-events: none;
 }
 .vg-road {
   position: absolute;
-  width: 68%;
-  height: 190px;
-  left: 24%;
+  top: 0;
   bottom: 0;
-  background: #283342;
-  border-inline: 4px solid #94a3b8;
+  width: 170px;
+  left: calc(50% - 65px);
+  background: #1e293b;
+  border-inline: 4px solid #64748b;
+  box-shadow: inset 0 0 25px rgba(0,0,0,0.6);
+}
+.vg-road-curb.left {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: repeating-linear-gradient(180deg, #ffffff 0 20px, #dc2626 20px 40px);
+}
+.vg-road-curb.right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 4px;
+  background: repeating-linear-gradient(180deg, #ffffff 0 20px, #dc2626 20px 40px);
 }
 .vg-road-lane {
   position: absolute;
@@ -433,37 +451,37 @@
 }
 .vg-machine {
   position: absolute;
-  left: 8%;
-  bottom: 25px;
-  width: 52px;
-  height: 140px;
+  left: calc(50% - 128px);
+  top: calc(50% - 55px);
+  width: 48px;
+  height: 110px;
   background: #ea580c;
   border-radius: 6px;
-  box-shadow: 2px 4px 12px rgba(0,0,0,0.5);
+  box-shadow: 2px 4px 14px rgba(0,0,0,0.55);
   border: 2px solid #c2410c;
   z-index: 5;
 }
 .vg-machine-label {
   position: absolute;
-  bottom: 14px;
-  left: 10px;
+  bottom: 12px;
+  left: 8px;
   writing-mode: vertical-rl;
   color: #111827;
   font-weight: 900;
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.08em;
 }
 .vg-light {
   position: absolute;
-  left: 14px;
+  left: 12px;
   top: 12px;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   background: #dc2626;
   border: 2px solid #ffffff;
   border-radius: 50%;
   box-sizing: border-box;
-  box-shadow: 0 0 10px rgba(220, 38, 38, 0.8);
+  box-shadow: 0 0 10px rgba(220, 38, 38, 0.85);
   transition: background-color 0.4s, box-shadow 0.4s;
 }
 .is-open .vg-light {
@@ -474,62 +492,110 @@
 /* Barrier Arm with Red/White Stripes */
 .vg-arm {
   position: absolute;
-  left: calc(8% + 26px);
-  bottom: 92px;
-  width: 72%;
+  left: calc(50% - 88px);
+  top: calc(50% - 7px);
+  width: 175px;
   height: 14px;
   background: repeating-linear-gradient(125deg, #ffffff 0 20px, #dc2626 20px 40px);
   border-radius: 3px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.4);
-  transform-origin: 0 50%;
+  transform-origin: 6px 50%;
   transform: rotate(0deg);
   transition: transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 4;
 }
 .is-open .vg-arm {
   transform: rotate(-80deg);
-  animation: vg-arm-lift 700ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-@keyframes vg-arm-lift {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-80deg); }
 }
 
-/* Vehicle on Sensor */
-.vg-car {
+/* Vehicle Track (Translation along road) */
+.vg-car-track {
   position: absolute;
-  width: 48px;
-  height: 72px;
-  bottom: 12px;
-  left: 44%;
-  border-radius: 12px;
-  background: #64748b;
-  border: 4px solid #cbd5e1;
-  box-sizing: border-box;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+  left: calc(50% - 2px);
+  width: 44px;
+  height: 68px;
   z-index: 3;
-  transition: transform 900ms ease-in-out;
+  transition: transform 1200ms cubic-bezier(0.45, 0, 0.25, 1);
+}
+
+/* Vehicle Body (Orientation & Styling) */
+.vg-car {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  background: #475569;
+  border: 3px solid #94a3b8;
+  box-sizing: border-box;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.65);
 }
 .vg-car-windshield {
   position: absolute;
   top: 8px;
   left: 4px;
   right: 4px;
-  height: 16px;
+  height: 14px;
   background: #0f172a;
   border-radius: 4px;
 }
 .vg-car-roof {
   position: absolute;
-  top: 26px;
-  left: 6px;
-  right: 6px;
+  top: 24px;
+  left: 5px;
+  right: 5px;
   height: 22px;
-  background: #475569;
+  background: #334155;
   border-radius: 3px;
 }
-.is-passed .vg-car {
-  transform: translateY(-150px);
+
+/* Direction: Entrance (Bottom to Top) */
+.vg-scene[data-direction="entry"] .vg-car-track {
+  top: 300px;
+  transform: translateY(0);
+}
+.vg-scene[data-direction="entry"] .vg-car {
+  transform: rotate(0deg);
+}
+.vg-scene[data-direction="entry"].is-moving .vg-car-track,
+.vg-scene[data-direction="entry"].is-passed .vg-car-track {
+  transform: translateY(-380px);
+}
+
+/* Direction: Exit (Top to Bottom) */
+.vg-scene[data-direction="exit"] .vg-car-track {
+  top: 60px;
+  transform: translateY(0);
+}
+.vg-scene[data-direction="exit"] .vg-car {
+  transform: rotate(180deg);
+}
+.vg-scene[data-direction="exit"].is-moving .vg-car-track,
+.vg-scene[data-direction="exit"].is-passed .vg-car-track {
+  transform: translateY(380px);
+}
+
+/* Mobile Responsive Scene Adjustment */
+@media (max-width: 600px) {
+  .vg-scene {
+    height: 380px;
+  }
+  .vg-arm {
+    width: 160px;
+  }
+  .vg-scene[data-direction="entry"] .vg-car-track {
+    top: 250px;
+  }
+  .vg-scene[data-direction="entry"].is-moving .vg-car-track,
+  .vg-scene[data-direction="entry"].is-passed .vg-car-track {
+    transform: translateY(-330px);
+  }
+  .vg-scene[data-direction="exit"] .vg-car-track {
+    top: 50px;
+  }
+  .vg-scene[data-direction="exit"].is-moving .vg-car-track,
+  .vg-scene[data-direction="exit"].is-passed .vg-car-track {
+    transform: translateY(330px);
+  }
 }
 
 /* LED Status Indicator */
@@ -766,8 +832,8 @@
 @media (prefers-reduced-motion: reduce) {
   .vg-arm,
   .is-open .vg-arm,
+  .vg-car-track,
   .vg-car,
-  .is-passed .vg-car,
   .vg-reticle-laser,
   .vg-live-dot {
     transition: none !important;

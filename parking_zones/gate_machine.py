@@ -3,11 +3,13 @@ Admin virtual parking gate simulator.
 Simulates optical QR / physical barrier arm operations for Entrance and Exit.
 Passage confirmation delegates to real atomic parking services.
 """
+import time
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.core import signing
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -48,6 +50,11 @@ def virtual_gate(request):
     Allows staff to simulate physical barrier arm operations with strict
     server-side authorization, cryptographic signed permits, and atomic inventory updates.
     """
+    is_ajax = (
+        request.headers.get('x-requested-with') == 'XMLHttpRequest' or
+        'application/json' in request.headers.get('Accept', '')
+    )
+
     initial = {'mode': request.GET.get('mode', 'entry')}
     if request.GET.get('zone'):
         initial['zone'] = request.GET.get('zone')
@@ -65,9 +72,10 @@ def virtual_gate(request):
         'now': timezone.now(),
         'gate_open': False,
         'passed': False,
+        'permit_expires_at': None,
     }
 
-    # If GET has valid code and zone, inspect reservation for preview
+    # If GET has valid code and zone, inspect reservation for preview or telemetry reconciliation
     if request.method == 'GET' and initial.get('zone') and initial.get('code'):
         zone_id = initial.get('zone')
         code = initial.get('code').strip()
@@ -80,6 +88,20 @@ def virtual_gate(request):
             if str(reservation.parking_zone_id) == str(zone_id):
                 bill = BillingService.calculate_bill(reservation, as_of=timezone.now()) if mode == 'exit' else None
                 context.update(reservation=reservation, bill=bill)
+                if is_ajax:
+                    return JsonResponse({
+                        'success': True,
+                        'ticket_code': reservation.ticket_code,
+                        'plate_number': reservation.plate_number,
+                        'status': reservation.status,
+                        'status_display': reservation.get_status_display(),
+                        'mode': mode,
+                        'checked_in_at': reservation.checked_in_at.isoformat() if reservation.checked_in_at else None,
+                        'checked_out_at': reservation.checked_out_at.isoformat() if reservation.checked_out_at else None,
+                    })
+
+    if request.method == 'POST' and not form.is_valid() and is_ajax:
+        return JsonResponse({'success': False, 'notice': form.errors.as_text()}, status=400)
 
     if request.method == 'POST' and form.is_valid():
         zone = form.cleaned_data['zone']
@@ -92,15 +114,23 @@ def virtual_gate(request):
             reservation = Reservation.objects.filter(access_token=code).first()
 
         if reservation is None:
-            form.add_error('code', f'No reservation found matching ticket code or QR token "{code}".')
+            err = f'No reservation found matching ticket code or QR token "{code}".'
+            if is_ajax:
+                return JsonResponse({'success': False, 'notice': err}, status=400)
+            form.add_error('code', err)
         elif reservation.parking_zone_id != zone.pk:
-            form.add_error(
-                'code',
+            err = (
                 f'Ticket #{reservation.ticket_code} is registered for facility '
                 f'"{reservation.parking_zone.name}", not "{zone.name}".'
             )
+            if is_ajax:
+                return JsonResponse({'success': False, 'notice': err}, status=400)
+            form.add_error('code', err)
         elif action not in ('open', 'close', 'pass', 'settle'):
-            form.add_error(None, f'Unknown gate action "{action}".')
+            err = f'Unknown gate action "{action}".'
+            if is_ajax:
+                return JsonResponse({'success': False, 'notice': err}, status=400)
+            form.add_error(None, err)
         else:
             with transaction.atomic():
                 reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
@@ -115,6 +145,13 @@ def virtual_gate(request):
                         context.update(reservation=reservation, bill=bill)
                     else:
                         context.update(reservation=reservation)
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': True,
+                            'gate_open': False,
+                            'passed': False,
+                            'notice': context['notice'],
+                        })
                     return render(request, 'admin/virtual_gate.html', context)
 
                 # Action: Settle exit balance
@@ -165,10 +202,43 @@ def virtual_gate(request):
                         success, reservation, notice = operation(reservation.pk, staff_user=request.user)
                         context.update(reservation=reservation, notice=notice, passed=success, gate_open=False)
                         if success:
+                            zone.refresh_from_db()
                             context['notice'] = 'Vehicle passage recorded. Barrier closed.'
                             messages.success(request, context['notice'])
+                            if is_ajax:
+                                return JsonResponse({
+                                    'success': True,
+                                    'passed': True,
+                                    'gate_open': False,
+                                    'mode': mode,
+                                    'ticket_code': reservation.ticket_code,
+                                    'plate_number': reservation.plate_number,
+                                    'status': reservation.status,
+                                    'status_display': reservation.get_status_display(),
+                                    'notice': context['notice'],
+                                    'occupied_slots': zone.occupied_slots,
+                                    'checked_in_at': reservation.checked_in_at.isoformat() if reservation.checked_in_at else None,
+                                    'checked_out_at': reservation.checked_out_at.isoformat() if reservation.checked_out_at else None,
+                                })
+                        else:
+                            if is_ajax:
+                                return JsonResponse({
+                                    'success': False,
+                                    'passed': False,
+                                    'gate_open': False,
+                                    'mode': mode,
+                                    'notice': notice or 'Passage confirmation rejected by gate service.',
+                                }, status=400)
                     else:
                         context['gate_open'] = False
+                        if is_ajax:
+                            return JsonResponse({
+                                'success': False,
+                                'passed': False,
+                                'gate_open': False,
+                                'mode': mode,
+                                'notice': context['notice'],
+                            }, status=400)
 
                 elif action == 'open':
                     if allowed:
@@ -176,6 +246,7 @@ def virtual_gate(request):
                         context['permit'] = signing.dumps(
                             [request.user.pk, reservation.pk, zone.pk, mode], salt='virtual-gate'
                         )
+                        context['permit_expires_at'] = int(time.time()) + 120
                         context['notice'] = 'Ticket verified. Barrier is OPEN — waiting for vehicle to pass.'
                     else:
                         context['gate_open'] = False

@@ -1,7 +1,8 @@
 /**
  * SomPark Virtual Parking Gate Terminal — Controller
- * Handles camera optical QR scanning, USB barcode scanner input,
- * 120-second permit countdown auto-closing, and authorization invalidation.
+ * Handles optical QR camera scanning, USB barcode scanner input,
+ * absolute server-issued permit countdown with tab-resume synchronization,
+ * authorization invalidation, and asynchronous passage animation choreography.
  */
 (() => {
   'use strict';
@@ -14,9 +15,21 @@
   const codeInput = document.getElementById('id_code');
   const form = document.getElementById('gate-machine-form');
 
+  const permitSecondsEl = document.getElementById('vg-timer-seconds');
+  const permitTimerBanner = document.getElementById('vg-permit-timer');
+  const passBtn = document.getElementById('vg-pass');
+  const closeBtn = document.getElementById('vg-close');
+  const sceneEl = document.getElementById('vg-scene-viewport');
+  const statusBanner = document.getElementById('vg-gate-status-banner');
+  const statusText = document.getElementById('vg-status-text');
+
   let stream = null;
   let scanning = false;
   let scanTimer = null;
+
+  let countdownInterval = null;
+  let permitExpiresAt = null;
+  let isCrossing = false;
 
   // Stop camera tracks cleanly
   function stopCamera() {
@@ -94,6 +107,9 @@
               const rawValue = barcodes[0].rawValue?.trim();
               if (rawValue) {
                 codeInput.value = rawValue;
+                // Dispatch input event to notify authorization invalidation listeners
+                codeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                codeInput.dispatchEvent(new Event('change', { bubbles: true }));
                 stopCamera();
                 statusEl.textContent = `QR detected (${rawValue.substring(0, 16)}...). Click "Check ticket & open barrier" to verify.`;
                 codeInput.focus();
@@ -122,79 +138,142 @@
     });
   }
 
-  // USB Barcode Scanner & Enter Key Handling
+  // USB Barcode Scanner & Enter Key Handling:
+  // Explicitly triggers #btn-check-open click rather than injecting hidden input and submitting form.
   if (codeInput && form) {
     codeInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        // Trigger check & open action
-        let actionInput = form.querySelector('input[name="action"]');
-        if (!actionInput) {
-          actionInput = document.createElement('input');
-          actionInput.type = 'hidden';
-          actionInput.name = 'action';
-          form.appendChild(actionInput);
+        const checkBtn = document.getElementById('btn-check-open');
+        if (checkBtn) {
+          checkBtn.click();
         }
-        actionInput.value = 'open';
-        form.submit();
       }
     });
   }
 
-  // 120-Second Gate Permit Expiration Timer
-  const permitSecondsEl = document.getElementById('vg-timer-seconds');
-  const permitTimerBanner = document.getElementById('vg-permit-timer');
-  const passBtn = document.getElementById('vg-pass');
-  const sceneEl = document.getElementById('vg-scene-viewport');
-  const statusBanner = document.getElementById('vg-gate-status-banner');
-  const statusText = document.getElementById('vg-status-text');
+  // Helper: wait for CSS transition with safety timeout fallback
+  function waitForTransition(element, expectedProp, maxMs) {
+    return new Promise(resolve => {
+      if (!element) {
+        resolve();
+        return;
+      }
+      let resolved = false;
+      const timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          element.removeEventListener('transitionend', onEnd);
+          resolve();
+        }
+      }, maxMs);
 
-  if (permitSecondsEl && permitTimerBanner && passBtn) {
-    let secondsLeft = 120;
-    const countdownInterval = setInterval(() => {
-      secondsLeft -= 1;
-      if (secondsLeft > 0) {
-        permitSecondsEl.textContent = secondsLeft;
-      } else {
-        clearInterval(countdownInterval);
-        // Authorization expired: close visual barrier and disable passage confirmation
-        permitTimerBanner.style.background = '#fef2f2';
-        permitTimerBanner.style.borderColor = '#f87171';
-        permitTimerBanner.style.color = '#991b1b';
-        permitTimerBanner.innerHTML = '<strong>Gate authorization expired (120s elapsed).</strong> Barrier auto-closed. Re-check ticket.';
-
-        passBtn.disabled = true;
-        if (sceneEl) sceneEl.classList.remove('is-open');
-
-        if (statusBanner && statusText) {
-          statusBanner.className = 'vg-status-indicator status-closed';
-          statusText.textContent = 'BARRIER CLOSED — AUTHORIZATION EXPIRED';
+      function onEnd(e) {
+        if (e.target === element && (!expectedProp || e.propertyName === expectedProp)) {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timer);
+            element.removeEventListener('transitionend', onEnd);
+            resolve();
+          }
         }
       }
-    }, 1000);
+
+      element.addEventListener('transitionend', onEnd);
+    });
   }
 
-  // Invalidate displayed authorization if attendant edits facility, code, or direction
-  document.querySelectorAll('#id_zone, #id_code, [name="mode"]').forEach(input => {
+  // Stop permit countdown
+  function stopPermitCountdown() {
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+  }
+
+  // Expire permit handler
+  function expirePermit() {
+    stopPermitCountdown();
+    if (permitTimerBanner) {
+      permitTimerBanner.style.background = '#fef2f2';
+      permitTimerBanner.style.borderColor = '#f87171';
+      permitTimerBanner.style.color = '#991b1b';
+      permitTimerBanner.innerHTML = '<strong>Gate authorization expired.</strong> Barrier auto-closed. Re-check ticket.';
+    }
+    if (passBtn) passBtn.disabled = true;
+    if (sceneEl) sceneEl.classList.remove('is-open');
+    if (statusBanner && statusText) {
+      statusBanner.className = 'vg-status-indicator status-closed';
+      statusText.textContent = 'BARRIER CLOSED — AUTHORIZATION EXPIRED';
+    }
+  }
+
+  // Start permit countdown using absolute server timestamp if provided
+  function startPermitCountdown() {
+    stopPermitCountdown();
+    if (!permitSecondsEl || !permitTimerBanner || !passBtn) return;
+
+    const expiresAtAttr = permitTimerBanner.dataset.expiresAt;
+    if (expiresAtAttr && parseInt(expiresAtAttr, 10)) {
+      permitExpiresAt = parseInt(expiresAtAttr, 10);
+    } else {
+      permitExpiresAt = Math.floor(Date.now() / 1000) + 120;
+    }
+
+    function tick() {
+      if (isCrossing) return; // Do not expire during active crossing playback
+      const nowSec = Math.floor(Date.now() / 1000);
+      const remaining = Math.max(0, permitExpiresAt - nowSec);
+      permitSecondsEl.textContent = remaining;
+
+      if (remaining <= 0) {
+        expirePermit();
+      }
+    }
+
+    tick();
+    countdownInterval = setInterval(tick, 1000);
+  }
+
+  // Reconcile permit countdown on tab resume (visibility change)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && permitExpiresAt && countdownInterval && !isCrossing) {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const remaining = Math.max(0, permitExpiresAt - nowSec);
+      if (remaining <= 0) {
+        expirePermit();
+      } else if (permitSecondsEl) {
+        permitSecondsEl.textContent = remaining;
+      }
+    }
+  });
+
+  // Invalidate authorization and clear obsolete timers upon input edits
+  function invalidateAuthorization(reason) {
+    stopPermitCountdown();
+    if (passBtn) {
+      passBtn.disabled = true;
+      passBtn.title = 'Input modified. Re-check ticket to authorize barrier.';
+    }
+    if (sceneEl) {
+      sceneEl.classList.remove('is-open');
+    }
+    if (permitTimerBanner) {
+      permitTimerBanner.style.display = 'none';
+    }
+    if (statusBanner && statusText) {
+      statusBanner.className = 'vg-status-indicator status-closed';
+      statusText.textContent = reason || 'BARRIER CLOSED — TICKET RE-CHECK REQUIRED';
+    }
+  }
+
+  document.querySelectorAll('#id_zone, #id_code').forEach(input => {
     input.addEventListener('input', () => {
-      if (passBtn) {
-        passBtn.disabled = true;
-        passBtn.title = 'Input modified. Re-check ticket to authorize barrier.';
-      }
-      if (sceneEl) {
-        sceneEl.classList.remove('is-open');
-      }
-      if (permitTimerBanner) {
-        permitTimerBanner.style.display = 'none';
-      }
-      if (statusBanner && statusText) {
-        statusBanner.className = 'vg-status-indicator status-closed';
-        statusText.textContent = 'BARRIER CLOSED — TICKET RE-CHECK REQUIRED';
-      }
+      invalidateAuthorization('BARRIER CLOSED — INPUT MODIFIED');
     });
   });
 
-  // Dynamic Direction Label Active Highlight
+  // Dynamic Direction Label & Immediate Scene Arrangement Reset
   document.querySelectorAll('.vg-direction-label input[type="radio"]').forEach(radio => {
     radio.addEventListener('change', () => {
       document.querySelectorAll('.vg-direction-label').forEach(label => {
@@ -204,8 +283,188 @@
       if (parentLabel) {
         parentLabel.classList.add('is-selected');
       }
+
+      // Immediately switch scene direction attribute and reset visual arrangement
+      if (sceneEl) {
+        sceneEl.dataset.direction = radio.value;
+        sceneEl.classList.remove('is-open', 'is-passed', 'is-moving');
+      }
+
+      invalidateAuthorization('BARRIER CLOSED — DIRECTION CHANGED');
     });
   });
+
+  // Initialize countdown if gate is open on page load
+  if (permitSecondsEl && permitTimerBanner && passBtn && !passBtn.disabled) {
+    startPermitCountdown();
+  }
+
+  // =========================================================================
+  // Passage Animation Controller (Asynchronous 7-Stage Sequence)
+  // Idle → Opening → Waiting → Passage pending → Moving → Closing → Complete
+  // =========================================================================
+  if (passBtn && form) {
+    passBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (isCrossing) return;
+
+      const checkBtn = document.getElementById('btn-check-open');
+      const zoneSelect = document.getElementById('id_zone');
+      const modeRadios = document.querySelectorAll('input[name="mode"]');
+
+      // 1. Passage pending: disable conflicting controls and cancel idle timer
+      passBtn.disabled = true;
+      if (closeBtn) closeBtn.disabled = true;
+      if (checkBtn) checkBtn.disabled = true;
+      if (codeInput) codeInput.disabled = true;
+      if (zoneSelect) zoneSelect.disabled = true;
+      modeRadios.forEach(r => r.disabled = true);
+
+      stopPermitCountdown();
+
+      if (statusText) statusText.textContent = 'CONFIRMING PASSAGE WITH SERVER...';
+
+      const formData = new FormData(form);
+      formData.set('action', 'pass');
+
+      let result = null;
+      try {
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formData
+        });
+
+        if (response.ok) {
+          result = await response.json();
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.notice || `Server error (${response.status})`);
+        }
+      } catch (err) {
+        // Ambiguous network failure: query server state before retrying or giving up
+        const zoneVal = document.getElementById('id_zone')?.value;
+        const codeVal = codeInput?.value?.trim();
+        const modeVal = document.querySelector('input[name="mode"]:checked')?.value || 'entry';
+
+        let reconciled = false;
+        if (zoneVal && codeVal) {
+          try {
+            const checkUrl = `${window.location.pathname}?zone=${encodeURIComponent(zoneVal)}&code=${encodeURIComponent(codeVal)}&mode=${encodeURIComponent(modeVal)}`;
+            const checkResp = await fetch(checkUrl, {
+              headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            });
+            if (checkResp.ok) {
+              const checkData = await checkResp.json();
+              if ((modeVal === 'entry' && checkData.status === 'CHECKED_IN') ||
+                  (modeVal === 'exit' && checkData.status === 'CHECKED_OUT')) {
+                result = {
+                  success: true,
+                  passed: true,
+                  notice: 'Vehicle passage reconciled with server status.',
+                  status: checkData.status,
+                  status_display: checkData.status_display
+                };
+                reconciled = true;
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (!reconciled) {
+          // Rejection or failure: DO NOT animate passage
+          passBtn.disabled = false;
+          if (closeBtn) closeBtn.disabled = false;
+          if (checkBtn) checkBtn.disabled = false;
+          if (codeInput) codeInput.disabled = false;
+          if (zoneSelect) zoneSelect.disabled = false;
+          modeRadios.forEach(r => r.disabled = false);
+
+          if (statusBanner && statusText) {
+            statusBanner.className = 'vg-status-indicator status-closed';
+            statusText.textContent = 'PASSAGE NOT RECORDED — RE-CHECK REQUIRED';
+          }
+          alert(err.message || 'Passage confirmation failed.');
+          return;
+        }
+      }
+
+      // 2. Server confirmed passage: execute visible crossing animation
+      isCrossing = true;
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // Moving stage: keep arm raised while vehicle crosses lane
+      if (statusText) statusText.textContent = 'VEHICLE CROSSING BARRIER...';
+      if (sceneEl) sceneEl.classList.add('is-moving');
+
+      const carTrack = document.getElementById('vg-car-track');
+      const armEl = document.getElementById('vg-barrier-arm');
+
+      if (!reducedMotion && carTrack) {
+        await waitForTransition(carTrack, 'transform', 1500);
+      } else {
+        await new Promise(r => setTimeout(r, 20));
+      }
+
+      // 3. Closing stage: car cleared barrier arm; now lower the arm
+      if (statusText) statusText.textContent = 'VEHICLE CLEARED — CLOSING BARRIER...';
+      if (sceneEl) sceneEl.classList.remove('is-open');
+
+      if (!reducedMotion && armEl) {
+        await waitForTransition(armEl, 'transform', 900);
+      } else {
+        await new Promise(r => setTimeout(r, 20));
+      }
+
+      // 4. Complete stage: mark passed and show final status
+      if (sceneEl) {
+        sceneEl.classList.remove('is-moving');
+        sceneEl.classList.add('is-passed');
+      }
+
+      if (statusBanner && statusText) {
+        statusBanner.className = 'vg-status-indicator status-passed';
+        statusText.textContent = 'VEHICLE PASSAGE CONFIRMED — BARRIER CLOSED';
+      }
+
+      // Hide pass action controls
+      const passBox = document.getElementById('vg-pass-actions-box');
+      if (passBox) passBox.style.display = 'none';
+
+      // Update or create notice banner
+      let noticeBox = document.querySelector('.vg-notice');
+      if (!noticeBox && statusBanner && statusBanner.parentNode) {
+        noticeBox = document.createElement('div');
+        noticeBox.className = 'vg-notice is-success';
+        statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
+      }
+      if (noticeBox) {
+        noticeBox.className = 'vg-notice is-success';
+        noticeBox.textContent = result?.notice || 'Vehicle passage recorded. Barrier closed.';
+      }
+
+      // Update reservation telemetry status badge if present
+      const statusBadge = document.querySelector('.vg-details-grid dd .vg-badge');
+      if (statusBadge && result?.status_display) {
+        statusBadge.className = result.status === 'CHECKED_IN' ? 'vg-badge badge-green' : 'vg-badge badge-muted';
+        statusBadge.textContent = `${result.status} (${result.status_display})`;
+      }
+
+      // Re-enable form fields for next vehicle check
+      if (checkBtn) checkBtn.disabled = false;
+      if (codeInput) {
+        codeInput.disabled = false;
+        codeInput.value = '';
+      }
+      if (zoneSelect) zoneSelect.disabled = false;
+      modeRadios.forEach(r => r.disabled = false);
+
+      isCrossing = false;
+    });
+  }
 
   // Cleanup on page hide or navigate away
   window.addEventListener('pagehide', stopCamera);
