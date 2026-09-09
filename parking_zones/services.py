@@ -78,7 +78,9 @@ class BillingService:
             'overstay_days': overstay_days,
             'overstay_charge': overstay_charge,
             'total_charge': total_charge,
+            'total_amount': total_charge,
             'deposit_paid': deposit_paid,
+            'deposit_deducted': deposit_paid,
             'balance_paid': balance_paid,
             'total_paid': total_paid,
             'balance_due': balance_due,
@@ -359,10 +361,14 @@ class GateService:
         now = timezone.now()
         bill = BillingService.calculate_bill(reservation, as_of=now)
 
-        # Check if currently within the 5-minute exit window
-        is_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until and bill['balance_due'] == 0)
+        # Check if currently authorized to exit (balance 0 or within 5-min exit authorization window)
+        is_authorized = bool(
+            bill['balance_due'] == 0 or
+            (reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
+        )
+        msg = 'Exit authorized. Barrier ready to open.' if is_authorized else f"Outstanding balance of {bill['balance_due']:,} KHR must be settled before exit."
 
-        return True, reservation, bill, 'Bill calculated successfully.'
+        return is_authorized, reservation, bill, msg
 
     @staticmethod
     @transaction.atomic
@@ -407,6 +413,18 @@ class ExpiryService:
     Background and on-the-fly expiration of unpaid holds,
     deposit timeouts, and no-show bookings.
     """
+
+    @classmethod
+    def expire_unpaid_holds(cls) -> int:
+        return cls.expire_stale_holds()['unpaid_holds']
+
+    @classmethod
+    def expire_pending_deposit_holds(cls) -> int:
+        return cls.expire_stale_holds()['deposit_timeouts']
+
+    @classmethod
+    def expire_no_shows(cls) -> int:
+        return cls.expire_stale_holds()['no_shows']
 
     @staticmethod
     @transaction.atomic

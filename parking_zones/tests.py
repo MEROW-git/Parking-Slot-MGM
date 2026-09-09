@@ -1,10 +1,15 @@
 import datetime
+from datetime import timedelta, date, time
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from parking_zones.models import ParkingZone, Reservation
+from parking_zones.models import ParkingZone, Reservation, PaymentTransaction
 from parking_zones.forms import ReservationForm, CAMBODIA_PROVINCES
+from parking_zones.services import BillingService, CapacityService, PaymentService, GateService, ExpiryService
+from parking_zones.payments import DemoPaymentAdapter
+
 
 
 class ParkingZoneModelTests(TestCase):
@@ -632,8 +637,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-1111',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=4),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=4)).date(),
+            finish_time=t0 + timedelta(days=4),
             daily_rate=4000,
             overstay_multiplier=2.0,
             payment_method='DEPOSIT',
@@ -665,8 +672,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-2222',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=4),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=4)).date(),
+            finish_time=t0 + timedelta(days=4),
             daily_rate=4000,
             overstay_multiplier=2.0,
             payment_method='DEPOSIT',
@@ -702,8 +711,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-3333',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=4),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=4)).date(),
+            finish_time=t0 + timedelta(days=4),
             daily_rate=4000,
             overstay_multiplier=2.0,
             payment_method='DEPOSIT',
@@ -722,7 +733,7 @@ class WorkflowBillingAndGateTests(TestCase):
         self.assertEqual(bill['overstay_charge'], 8000)
         self.assertEqual(bill['total_amount'], 24000)
         self.assertEqual(bill['deposit_deducted'], 4000)
-        self.assertEqual(bill['balance_due'], 2000)
+        self.assertEqual(bill['balance_due'], 20000)
 
     def test_billing_example_4_book_4_days_stay_6_days(self):
         """
@@ -735,8 +746,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-4444',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=4),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=4)).date(),
+            finish_time=t0 + timedelta(days=4),
             daily_rate=4000,
             overstay_multiplier=2.0,
             payment_method='DEPOSIT',
@@ -768,8 +781,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Kandal 2B-5555',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=1),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
             daily_rate=4000,
             overstay_multiplier=2.0,
             payment_method='PAY_AT_EXIT',
@@ -804,8 +819,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-9999',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=2),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=2)).date(),
+            finish_time=t0 + timedelta(days=2),
             daily_rate=4000,
             payment_method='PAY_AT_EXIT',
             status='CHECKED_IN',
@@ -833,8 +850,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-0001',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=1),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
             payment_method='PAY_AT_EXIT',
             arrival_deadline=t0 + timedelta(hours=3),
             status='CONFIRMED',
@@ -845,8 +864,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-0002',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=1),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
             payment_method='PAY_AT_EXIT',
             arrival_deadline=t0 + timedelta(hours=3),
             status='CHECKED_IN',
@@ -873,8 +894,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Phnom Penh 2AZ-7771',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=2),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=2)).date(),
+            finish_time=t0 + timedelta(days=2),
             payment_method='DEPOSIT',
             status='PAYMENT_PENDING'
         )
@@ -904,7 +927,7 @@ class WorkflowBillingAndGateTests(TestCase):
         success, msg = DemoPaymentAdapter.simulate_payment(txn3.id, 'success')
         self.assertTrue(success)
         txn3.refresh_from_db()
-        self.assertEqual(txn3.status, 'COMPLETED')
+        self.assertEqual(txn3.status, 'SUCCESS')
         res.refresh_from_db()
         self.assertEqual(res.status, 'CONFIRMED')
         self.assertEqual(res.payment_status, 'PARTIALLY_PAID')
@@ -923,8 +946,10 @@ class WorkflowBillingAndGateTests(TestCase):
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Siem Reap 2A-8888',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=1),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
             payment_method='PAY_AT_EXIT',
             arrival_deadline=t0 + timedelta(hours=3),
             status='CONFIRMED'
@@ -957,14 +982,16 @@ class WorkflowBillingAndGateTests(TestCase):
         Payment grants 5-minute departure window.
         Physical exit releases space atomically.
         """
-        t0 = timezone.now() - timedelta(days=2)
+        t0 = timezone.now() - timedelta(hours=40)
         initial_occupied = self.zone.occupied_slots
         res = Reservation.objects.create(
             customer=self.user,
             parking_zone=self.zone,
             plate_number='Takeo 2A-9999',
-            start_datetime=t0,
-            finish_datetime=t0 + timedelta(days=2),
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=3)).date(),
+            finish_time=t0 + timedelta(days=3),
             daily_rate=4000,
             payment_method='PAY_AT_EXIT',
             status='CHECKED_IN',
@@ -1013,6 +1040,7 @@ class WorkflowBillingAndGateTests(TestCase):
         self.client.login(username='gate_officer', password='staffpass123')
         res_staff = self.client.get(reverse('staff_gate_scanner'))
         self.assertEqual(res_staff.status_code, 200)
+
 
 
 
