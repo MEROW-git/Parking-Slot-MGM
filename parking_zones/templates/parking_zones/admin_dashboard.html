@@ -18,6 +18,9 @@
       </p>
     </div>
     <div class="sp-admin-header-actions">
+      <a href="{% url 'staff_gate_scanner' %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-admin-gate-scanner" title="Open Attendant Gate Scanner & Barrier Control">
+        ⚡ Gate Scanner & Barrier
+      </a>
       <a href="{% url 'home' %}#parking-zones" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-admin-map" title="View Public City Inventory">
         Live City Map
       </a>
@@ -26,6 +29,17 @@
       </a>
     </div>
   </header>
+
+  {% if overstay_count > 0 %}
+    <div class="sp-alert sp-alert-warning" data-reveal="up" style="margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+      <div>
+        <strong>⚠ Overstay Alert (រថយន្តហួសម៉ោងកំណត់):</strong> {{ overstay_count }} parked vehicle{{ overstay_count|pluralize }} currently exceeding booked departure deadline (billed at 2× overstay rate).
+      </div>
+      <a href="{% url 'staff_gate_scanner' %}" class="sp-btn sp-btn-secondary sp-btn-sm" style="white-space:nowrap;">
+        Open Gate Terminal →
+      </a>
+    </div>
+  {% endif %}
 
   <!-- 1. System Summary Cards (8 Real Database Metrics) -->
   <section aria-labelledby="section-stats-heading" class="sp-workbench-section" id="admin-summary-stats">

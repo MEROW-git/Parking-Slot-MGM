@@ -89,9 +89,19 @@
     <section class="sp-dashboard-active-box" id="dashboard-active-reservation" aria-labelledby="active-res-heading" data-reveal="up">
       <div class="sp-dashboard-active-header">
         <div>
-          <span class="sp-avail-badge available" style="margin-bottom:0.35rem; display:inline-flex;">
-            <span class="sp-dot"></span> CURRENT ACTIVE SESSION
-          </span>
+          {% if active_reservation.status == 'CHECKED_IN' %}
+            <span class="sp-avail-badge available" style="margin-bottom:0.35rem; display:inline-flex; background:rgba(34,197,94,0.2); color:#4ade80;">
+              <span class="sp-dot"></span> PARKED IN SESSION (កំពុងចត)
+            </span>
+          {% elif active_reservation.status == 'CONFIRMED' %}
+            <span class="sp-avail-badge" style="margin-bottom:0.35rem; display:inline-flex; background:rgba(59,130,246,0.2); color:#60a5fa;">
+              <span class="sp-dot"></span> HOLD CONFIRMED (បានកក់)
+            </span>
+          {% else %}
+            <span class="sp-avail-badge" style="margin-bottom:0.35rem; display:inline-flex;">
+              {{ active_reservation.get_status_display }}
+            </span>
+          {% endif %}
           <h2 id="active-res-heading" style="font-size: clamp(1.75rem, 3vw, 2.25rem); margin-bottom: 0.25rem;">
             {{ active_reservation.parking_zone.name }}
           </h2>
@@ -100,18 +110,46 @@
           </p>
         </div>
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <a href="{% url 'ticket_gate_mode' active_reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-active-gate-pass" title="Open Fullscreen Gate QR">
+            ⚡ Show Gate Pass
+          </a>
           <a href="{% url 'ticket_code' active_reservation.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-active-view-ticket">
             View Digital Ticket
           </a>
-          <form action="{% url 'checkout' %}" method="post" class="sp-inline-form" id="form-active-checkout">
-            {% csrf_token %}
-            <input type="hidden" name="ticket_code" value="{{ active_reservation.ticket_code }}">
-            <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-active-checkout">
-              Check Out (ចេញពីចំណត)
-            </button>
-          </form>
+          {% if active_reservation.status == 'CHECKED_IN' %}
+            <form action="{% url 'checkout' %}" method="post" class="sp-inline-form" id="form-active-checkout">
+              {% csrf_token %}
+              <input type="hidden" name="ticket_code" value="{{ active_reservation.ticket_code }}">
+              <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-active-checkout">
+                Check Out (ចេញពីចំណត)
+              </button>
+            </form>
+          {% else %}
+            <form action="{% url 'cancel_booking' active_reservation.ticket_code %}" method="post" class="sp-inline-form" id="form-active-cancel" onsubmit="return confirm('Cancel this parking hold?');">
+              {% csrf_token %}
+              <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#f87171;" id="btn-active-cancel">
+                Cancel
+              </button>
+            </form>
+          {% endif %}
         </div>
       </div>
+
+      {% if active_reservation.status == 'CONFIRMED' and active_reservation.payment_method == 'PAY_AT_EXIT' and active_reservation.arrival_deadline %}
+        <div class="sp-countdown-box" style="margin: 1rem 0; padding: 0.75rem 1rem;">
+          <div class="sp-countdown-icon" style="font-size:1.5rem;">⏱</div>
+          <div>
+            <div class="sp-countdown-title" style="font-size:0.85rem;">3-Hour Arrival Hold Deadline</div>
+            <p style="margin:0; font-size:0.75rem; color:var(--color-ink-2);">
+              Must check in at the barrier before {{ active_reservation.arrival_deadline|date:"H:i, d M Y" }}:
+            </p>
+          </div>
+          <div class="sp-countdown-timer" style="font-size:1.25rem;" data-target="{{ active_reservation.arrival_deadline|date:'c' }}">
+            --:--
+          </div>
+        </div>
+      {% endif %}
+
       <div class="sp-dashboard-active-grid">
         <div>
           <span class="sp-dashboard-metric-label">Ticket Code</span>
@@ -220,3 +258,8 @@
   {% endif %}
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/sompark-countdown.js"></script>
+{% endblock %}
+

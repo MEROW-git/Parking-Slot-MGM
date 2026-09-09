@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Pay Deposit · Ticket #{{ reservation.ticket_code }} | SomPark Phnom Penh{% endblock %}
+
+{% block content %}
+{% include "components/page_header.html" with title="Complete Deposit Payment" subtitle="Lock in your guaranteed parking space by paying the first day's deposit" khmer_tag="ទូទាត់ប្រាក់កក់ថ្ងៃដំបូង" %}
+
+<div class="sp-booking-container" style="max-width: 680px; margin-inline: auto;" id="pay-deposit-container">
+  <!-- Payment Timeout Countdown Banner -->
+  {% if reservation.payment_deadline %}
+    <div class="sp-countdown-box" id="payment-countdown-card" data-reveal="up">
+      <div class="sp-countdown-icon">⏱</div>
+      <div>
+        <div class="sp-countdown-title">Checkout Hold Expiration (ផុតកំណត់ការទូទាត់)</div>
+        <p style="margin:0; font-size:0.83rem; color:var(--color-ink-2);">
+          Your capacity hold will expire if the deposit is not verified within the checkout window:
+        </p>
+      </div>
+      <div class="sp-countdown-timer" id="payment-timer" data-target="{{ reservation.payment_deadline|date:'c' }}">
+        --:--
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Deposit Order Summary Card -->
+  <div class="sp-booking-card" data-reveal="up" data-reveal-delay="40" style="margin-top: 1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1.5rem; border-bottom:1px solid var(--color-surface-2); padding-bottom:1rem;">
+      <div>
+        <span class="sp-avail-badge" style="background:rgba(234,179,8,0.15); color:#facc15; border:1px solid rgba(234,179,8,0.3); margin-bottom:0.4rem; display:inline-block;">
+          PAYMENT PENDING (រង់ចាំការទូទាត់)
+        </span>
+        <h2 style="font-size:1.5rem; margin:0;">Ticket #{{ reservation.ticket_code }}</h2>
+        <div style="font-size:0.85rem; color:var(--color-ink-2);">Facility: <strong>{{ reservation.parking_zone.name }}</strong></div>
+      </div>
+      <div style="text-align:right;">
+        <span style="font-size:0.8rem; color:var(--color-ink-2); display:block;">Deposit Amount (ប្រាក់កក់)</span>
+        <span style="font-family:var(--font-outlier); font-size:1.85rem; font-weight:800; color:var(--color-primary-light);">
+          {{ reservation.daily_rate_khr_formatted }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Booking details grid -->
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1.5rem; font-size:0.88rem;">
+      <div>
+        <span style="color:var(--color-ink-2); display:block; font-size:0.75rem; text-transform:uppercase;">Vehicle Plate</span>
+        <strong style="font-family:var(--font-outlier); font-size:1.05rem;">{{ reservation.plate_number }}</strong>
+      </div>
+      <div>
+        <span style="color:var(--color-ink-2); display:block; font-size:0.75rem; text-transform:uppercase;">Customer</span>
+        <strong>{{ reservation.customer.username }}</strong> ({{ reservation.phone_number }})
+      </div>
+      <div>
+        <span style="color:var(--color-ink-2); display:block; font-size:0.75rem; text-transform:uppercase;">Arrival Window</span>
+        <strong>{{ reservation.start_datetime|date:"d M Y, H:i" }}</strong>
+      </div>
+      <div>
+        <span style="color:var(--color-ink-2); display:block; font-size:0.75rem; text-transform:uppercase;">Booked Exit</span>
+        <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
+      </div>
+    </div>
+
+    <!-- Deposit Policy Disclosure -->
+    <div class="sp-form-note" style="border-left-color:var(--color-primary); background:rgba(30, 41, 59, 0.6); margin-bottom:1.5rem;">
+      <strong>📌 How your deposit works (លក្ខខណ្ឌប្រាក់កក់):</strong>
+      <ul style="margin:0.35rem 0 0; padding-left:1.2rem; font-size:0.82rem; line-height:1.45; color:var(--color-ink-2);">
+        <li>This deposit equals 1 day's standard parking rate and guarantees your spot without a 3-hour arrival expiry.</li>
+        <li>It is deducted in full from your bill at the exit barrier when settling actual parking time.</li>
+        <li>Disclosed demo policy: Deposits are non-refundable in the event of customer cancellation or no-show.</li>
+      </ul>
+    </div>
+
+    <!-- Payment Simulator / Gateway Section -->
+    {% if demo_enabled %}
+      <div style="background: rgba(15, 23, 42, 0.95); border: 2px dashed rgba(59, 130, 246, 0.4); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <span style="background:#2563eb; color:white; font-size:0.7rem; font-weight:700; padding:0.2rem 0.5rem; border-radius:4px;">
+              DEMO PAYMENT ADAPTER
+            </span>
+            <span style="font-size:0.85rem; font-weight:600;">Simulated Local Payment Gateway</span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--color-ink-2);">Ref: {{ transaction.transaction_reference }}</span>
+        </div>
+
+        <p style="font-size:0.82rem; color:var(--color-ink-2); margin-bottom:1rem; line-height:1.4;">
+          This demo adapter provides simulated payment confirmations for development, verification, and testing.
+          Real production deployments integrate Bakong KHQR / PayWay webhooks.
+        </p>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem;">
+          <!-- Success Simulation -->
+          <form action="{% url 'payment_simulate' transaction.id %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="outcome" value="success">
+            <button type="submit" class="sp-btn sp-btn-primary" style="width:100%; justify-content:center;" id="btn-demo-pay-success">
+              ✓ Simulate Success (ជោគជ័យ)
+            </button>
+          </form>
+
+          <!-- Failure Simulation -->
+          <form action="{% url 'payment_simulate' transaction.id %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="outcome" value="failure">
+            <button type="submit" class="sp-btn sp-btn-secondary" style="width:100%; justify-content:center; color:#f87171; border-color:rgba(239,68,68,0.4);" id="btn-demo-pay-fail">
+              ✕ Simulate Failure (បរាជ័យ)
+            </button>
+          </form>
+
+          <!-- Cancel Simulation -->
+          <form action="{% url 'payment_simulate' transaction.id %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="outcome" value="cancel">
+            <button type="submit" class="sp-btn sp-btn-secondary" style="width:100%; justify-content:center;" id="btn-demo-pay-cancel">
+              ⊘ Cancel Attempt
+            </button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <div class="sp-alert sp-alert-warning">
+        <div>
+          <strong>Production Payment Gateway:</strong> Real bank QR integration pending. Contact system administrator.
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Cancel Reservation Action -->
+    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--color-surface-2); padding-top:1.25rem;">
+      <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" onsubmit="return confirm('Are you sure you want to release this parking hold?');">
+        {% csrf_token %}
+        <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#ef4444;" id="btn-cancel-deposit-hold">
+          ✕ Cancel Booking & Release Hold
+        </button>
+      </form>
+
+      <a href="{% url 'dashboard' %}" class="sp-btn sp-btn-secondary sp-btn-sm">
+        Return to Dashboard →
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/sompark-countdown.js"></script>
+{% endblock %}

@@ -3,7 +3,7 @@
 {% block title %}Reserve Parking Spot | SomPark Phnom Penh{% endblock %}
 
 {% block content %}
-{% include "components/page_header.html" with title="Reserve a Parking Slot" subtitle="Lock in your guaranteed parking space in central Phnom Penh" khmer_tag="កក់កន្លែងចំណតទុកជាមុន" %}
+{% include "components/page_header.html" with title="Reserve a Parking Slot" subtitle="Guaranteed parking space in central Phnom Penh with real-time capacity hold" khmer_tag="កក់កន្លែងចំណតទុកជាមុន" %}
 
 <div class="sp-booking-container" id="booking-container">
   {% if active_reservation %}
@@ -16,13 +16,9 @@
       <a href="{% url 'ticket_code' active_reservation.ticket_code %}" class="sp-btn sp-btn-secondary" id="btn-booking-view-ticket">
         View Current Ticket
       </a>
-      <form action="{% url 'checkout' %}" method="post" style="display:inline;">
-        {% csrf_token %}
-        <input type="hidden" name="ticket_code" value="{{ active_reservation.ticket_code }}">
-        <button type="submit" class="sp-btn sp-btn-primary" id="btn-booking-checkout">
-          Check Out Now (ចេញពីចំណត)
-        </button>
-      </form>
+      <a href="{% url 'ticket_gate_mode' active_reservation.ticket_code %}" class="sp-btn sp-btn-primary" id="btn-booking-gate-pass">
+        Show Gate Pass ⚡
+      </a>
     </div>
   {% else %}
     <div class="sp-booking-card" data-reveal="up" data-reveal-delay="50">
@@ -39,9 +35,41 @@
 
         {% include "components/form_field.html" with field=form.parking_zone %}
 
-        <div class="sp-form-row">
-          {% include "components/form_field.html" with field=form.start_date %}
-          {% include "components/form_field.html" with field=form.finish_date %}
+        <!-- Booked Time Interval -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+          <div class="sp-form-group">
+            <label class="sp-label" for="id_start_date">
+              Start Date & Arrival Time (មកដល់)
+              <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 0.5rem;">
+              {{ form.start_date }}
+              {{ form.start_time }}
+            </div>
+            {% if form.start_date.errors or form.start_time.errors %}
+              <div class="sp-field-feedback">
+                {% for err in form.start_date.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
+                {% for err in form.start_time.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="sp-form-group">
+            <label class="sp-label" for="id_finish_date">
+              Finish Date & Exit Deadline (ចេញផុតកំណត់)
+              <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 0.5rem;">
+              {{ form.finish_date }}
+              {{ form.finish_time }}
+            </div>
+            {% if form.finish_date.errors or form.finish_time.errors %}
+              <div class="sp-field-feedback">
+                {% for err in form.finish_date.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
+                {% for err in form.finish_time.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
+              </div>
+            {% endif %}
+          </div>
         </div>
 
         <!-- Vehicle Plate Number Grouped Field -->
@@ -101,9 +129,72 @@
 
         {% include "components/form_field.html" with field=form.phone_number %}
 
-        <!-- Local Guidance Note -->
-        <div class="sp-form-note">
-          <strong>ចំណាំ (Note):</strong> Parking fees are paid in Cambodian Riel (KHR / ៛) upon entry or digital validation. Please present your digital or printed ticket code to the facility attendant upon arrival.
+        <!-- Payment Choices Selection (Two Distinct Methods) -->
+        <div class="sp-form-group" id="group_payment_choices" style="margin-top:1.5rem;">
+          <label class="sp-label" id="legend_payment_choice">
+            Select Payment Policy (ជម្រើសទូទាត់ប្រាក់)
+            <span class="sp-required" aria-hidden="true">*</span>
+          </label>
+
+          <div class="sp-payment-choices" role="radiogroup" aria-labelledby="legend_payment_choice">
+            <!-- Option A: Pay first day now -->
+            <label class="sp-payment-option" id="label-pay-deposit">
+              <input type="radio" name="payment_method" value="DEPOSIT" id="id_payment_method_deposit" {% if form.payment_method.value != 'PAY_AT_EXIT' %}checked{% endif %}>
+              <div class="sp-payment-content">
+                <div class="sp-payment-title">
+                  <strong>Pay first day now (កក់ប្រាក់១ថ្ងៃជាមុន)</strong>
+                  <span class="sp-avail-badge available" style="font-size:0.7rem;">RECOMMENDED</span>
+                </div>
+                <p class="sp-payment-desc">
+                  Pay 1 day’s parking rate now as a secure deposit. Counts toward your final bill at exit.
+                  Guarantees your slot with no 3-hour arrival expiry. Required for future dates.
+                </p>
+                <div style="font-size:0.78rem; color:var(--color-primary-light); margin-top:0.35rem;">
+                  ✓ Unlocks instant digital QR access pass upon verified deposit.
+                </div>
+              </div>
+            </label>
+
+            <!-- Option B: Pay at exit -->
+            <label class="sp-payment-option" id="label-pay-at-exit">
+              <input type="radio" name="payment_method" value="PAY_AT_EXIT" id="id_payment_method_exit" {% if form.payment_method.value == 'PAY_AT_EXIT' %}checked{% endif %}>
+              <div class="sp-payment-content">
+                <div class="sp-payment-title">
+                  <strong>Pay at exit (ទូទាត់ពេលចេញ)</strong>
+                  <span class="sp-avail-badge" style="background:rgba(234,179,8,0.15); color:#facc15; font-size:0.7rem;">SAME-DAY ONLY</span>
+                </div>
+                <p class="sp-payment-desc">
+                  $0 due at booking. Holds capacity for <strong>3 hours</strong> from reservation creation.
+                  Must check in at the facility barrier before the 3-hour deadline, or the hold expires.
+                </p>
+                <div id="future-date-warning" style="display:none; font-size:0.78rem; color:#f87171; margin-top:0.35rem;">
+                  ⚠ Future-date bookings require "Pay first day now". Select today's date to enable Pay at exit.
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {% if form.payment_method.errors %}
+            <div class="sp-field-feedback">
+              {% for err in form.payment_method.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Overstay and Billing Policy Disclosure -->
+        <div class="sp-form-note" style="border-left-color: var(--color-primary); background: rgba(30, 41, 59, 0.7); margin: 1.5rem 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+            <strong style="color:var(--color-ink); font-size:0.92rem;">
+              📋 Transparent Billing & Overstay Policy (គោលការណ៍គិតថ្លៃ និងហួសម៉ោង)
+            </strong>
+            <span class="sp-overstay-badge">Overstay rate: 2× daily rate</span>
+          </div>
+          <ul style="margin:0; padding-left:1.2rem; font-size:0.83rem; color:var(--color-ink-2); line-height:1.5;">
+            <li><strong>Pay for actual use:</strong> Every started 24-hour block counts as one billable day (1-day minimum after check-in).</li>
+            <li><strong>Deposit credit:</strong> Any deposit paid is deducted directly from your final bill at the exit barrier.</li>
+            <li><strong>Overstay multiplier:</strong> Staying beyond your booked exit is charged at <strong>DOUBLE (2×)</strong> the standard daily rate for each started overstay day (this 2× rate fully includes the normal charge).</li>
+            <li><strong>Exact boundary:</strong> Exiting on or before your exact booked end incurs zero overstay penalty. Rates are snapshotted at booking.</li>
+          </ul>
         </div>
 
         <div class="sp-form-actions">
@@ -127,27 +218,61 @@
     var codeEl = document.getElementById('id_plate_code');
     var prevValEl = document.getElementById('plate-preview-text');
 
-    if (!provEl || !codeEl || !prevValEl) return;
+    if (provEl && codeEl && prevValEl) {
+      function updatePreview() {
+        var prov = provEl.value || 'Phnom Penh';
+        var raw = codeEl.value ? codeEl.value.trim().replace(/\s+/g, ' ') : '';
+        var code = raw ? raw.toUpperCase() : '2AZ-1234';
+        prevValEl.textContent = prov + ' ' + code;
+      }
 
-    function updatePreview() {
-      var prov = provEl.value || 'Phnom Penh';
-      var raw = codeEl.value ? codeEl.value.trim().replace(/\s+/g, ' ') : '';
-      var code = raw ? raw.toUpperCase() : '2AZ-1234';
-      prevValEl.textContent = prov + ' ' + code;
+      codeEl.addEventListener('input', updatePreview);
+      codeEl.addEventListener('blur', function() {
+        if (codeEl.value) {
+          codeEl.value = codeEl.value.trim().replace(/\s+/g, ' ').toUpperCase();
+          updatePreview();
+        }
+      });
+      provEl.addEventListener('change', updatePreview);
     }
 
-    codeEl.addEventListener('input', function() {
-      updatePreview();
-    });
+    // Dynamic disabling of Pay at Exit for future dates
+    var startDateEl = document.getElementById('id_start_date');
+    var radioExit = document.getElementById('id_payment_method_exit');
+    var radioDeposit = document.getElementById('id_payment_method_deposit');
+    var labelExit = document.getElementById('label-pay-at-exit');
+    var warnExit = document.getElementById('future-date-warning');
 
-    codeEl.addEventListener('blur', function() {
-      if (codeEl.value) {
-        codeEl.value = codeEl.value.trim().replace(/\s+/g, ' ').toUpperCase();
-        updatePreview();
+    function checkDatePolicy() {
+      if (!startDateEl || !radioExit) return;
+      var todayStr = new Date().toISOString().split('T')[0];
+      var chosenDate = startDateEl.value;
+
+      if (chosenDate && chosenDate > todayStr) {
+        // Future booking: disable pay at exit
+        radioExit.disabled = true;
+        if (labelExit) {
+          labelExit.style.opacity = '0.55';
+          labelExit.style.cursor = 'not-allowed';
+        }
+        if (warnExit) warnExit.style.display = 'block';
+        if (radioExit.checked && radioDeposit) {
+          radioDeposit.checked = true;
+        }
+      } else {
+        radioExit.disabled = false;
+        if (labelExit) {
+          labelExit.style.opacity = '1';
+          labelExit.style.cursor = 'pointer';
+        }
+        if (warnExit) warnExit.style.display = 'none';
       }
-    });
+    }
 
-    provEl.addEventListener('change', updatePreview);
+    if (startDateEl) {
+      startDateEl.addEventListener('change', checkDatePolicy);
+      checkDatePolicy();
+    }
   })();
 </script>
 {% endblock %}

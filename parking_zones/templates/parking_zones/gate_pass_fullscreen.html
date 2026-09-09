@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gate Access Pass #{{ reservation.ticket_code }} · SomPark</title>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Kantumruy Pro", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      overflow-x: hidden;
+    }
+    .gate-top-bar {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .btn-gate-close {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .gate-facility-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.01em;
+    }
+    .gate-status-pill {
+      display: inline-block;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+    .status-confirmed { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+    .status-parked { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .status-completed { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+    /* High-contrast QR Display Box with Strict Quiet Zone */
+    .gate-qr-stage {
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      border: 2px solid #e2e8f0;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-block: auto;
+    }
+    .gate-qr-img {
+      width: clamp(240px, 70vw, 300px);
+      height: clamp(240px, 70vw, 300px);
+      display: block;
+      image-rendering: pixelated;
+    }
+    .gate-plate-badge {
+      font-family: var(--font-outlier, monospace);
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: #0f172a;
+      background: #f8fafc;
+      border: 2px solid #cbd5e1;
+      padding: 0.35rem 1.25rem;
+      border-radius: 8px;
+      margin-top: 1.25rem;
+      letter-spacing: 0.05em;
+    }
+    .gate-token-ref {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 0.5rem;
+      font-family: monospace;
+      font-weight: 600;
+    }
+    .gate-footer-hint {
+      width: 100%;
+      max-width: 400px;
+      font-size: 0.8rem;
+      color: #64748b;
+      line-height: 1.45;
+      margin-top: 1.5rem;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="gate-top-bar">
+    <a href="{% url 'ticket_code' reservation.ticket_code %}" class="btn-gate-close" id="btn-gate-back">
+      ← Close Pass
+    </a>
+    <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; letter-spacing: 0.08em;">
+      SOMPARK GATE PASS
+    </span>
+  </div>
+
+  <div style="margin-bottom: 0.75rem;">
+    <div class="gate-facility-title">{{ reservation.parking_zone.name }}</div>
+    <div style="font-size: 0.85rem; color: #475569;">{{ reservation.parking_zone.address }}</div>
+  </div>
+
+  <div>
+    {% if reservation.checked_out %}
+      <span class="gate-status-pill status-completed">COMPLETED / CHECKED OUT</span>
+    {% elif reservation.status == 'CHECKED_IN' %}
+      <span class="gate-status-pill status-parked">PARKED · READY FOR EXIT SCAN</span>
+    {% elif reservation.status == 'CONFIRMED' %}
+      <span class="gate-status-pill status-confirmed">RESERVED · READY FOR ENTRY SCAN</span>
+    {% else %}
+      <span class="gate-status-pill">{{ reservation.get_status_display }}</span>
+    {% endif %}
+  </div>
+
+  <!-- High-contrast QR Stage with White Background and Quiet Zone -->
+  <div class="gate-qr-stage" id="gate-qr-stage">
+    {% if qr_data_uri %}
+      <img src="{{ qr_data_uri }}" alt="Access QR Code" class="gate-qr-img" id="gate-qr-image">
+    {% else %}
+      <img src="{% url 'ticket_qr_image' reservation.ticket_code %}" alt="Access QR Code" class="gate-qr-img">
+    {% endif %}
+
+    <div class="gate-plate-badge" id="gate-plate-number">
+      {{ reservation.plate_number }}
+    </div>
+
+    <div class="gate-token-ref">
+      Ticket #{{ reservation.ticket_code }}
+    </div>
+  </div>
+
+  <div class="gate-footer-hint">
+    <strong>Turn phone brightness to MAX for quickest barrier scanning.</strong><br>
+    សូមបង្កើនពន្លឺអេក្រង់ទូរស័ព្ទឱ្យខ្ពស់ ដើម្បីស្កេនបានលឿននៅរបាំងស្វ័យប្រវត្តិ។
+  </div>
+</body>
+</html>

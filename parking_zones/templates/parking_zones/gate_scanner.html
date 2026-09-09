@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Gate Operations Scanner · SomPark Attendant Workbench{% endblock %}
+
+{% block content %}
+<div class="sp-dashboard sp-admin-workbench" id="gate-scanner-workbench">
+  <!-- Header Bar -->
+  <header class="sp-dashboard-greeting sp-admin-header" data-reveal="up">
+    <div>
+      <div class="sp-dashboard-welcome-badge sp-admin-badge">
+        <span>ច្រកទ្វារចំណត SOMPARK</span> · <span>Staff Gate Operations Workbench</span>
+      </div>
+      <h1 class="sp-admin-title" style="font-size: clamp(1.75rem, 3.5vw, 2.5rem);">
+        Barrier Scanner & Attendant Terminal
+      </h1>
+      <p class="sp-admin-subtitle">
+        Unified entry validation, automated billing breakdown, payment collection, and barrier control.
+      </p>
+    </div>
+    <div class="sp-admin-header-actions">
+      <a href="{% url 'admin_dashboard' %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-return-admin-dash">
+        ← Operations Dashboard
+      </a>
+    </div>
+  </header>
+
+  <!-- Barrier Hardware Simulation Panel -->
+  <section class="sp-scanner-container" data-reveal="up" data-reveal-delay="40" style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--color-surface-2); padding-bottom: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span class="sp-barrier-status {% if mode == 'exit_preview' and can_exit %}open{% else %}closed{% endif %}" id="barrier-visual-indicator">
+          <span class="sp-barrier-light"></span>
+          {% if mode == 'exit_preview' and can_exit %}
+            GATE OPEN (របាំងបើក - AUTHORIZED)
+          {% else %}
+            GATE CLOSED (របាំងបិទ - LOCKED)
+          {% endif %}
+        </span>
+        <span style="font-size: 0.78rem; color: var(--color-ink-2);">
+          Simulated IoT Barrier Relay
+        </span>
+      </div>
+
+      <!-- Mode Switcher -->
+      <div class="sp-gate-mode-tabs" role="tablist">
+        <button type="button" class="sp-gate-tab {% if mode != 'exit_preview' %}active{% endif %}" id="tab-mode-entry" onclick="setGateMode('entry')">
+          🚗 Entry Mode (ច្រកចូល)
+        </button>
+        <button type="button" class="sp-gate-tab {% if mode == 'exit_preview' %}active{% endif %}" id="tab-mode-exit" onclick="setGateMode('exit')">
+          🏁 Exit Mode (ច្រកចេញ)
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Mode Container -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; align-items: start;">
+
+      <!-- Scanner / Camera / Input Column -->
+      <div>
+        <h3 style="font-size: 1.15rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="color: var(--color-primary-light);">📷</span> Scanner & Pass Lookup
+        </h3>
+
+        <!-- Camera Scanner Simulation Box -->
+        <div class="sp-camera-feed" id="camera-viewport-box">
+          <div class="sp-scan-reticle"></div>
+          <div class="sp-scan-line"></div>
+          <video id="gate-camera-stream" style="width: 100%; height: 100%; object-fit: cover; display: none;" playsinline></video>
+          <div id="camera-placeholder-msg" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; text-align: center; color: var(--color-ink-2);">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="opacity:0.6; margin-bottom:0.5rem;">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <path d="M7 7h.01M7 17h.01M17 7h.01M17 17h.01"></path>
+            </svg>
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-ink);">Gate Camera Feed Ready</span>
+            <span style="font-size: 0.75rem; margin-top: 0.25rem;">Present QR code or enter ticket code below</span>
+            <button type="button" class="sp-btn sp-btn-secondary sp-btn-sm" style="margin-top: 0.75rem; font-size: 0.72rem;" id="btn-toggle-camera" onclick="startCamera()">
+              Enable WebCam Scanner
+            </button>
+            <div id="camera-status-msg" style="font-size: 0.7rem; color: #f87171; margin-top: 0.35rem; display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Manual Lookup Form -->
+        <form action="{% url 'staff_gate_action' %}" method="post" id="gate-lookup-form" style="margin-top: 1.25rem;">
+          {% csrf_token %}
+          <input type="hidden" name="action" id="input-gate-action" value="{% if mode == 'exit_preview' %}lookup_exit{% else %}lookup_entry{% endif %}">
+
+          <div class="sp-form-group" style="margin-bottom: 0.75rem;">
+            <label class="sp-label" for="input-token-code">
+              Scan QR Token or Enter Reference Code (លេខកូដសំបុត្រ ឬ Token)
+              <span class="sp-required">*</span>
+            </label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" name="token_or_code" id="input-token-code" class="sp-input" placeholder="e.g. TK123456 or opaque token" value="{{ reservation.ticket_code|default:'' }}" required autofocus style="font-family: monospace; font-weight: 700;">
+              <button type="submit" class="sp-btn sp-btn-primary" id="btn-lookup-ticket" style="white-space: nowrap;">
+                Lookup Pass →
+              </button>
+            </div>
+          </div>
+
+          <!-- Zone filter selector -->
+          <div class="sp-form-group">
+            <label class="sp-label" for="select-scanner-zone" style="font-size: 0.8rem; color: var(--color-ink-2);">
+              Target Facility Gate (ទីតាំងច្រកទ្វារ)
+            </label>
+            <select name="zone_id" id="select-scanner-zone" class="sp-input sp-select" style="font-size: 0.85rem; padding: 0.5rem 0.75rem;">
+              <option value="">-- All SomPark Facilities (ស្កេនគ្រប់ចំណត) --</option>
+              {% for z in zones %}
+                <option value="{{ z.id }}" {% if reservation.parking_zone_id == z.id %}selected{% endif %}>
+                  {{ z.name }} ({{ z.vacant_slots }} vacant / {{ z.total_capacity }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <!-- Result / Verification & Actions Column -->
+      <div id="gate-result-column">
+        {% if mode == 'entry_preview' %}
+          <!-- Entry Preview Card -->
+          <div class="sp-booking-card" style="border: 2px solid {% if is_valid %}rgba(34,197,94,0.4){% else %}rgba(239,68,68,0.4){% endif %};">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--color-surface-2); padding-bottom:0.75rem;">
+              <div>
+                <span class="sp-avail-badge {% if is_valid %}available{% else %}sp-stat-red{% endif %}" style="font-size:0.75rem;">
+                  {% if is_valid %}✓ ELIGIBLE FOR ENTRY (អនុញ្ញាតឱ្យចូល){% else %}✕ ENTRY REJECTED (មិនអនុញ្ញាត){% endif %}
+                </span>
+                <h3 style="font-size:1.35rem; margin:0.35rem 0 0;">Ticket #{{ reservation.ticket_code }}</h3>
+              </div>
+              <div style="text-align:right;">
+                <span style="font-size:0.75rem; color:var(--color-ink-2);">Facility</span>
+                <strong style="display:block;">{{ reservation.parking_zone.name }}</strong>
+              </div>
+            </div>
+
+            {% if message %}
+              <div class="sp-alert {% if is_valid %}sp-alert-success{% else %}sp-alert-error{% endif %}" style="margin-bottom:1rem; font-size:0.85rem;">
+                <div>{{ message }}</div>
+              </div>
+            {% endif %}
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; font-size:0.85rem; margin-bottom:1.25rem;">
+              <div>
+                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Vehicle Plate</span>
+                <strong style="font-family:var(--font-outlier); font-size:1.15rem;">{{ reservation.plate_number }}</strong>
+              </div>
+              <div>
+                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Customer</span>
+                <strong>{{ reservation.customer.username }}</strong> ({{ reservation.phone_number }})
+              </div>
+              <div>
+                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Payment Policy</span>
+                <strong>{{ reservation.get_payment_method_display }}</strong>
+              </div>
+              <div>
+                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Payment Status</span>
+                <strong>{{ reservation.get_payment_status_display }}</strong>
+              </div>
+              <div>
+                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Arrival Window</span>
+                <span>{{ reservation.start_datetime|date:"d M Y, H:i" }}</span>
+              </div>
+              <div>
+                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Booked Exit</span>
+                <span>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</span>
+              </div>
+            </div>
+
+            {% if is_valid %}
+              <form action="{% url 'staff_gate_action' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="confirm_entry">
+                <input type="hidden" name="reservation_id" value="{{ reservation.id }}">
+                <button type="submit" class="sp-btn sp-btn-primary" style="width:100%; justify-content:center; padding:0.85rem;" id="btn-confirm-entry">
+                  ✓ Open Barrier & Confirm Entry (បើករបាំងចូល)
+                </button>
+              </form>
+            {% else %}
+              <div style="text-align:center; padding:0.5rem; font-size:0.82rem; color:#f87171;">
+                Cannot admit vehicle into facility. Please review the error above.
+              </div>
+            {% endif %}
+          </div>
+
+        {% elif mode == 'exit_preview' %}
+          <!-- Exit Settlement & Verification Card -->
+          <div class="sp-booking-card" style="border: 2px solid {% if can_exit %}rgba(34,197,94,0.4){% else %}rgba(234,179,8,0.4){% endif %};">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--color-surface-2); padding-bottom:0.75rem;">
+              <div>
+                <span class="sp-avail-badge {% if can_exit %}available{% else %}sp-stat-amber{% endif %}" style="font-size:0.75rem;">
+                  {% if can_exit %}✓ READY FOR PHYSICAL EXIT (អនុញ្ញាតឱ្យចេញ){% else %}⚠ SETTLEMENT REQUIRED (ត្រូវទូទាត់មុនចេញ){% endif %}
+                </span>
+                <h3 style="font-size:1.35rem; margin:0.35rem 0 0;">Ticket #{{ reservation.ticket_code }}</h3>
+              </div>
+              <div style="text-align:right;">
+                <span style="font-family:var(--font-outlier); font-size:1.2rem;">{{ reservation.plate_number }}</span>
+              </div>
+            </div>
+
+            {% if message %}
+              <div class="sp-alert {% if can_exit %}sp-alert-success{% else %}sp-alert-warning{% endif %}" style="margin-bottom:1rem; font-size:0.85rem;">
+                <div>{{ message }}</div>
+              </div>
+            {% endif %}
+
+            <!-- Itemized Bill Breakdown -->
+            <div class="sp-bill-breakdown" style="background:rgba(15,23,42,0.6); padding:1rem; border-radius:8px; margin-bottom:1.25rem;">
+              <div style="font-weight:700; font-size:0.9rem; margin-bottom:0.6rem; border-bottom:1px solid var(--color-surface-2); padding-bottom:0.4rem; display:flex; justify-content:space-between;">
+                <span>Billable Calculation (ការគិតថ្លៃជាក់ស្តែង)</span>
+                <span style="font-size:0.75rem; color:var(--color-ink-2);">Snapshotted: {{ reservation.daily_rate_khr_formatted }}/day</span>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:0.35rem;">
+                <span>Normal Duration ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }}):</span>
+                <strong style="font-family:var(--font-outlier);">{{ bill.normal_charge_formatted }}</strong>
+              </div>
+
+              {% if bill.overstay_days > 0 %}
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:0.35rem; color:#f87171;">
+                  <span>Overstay Penalty ({{ bill.overstay_days }} day{{ bill.overstay_days|pluralize }} @ 2× rate):</span>
+                  <strong style="font-family:var(--font-outlier);">+ {{ bill.overstay_charge_formatted }}</strong>
+                </div>
+              {% endif %}
+
+              {% if bill.deposit_deducted > 0 %}
+                <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:0.35rem; color:#4ade80;">
+                  <span>Deposit Deducted:</span>
+                  <strong style="font-family:var(--font-outlier);">- {{ bill.deposit_deducted_formatted }}</strong>
+                </div>
+              {% endif %}
+
+              <div style="display:flex; justify-content:space-between; font-size:1.15rem; font-weight:800; border-top:1px solid var(--color-surface-2); padding-top:0.5rem; margin-top:0.5rem;">
+                <span>Balance Due (សមតុល្យត្រូវបង់):</span>
+                <span style="font-family:var(--font-outlier); color:var(--color-primary-light);">{{ bill.balance_due_formatted }}</span>
+              </div>
+            </div>
+
+            {% if not can_exit and bill.balance_due > 0 %}
+              <!-- Settle Balance Form -->
+              <form action="{% url 'staff_gate_action' %}" method="post" style="margin-bottom:1rem;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="collect_exit_payment">
+                <input type="hidden" name="reservation_id" value="{{ reservation.id }}">
+
+                <div class="sp-form-group" style="margin-bottom:0.75rem;">
+                  <label class="sp-label" for="select-exit-provider" style="font-size:0.82rem;">
+                    Select Settlement Method (វិធីទូទាត់)
+                  </label>
+                  <select name="payment_provider" id="select-exit-provider" class="sp-input sp-select">
+                    <option value="CASH">💵 Cash / សាច់ប្រាក់ផ្ទាល់ (Attendant Till)</option>
+                    {% if demo_enabled %}
+                      <option value="BAKONG_KHQR_DEMO">📲 Bakong KHQR (Demo Adapter Simulation)</option>
+                    {% endif %}
+                    <option value="POS_TERMINAL">💳 Credit/Debit Card POS</option>
+                  </select>
+                </div>
+
+                <button type="submit" class="sp-btn sp-btn-primary" style="width:100%; justify-content:center; padding:0.75rem;" id="btn-collect-exit-balance">
+                  Collect {{ bill.balance_due_formatted }} & Authorize 5-min Exit →
+                </button>
+              </form>
+
+              <p style="font-size:0.75rem; color:var(--color-ink-2); line-height:1.4; margin:0;">
+                * Settle payment to start the 5-minute departure window. Physical vehicle release occurs in the next step.
+              </p>
+
+            {% elif can_exit %}
+              <!-- Exit Authorized - Physical Barrier Release Action -->
+              <div style="background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); border-radius:6px; padding:0.75rem; margin-bottom:1rem; font-size:0.82rem; color:#4ade80;">
+                ✓ Settlement verified. 5-minute exit clearance window authorized
+                {% if reservation.exit_authorized_until %}until {{ reservation.exit_authorized_until|date:"H:i:s" }}{% endif %}.
+              </div>
+
+              <form action="{% url 'staff_gate_action' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="confirm_exit">
+                <input type="hidden" name="reservation_id" value="{{ reservation.id }}">
+                <button type="submit" class="sp-btn sp-btn-primary" style="width:100%; justify-content:center; padding:0.85rem;" id="btn-confirm-exit-barrier">
+                  🏁 Open Barrier & Confirm Vehicle Departure (បើករបាំងចេញ)
+                </button>
+              </form>
+            {% endif %}
+          </div>
+
+        {% else %}
+          <!-- Empty State / Standby Mode -->
+          <div class="sp-booking-card" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:280px; text-align:center; color:var(--color-ink-2);">
+            <div style="font-size:2.5rem; margin-bottom:0.75rem; opacity:0.7;">🛡️</div>
+            <h4 style="font-size:1.15rem; color:var(--color-ink); margin-bottom:0.35rem;">Attendant Terminal Standby</h4>
+            <p style="font-size:0.85rem; max-width:320px; line-height:1.45;">
+              Scan a digital QR access pass or enter a ticket reference code on the left to begin entry or exit validation.
+            </p>
+          </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Developer & Integrator Hardware Note -->
+  <footer style="font-size:0.75rem; color:var(--color-ink-2); border-top:1px solid var(--color-surface-2); padding-top:1rem; margin-top:2rem; line-height:1.5;">
+    <strong>Hardware Integration Point:</strong> Automated barrier PLCs (e.g. Moxa, Advantech, Raspberry Pi relays) trigger barrier arms via authenticated webhook `POST /staff/gate/action/` with staff API key or session credentials. See <code>services.GateService</code> for state machine transitions.
+  </footer>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function setGateMode(mode) {
+    var tabEntry = document.getElementById('tab-mode-entry');
+    var tabExit = document.getElementById('tab-mode-exit');
+    var inputAction = document.getElementById('input-gate-action');
+
+    if (mode === 'entry') {
+      if (tabEntry) tabEntry.classList.add('active');
+      if (tabExit) tabExit.classList.remove('active');
+      if (inputAction) inputAction.value = 'lookup_entry';
+    } else {
+      if (tabExit) tabExit.classList.add('active');
+      if (tabEntry) tabEntry.classList.remove('active');
+      if (inputAction) inputAction.value = 'lookup_exit';
+    }
+  }
+
+  // Camera integration fallback
+  var videoEl = document.getElementById('gate-camera-stream');
+  var btnCam = document.getElementById('btn-toggle-camera');
+  var statusMsg = document.getElementById('camera-status-msg');
+
+  function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (statusMsg) {
+        statusMsg.textContent = 'Camera API not supported on this browser/insecure origin.';
+        statusMsg.style.display = 'block';
+      }
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(function(stream) {
+        if (videoEl) {
+          videoEl.srcObject = stream;
+          videoEl.style.display = 'block';
+          videoEl.play();
+        }
+        var placeholder = document.getElementById('camera-placeholder-msg');
+        if (placeholder) placeholder.style.display = 'none';
+      })
+      .catch(function(err) {
+        if (statusMsg) {
+          statusMsg.textContent = 'Camera permission denied or camera in use (' + err.name + '). Please use manual code lookup.';
+          statusMsg.style.display = 'block';
+        }
+      });
+  }
+</script>
+{% endblock %}

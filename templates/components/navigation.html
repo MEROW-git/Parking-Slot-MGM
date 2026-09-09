@@ -11,6 +11,7 @@
         <li><a href="{% url 'dashboard' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" id="nav-dashboard">Dashboard</a></li>
         {% if user.is_staff %}
           <li><a href="{% url 'admin_dashboard' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" id="nav-admin-dashboard">Admin dashboard</a></li>
+          <li><a href="{% url 'staff_gate_scanner' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'staff_gate_scanner' %}active{% endif %}" id="nav-gate-scanner">Gate Scanner</a></li>
         {% endif %}
         <li><a href="{% url 'book' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'book' %}active{% endif %}" id="nav-book">Reserve</a></li>
         <li><a href="{% url 'all_tickets' %}" class="sp-nav-link {% if request.resolver_match.url_name == 'all_tickets' or request.resolver_match.url_name == 'ticket' or request.resolver_match.url_name == 'ticket_code' %}active{% endif %}" id="nav-tickets">My tickets</a></li>

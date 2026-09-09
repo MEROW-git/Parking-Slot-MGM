@@ -216,3 +216,11 @@ LOGOUT_REDIRECT_URL = 'login'
 
 X_FRAME_OPTIONS = 'ALLOWALL'
 
+# SomPark Workflow & Payment Configuration
+# In production, set DEMO_PAYMENT_ENABLED=False to require verified external bank gateways
+DEMO_PAYMENT_ENABLED = os.environ.get('DEMO_PAYMENT_ENABLED', 'True').strip().lower() in ('true', '1', 'yes')
+PAYMENT_TIMEOUT_MINUTES = int(os.environ.get('PAYMENT_TIMEOUT_MINUTES', '15'))
+ARRIVAL_HOLD_HOURS = int(os.environ.get('ARRIVAL_HOLD_HOURS', '3'))
+EXIT_WINDOW_MINUTES = int(os.environ.get('EXIT_WINDOW_MINUTES', '5'))
+DEFAULT_OVERSTAY_MULTIPLIER = float(os.environ.get('DEFAULT_OVERSTAY_MULTIPLIER', '2.0'))
+

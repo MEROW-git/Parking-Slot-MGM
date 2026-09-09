@@ -1,7 +1,10 @@
 import re
+from datetime import time, datetime, timedelta
 from django import forms
+from django.conf import settings
 from django.utils import timezone
 from .models import ParkingZone, Reservation
+from .services import CapacityService
 
 # Centralized constant of Phnom Penh Capital and all 24 Cambodian Provinces
 CAMBODIA_PROVINCES = (
@@ -55,6 +58,17 @@ class ReservationForm(forms.ModelForm):
         label='Start Date (កាលបរិច្ឆេទចាប់ផ្តើម)'
     )
 
+    start_time = forms.TimeField(
+        initial='07:00',
+        required=False,
+        widget=forms.TimeInput(attrs={
+            'type': 'time',
+            'class': 'sp-input',
+            'id': 'id_start_time',
+        }),
+        label='Arrival Time (ម៉ោងមកដល់)'
+    )
+
     finish_date = forms.DateField(
         widget=forms.DateInput(attrs={
             'type': 'date',
@@ -63,6 +77,28 @@ class ReservationForm(forms.ModelForm):
             'required': 'required',
         }),
         label='Finish Date (កាលបរិច្ឆេទបញ្ចប់)'
+    )
+
+    finish_time = forms.TimeField(
+        initial='22:00',
+        required=False,
+        widget=forms.TimeInput(attrs={
+            'type': 'time',
+            'class': 'sp-input',
+            'id': 'id_finish_time',
+        }),
+        label='Exit Time (ម៉ោងចេញ)'
+    )
+
+    payment_method = forms.ChoiceField(
+        choices=Reservation.PAYMENT_METHOD_CHOICES,
+        initial='DEPOSIT',
+        required=False,
+        widget=forms.RadioSelect(attrs={
+            'class': 'sp-payment-radio',
+        }),
+        label='Payment Choice (ជម្រើសទូទាត់)',
+        help_text='Deposit pays 1st day now and counts toward bill. Pay at exit is available for same-day booking with 3-hour arrival hold.'
     )
 
     plate_province = forms.ChoiceField(
@@ -116,12 +152,13 @@ class ReservationForm(forms.ModelForm):
 
     class Meta:
         model = Reservation
-        fields = ['parking_zone', 'start_date', 'finish_date', 'plate_number', 'phone_number']
+        fields = ['parking_zone', 'start_date', 'finish_date', 'plate_number', 'phone_number', 'payment_method']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['plate_province'].initial = 'Phnom Penh'
         self.fields['plate_number'].required = False
+        self.fields['payment_method'].initial = 'DEPOSIT'
 
         # If editing an existing reservation instance, extract province and code
         if self.instance and self.instance.pk and self.instance.plate_number:
@@ -136,14 +173,17 @@ class ReservationForm(forms.ModelForm):
             if not matched:
                 self.fields['plate_code'].initial = plate
 
+        if self.instance and self.instance.pk and self.instance.start_time:
+            self.fields['start_time'].initial = self.instance.start_time.strftime('%H:%M')
+        if self.instance and self.instance.pk and self.instance.finish_time:
+            self.fields['finish_time'].initial = self.instance.finish_time.strftime('%H:%M')
+
     def clean_phone_number(self):
         raw_phone = self.cleaned_data.get('phone_number', '').strip()
         if not raw_phone:
             raise forms.ValidationError('Please enter your contact phone number.')
 
-        # Strip spaces and dashes
         digits_only = re.sub(r'[\s\-\(\)]', '', raw_phone)
-        # Check Cambodian phone: +855 followed by 8-9 digits, or 0 followed by 8-9 digits
         valid_cam = re.match(r'^(\+855|855|0)[1-9]\d{7,8}$', digits_only)
         if not valid_cam:
             raise forms.ValidationError(
@@ -155,15 +195,41 @@ class ReservationForm(forms.ModelForm):
         cleaned_data = super().clean()
         start_date = cleaned_data.get('start_date')
         finish_date = cleaned_data.get('finish_date')
+        raw_start_time = cleaned_data.get('start_time') or time(7, 0)
+        raw_finish_time = cleaned_data.get('finish_time') or time(22, 0)
+        payment_method = cleaned_data.get('payment_method') or 'DEPOSIT'
         zone = cleaned_data.get('parking_zone')
 
         today = timezone.localdate()
+        tz = timezone.get_current_timezone()
 
         if start_date and start_date < today:
             self.add_error('start_date', 'Start date cannot be in the past.')
 
         if start_date and finish_date and finish_date < start_date:
             self.add_error('finish_date', 'Finish date must be on or after start date.')
+
+        # Construct timezone-aware start and finish datetimes
+        start_dt = None
+        finish_dt = None
+        if start_date and finish_date:
+            start_dt = timezone.make_aware(datetime.combine(start_date, raw_start_time), tz)
+            finish_dt = timezone.make_aware(datetime.combine(finish_date, raw_finish_time), tz)
+
+            if finish_dt <= start_dt:
+                self.add_error('finish_time', 'Finish time must be after start time.')
+
+            cleaned_data['start_datetime'] = start_dt
+            cleaned_data['finish_datetime'] = finish_dt
+
+        # Business Rule: Pay at exit is only available for same-day immediate arrival
+        if payment_method == 'PAY_AT_EXIT':
+            if start_date and start_date > today:
+                self.add_error(
+                    'payment_method',
+                    'Pay at exit (3-hour hold) is only available for immediate same-day arrival. '
+                    'For future dates, please select "Pay first day now" to secure your guaranteed spot.'
+                )
 
         if zone and zone.vacant_slots <= 0:
             self.add_error('parking_zone', f'Zone "{zone.name}" is currently at full capacity.')
@@ -175,7 +241,6 @@ class ReservationForm(forms.ModelForm):
 
         valid_provinces = [p[0] for p in CAMBODIA_PROVINCES]
 
-        # Check if the split UI fields were submitted
         if 'plate_code' in self.data or 'plate_province' in self.data:
             has_plate_error = False
 
@@ -190,10 +255,8 @@ class ReservationForm(forms.ModelForm):
                 self.add_error('plate_code', 'Please enter a vehicle plate number (សូមបញ្ចូលលេខផ្លាកលេខ).')
                 has_plate_error = True
             else:
-                # Collapse whitespace and convert Latin letters to uppercase
                 cleaned_code = re.sub(r'\s+', ' ', raw_code).upper()
 
-                # Allow Latin letters, numbers, spaces, periods, and hyphens
                 if not re.match(r'^[A-Z0-9\s\.\-]{2,15}$', cleaned_code):
                     self.add_error(
                         'plate_code',
@@ -215,7 +278,6 @@ class ReservationForm(forms.ModelForm):
                 self.instance.plate_number = combined_plate
 
         elif raw_plate:
-            # Backward compatibility: raw plate_number submitted directly
             cleaned = re.sub(r'\s+', ' ', raw_plate).upper()
             plate_regex = r'^[A-Z0-9\s\.\-]{3,40}$'
             if not re.match(plate_regex, cleaned) or not re.search(r'\d', cleaned):
@@ -226,7 +288,7 @@ class ReservationForm(forms.ModelForm):
         else:
             self.add_error('plate_code', 'Please enter a vehicle plate number (សូមបញ្ចូលលេខផ្លាកលេខ).')
 
-        # Accessibility: Update aria-invalid, aria-describedby, and is-invalid class based on error state
+        # Accessibility attributes update
         if 'plate_province' in self.errors:
             self.fields['plate_province'].widget.attrs['aria-invalid'] = 'true'
             self.fields['plate_province'].widget.attrs['aria-describedby'] = 'error_plate_province plate-preview-box'
@@ -251,8 +313,38 @@ class ReservationForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+
         if 'plate_number' in self.cleaned_data and self.cleaned_data['plate_number']:
             instance.plate_number = self.cleaned_data['plate_number']
+
+        if 'start_datetime' in self.cleaned_data:
+            instance.start_time = self.cleaned_data['start_datetime']
+        if 'finish_datetime' in self.cleaned_data:
+            instance.finish_time = self.cleaned_data['finish_datetime']
+
+        # Price snapshot
+        if instance.parking_zone_id:
+            instance.daily_rate = instance.parking_zone.price
+        instance.overstay_multiplier = getattr(settings, 'DEFAULT_OVERSTAY_MULTIPLIER', 2.0)
+
+        # Payment & status initialization
+        payment_method = self.cleaned_data.get('payment_method') or 'DEPOSIT'
+        instance.payment_method = payment_method
+        now = timezone.now()
+
+        if payment_method == 'PAY_AT_EXIT':
+            instance.status = 'CONFIRMED'
+            instance.payment_status = 'UNPAID'
+            hold_hours = getattr(settings, 'ARRIVAL_HOLD_HOURS', 3)
+            instance.arrival_deadline = now + timedelta(hours=hold_hours)
+            instance.payment_deadline = None
+        else:
+            instance.status = 'PAYMENT_PENDING'
+            instance.payment_status = 'UNPAID'
+            timeout_mins = getattr(settings, 'PAYMENT_TIMEOUT_MINUTES', 15)
+            instance.payment_deadline = now + timedelta(minutes=timeout_mins)
+            instance.arrival_deadline = None
+
         if commit:
             instance.save()
         return instance

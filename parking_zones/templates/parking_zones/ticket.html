@@ -8,20 +8,49 @@
     ← Ticket History
   </a>
   <div class="sp-ticket-actions-group">
+    <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-show-gate-mode" title="Fullscreen high-contrast QR for gate scanner">
+      ⚡ Show at Gate (បង្ហាញនៅរបាំង)
+    </a>
     <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
       Print ticket (បោះពុម្ព)
     </button>
     {% if not reservation.checked_out %}
-      <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-ticket-checkout">
-        {% csrf_token %}
-        <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
-        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket">
-          Check Out (ចេញពីចំណត)
-        </button>
-      </form>
+      {% if reservation.status == 'CHECKED_IN' %}
+        <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-ticket-checkout">
+          {% csrf_token %}
+          <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
+          <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket">
+            Proceed to Gate Exit (ចេញពីចំណត)
+          </button>
+        </form>
+      {% else %}
+        <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" style="display:inline;" id="form-ticket-cancel" onsubmit="return confirm('Cancel this parking reservation?');">
+          {% csrf_token %}
+          <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#ef4444;" id="btn-cancel-ticket">
+            Cancel Hold (បោះបង់)
+          </button>
+        </form>
+      {% endif %}
     {% endif %}
   </div>
 </div>
+
+<!-- Live Arrival Countdown Banner (For Unpaid Same-Day Holds) -->
+{% if reservation.status == 'CONFIRMED' and reservation.payment_method == 'PAY_AT_EXIT' and reservation.arrival_deadline %}
+  <div class="no-print sp-countdown-box" id="arrival-countdown-card" data-reveal="up" style="max-width:820px; margin: 0 auto 1.5rem;">
+    <div class="sp-countdown-icon">🚗</div>
+    <div>
+      <div class="sp-countdown-title">3-Hour Arrival Hold Active (កំណត់ពេលមកដល់ ៣ម៉ោង)</div>
+      <p style="margin:0; font-size:0.83rem; color:var(--color-ink-2);">
+        Your space is held until <strong>{{ reservation.arrival_deadline|date:"H:i, d M Y" }}</strong>.
+        Please scan your access QR at the entrance barrier before the timer expires:
+      </p>
+    </div>
+    <div class="sp-countdown-timer" id="arrival-timer" data-target="{{ reservation.arrival_deadline|date:'c' }}">
+      --:--
+    </div>
+  </div>
+{% endif %}
 
 <!-- Printable Parking Ticket Sheet -->
 <div class="sp-ticket-sheet" id="parking-ticket-sheet" data-reveal="scale" data-reveal-delay="50">
@@ -43,10 +72,20 @@
         <span class="sp-avail-badge" style="background:#e5e7eb; color:#4b5563; border:1px solid #9ca3af;">
           CHECKED OUT (បានចេញ)
         </span>
-      {% else %}
-        <span class="sp-avail-badge available" style="border:1px solid #16a34a;">
-          ACTIVE RESERVATION (កំពុងចត)
+      {% elif reservation.status == 'CHECKED_IN' %}
+        <span class="sp-avail-badge available" style="background:rgba(34,197,94,0.2); color:#15803d; border:1px solid #16a34a;">
+          PARKED / CHECKED IN (កំពុងចត)
         </span>
+      {% elif reservation.status == 'CONFIRMED' %}
+        <span class="sp-avail-badge" style="background:rgba(59,130,246,0.15); color:#1d4ed8; border:1px solid #3b82f6;">
+          CONFIRMED HOLD (បានកក់)
+        </span>
+      {% elif reservation.status == 'EXPIRED' %}
+        <span class="sp-avail-badge" style="background:rgba(239,68,68,0.15); color:#b91c1c; border:1px solid #ef4444;">
+          EXPIRED (ផុតកំណត់)
+        </span>
+      {% else %}
+        <span class="sp-avail-badge">{{ reservation.get_status_display }}</span>
       {% endif %}
       <div style="font-size:0.75rem; color:var(--color-print-muted); margin-top:0.35rem;">
         Issued: {{ reservation.created_on|date:"d M Y, H:i" }}
@@ -54,12 +93,26 @@
     </div>
   </div>
 
-  <div style="text-align:center; margin:1.5rem 0 2rem;">
-    <div style="font-size:0.8rem; font-weight:700; color:var(--color-print-muted); text-transform:uppercase; letter-spacing:0.04em;">
-      TICKET REFERENCE CODE (លេខកូដសំបុត្រ)
+  <!-- QR Access Pass & Reference Box -->
+  <div class="sp-qr-sheet-card" style="display:flex; flex-direction:column; align-items:center; margin:1.5rem 0; padding:1.25rem; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px;">
+    <div style="font-size:0.8rem; font-weight:700; color:var(--color-print-muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.75rem;">
+      OFFICIAL GATE ACCESS QR (កូដ QR សម្រាប់ស្កេនចូល-ចេញ)
     </div>
-    <div class="sp-ticket-barcode" id="ticket-barcode-val">
+
+    <!-- Scannable QR Code Image -->
+    <div style="background:white; padding:12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border:1px solid #e2e8f0; line-height:0;">
+      {% if qr_data_uri %}
+        <img src="{{ qr_data_uri }}" alt="Access QR Code for Ticket {{ reservation.ticket_code }}" style="width:180px; height:180px; display:block;" id="ticket-access-qr-img">
+      {% else %}
+        <img src="{% url 'ticket_qr_image' reservation.ticket_code %}" alt="Access QR Code" style="width:180px; height:180px; display:block;">
+      {% endif %}
+    </div>
+
+    <div class="sp-ticket-barcode" id="ticket-barcode-val" style="margin-top:0.75rem;">
       * {{ reservation.ticket_code }} *
+    </div>
+    <div style="font-size:0.75rem; color:#64748b; margin-top:0.25rem;">
+      Opaque Token: <code style="font-size:0.72rem; color:#334155;">{{ reservation.access_token|slice:":12" }}...</code> (Validated server-side)
     </div>
   </div>
 
@@ -83,26 +136,77 @@
     </div>
 
     <div>
-      <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">VALIDITY DATES (កាលបរិច្ឆេទ)</span>
-      <strong>{{ reservation.start_date|date:"d M Y" }}</strong> to <strong>{{ reservation.finish_date|date:"d M Y" }}</strong>
+      <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">VALIDITY PERIOD (កាលបរិច្ឆេទ)</span>
+      <strong>{{ reservation.start_datetime|date:"d M Y, H:i" }}</strong> to <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
     </div>
   </div>
 
-  <!-- Fee Calculation -->
-  <div class="sp-ticket-rate-panel">
-    <div>
-      <div style="font-weight:700;">Daily Parking Rate (តម្លៃក្នុងមួយថ្ងៃ)</div>
-      <div style="font-size:0.8rem; color:var(--color-print-muted);">Official rate payable at entry/exit</div>
+  <!-- Real-time Bill Breakdown / Rates -->
+  <div class="sp-ticket-rate-panel" style="flex-direction:column; align-items:stretch; gap:0.75rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,0,0,0.06); padding-bottom:0.5rem;">
+      <div>
+        <div style="font-weight:700; color:var(--color-print-ink);">Payment Policy: {{ reservation.get_payment_method_display }}</div>
+        <div style="font-size:0.8rem; color:var(--color-print-muted);">
+          Snapshotted Base Rate: {{ reservation.daily_rate_khr_formatted }} / day ·
+          <span style="color:#b91c1c; font-weight:600;">Overstay: 2× daily rate</span>
+        </div>
+      </div>
+      <div>
+        <span class="sp-avail-badge" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1;">
+          Status: {{ reservation.get_payment_status_display }}
+        </span>
+      </div>
     </div>
-    <div style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-print-ink);">
-      {{ reservation.parking_zone.price_khr_formatted }}
+
+    <!-- Itemized Server-Calculated Bill Details -->
+    <div style="font-size:0.88rem; color:var(--color-print-ink); line-height:1.6;">
+      <div style="display:flex; justify-content:space-between;">
+        <span>Normal Parking Duration ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }} @ {{ bill.daily_rate|default:reservation.daily_rate }} KHR):</span>
+        <strong style="font-family:var(--font-outlier);">{{ bill.normal_charge_formatted }}</strong>
+      </div>
+
+      {% if bill.overstay_days > 0 %}
+        <div style="display:flex; justify-content:space-between; color:#b91c1c;">
+          <span>Overstay Penalty ({{ bill.overstay_days }} day{{ bill.overstay_days|pluralize }} @ 2× rate):</span>
+          <strong style="font-family:var(--font-outlier);">+ {{ bill.overstay_charge_formatted }}</strong>
+        </div>
+      {% endif %}
+
+      {% if bill.deposit_deducted > 0 %}
+        <div style="display:flex; justify-content:space-between; color:#15803d;">
+          <span>Deposit Credited (ប្រាក់កក់បានកាត់):</span>
+          <strong style="font-family:var(--font-outlier);">- {{ bill.deposit_deducted_formatted }}</strong>
+        </div>
+      {% endif %}
+
+      <div style="display:flex; justify-content:space-between; border-top:2px solid #0f172a; padding-top:0.4rem; margin-top:0.4rem; font-size:1.15rem; font-weight:800;">
+        <span>{% if reservation.checked_out %}Total Paid (បានទូទាត់):{% else %}Estimated Balance Due (សមតុល្យត្រូវបង់):{% endif %}</span>
+        <span style="font-family:var(--font-outlier); color:#0f172a;">{{ bill.balance_due_formatted }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checked In / Checked Out Timestamps -->
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.5rem; margin-top:1rem; font-size:0.8rem; color:var(--color-print-muted); background:#f8fafc; padding:0.75rem; border-radius:6px;">
+    <div>
+      Checked In: <strong>{{ reservation.checked_in_at|date:"d M Y, H:i"|default:"Pending arrival" }}</strong>
+    </div>
+    <div>
+      Booked Exit: <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
+    </div>
+    <div>
+      Checked Out: <strong>{{ reservation.checked_out_at|date:"d M Y, H:i"|default:"In session" }}</strong>
     </div>
   </div>
 
   <!-- Attendant Instructions -->
-  <div style="font-size:0.82rem; color:var(--color-print-muted); border-top:1px dashed var(--color-print-rule); padding-top:1rem; text-align:center; line-height:1.45;">
-    សូមបង្ហាញសំបុត្រនេះដល់បុគ្គលិកចំណតនៅពេលចេញ-ចូល។<br>
-    Please show this ticket or barcode code to the barrier attendant. Hotline: +855 23 888 999.
+  <div style="font-size:0.82rem; color:var(--color-print-muted); border-top:1px dashed var(--color-print-rule); padding-top:1rem; text-align:center; line-height:1.45; margin-top:1.25rem;">
+    សូមបង្ហាញកូដ QR នេះដល់ម៉ាស៊ីនស្កេន ឬបុគ្គលិកចំណតនៅពេលចេញ-ចូល។<br>
+    Please scan this access QR at the barrier camera or present to staff. SomPark Hotline: +855 23 888 999.
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/sompark-countdown.js"></script>
 {% endblock %}

@@ -41,18 +41,33 @@
                 <span class="sp-avail-badge" style="background:var(--color-paper-3); color:var(--color-muted);">
                   COMPLETED
                 </span>
-              {% else %}
-                <span class="sp-avail-badge available">
-                  <span class="sp-dot"></span> ACTIVE
+              {% elif ticket.status == 'CHECKED_IN' %}
+                <span class="sp-avail-badge available" style="background:rgba(34,197,94,0.2); color:#4ade80;">
+                  PARKED
                 </span>
+              {% elif ticket.status == 'CONFIRMED' %}
+                <span class="sp-avail-badge" style="background:rgba(59,130,246,0.2); color:#60a5fa;">
+                  CONFIRMED
+                </span>
+              {% elif ticket.status == 'EXPIRED' %}
+                <span class="sp-avail-badge" style="background:rgba(239,68,68,0.2); color:#f87171;">
+                  EXPIRED
+                </span>
+              {% else %}
+                <span class="sp-avail-badge">{{ ticket.get_status_display }}</span>
               {% endif %}
             </td>
             <td class="col-actions" style="text-align:right;">
-              <div style="display:inline-flex; gap:var(--space-xs); justify-content:flex-end;">
-                <a href="{% url 'ticket_code' ticket.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-view-{{ ticket.ticket_code }}">
-                  View
-                </a>
+              <div style="display:inline-flex; gap:var(--space-xs); justify-content:flex-end; flex-wrap:wrap;">
                 {% if not ticket.checked_out %}
+                  <a href="{% url 'ticket_gate_mode' ticket.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-gate-{{ ticket.ticket_code }}" title="Show Gate QR Pass">
+                    ⚡ Gate Pass
+                  </a>
+                {% endif %}
+                <a href="{% url 'ticket_code' ticket.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-view-{{ ticket.ticket_code }}">
+                  View Pass
+                </a>
+                {% if not ticket.checked_out and ticket.status == 'CHECKED_IN' %}
                   <form action="{% url 'checkout' %}" method="post" style="display:inline;" id="form-co-{{ ticket.ticket_code }}">
                     {% csrf_token %}
                     <input type="hidden" name="ticket_code" value="{{ ticket.ticket_code }}">

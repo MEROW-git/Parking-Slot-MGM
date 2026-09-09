@@ -593,4 +593,427 @@ class VehiclePlateAndBookingFormTests(TestCase):
         self.assertContains(admin_res, 'Siem Reap 2AZ-7777')
 
 
+class WorkflowBillingAndGateTests(TestCase):
+    """
+    Exhaustive verification of billing calculations, overstay penalty,
+    arrival holds, payment timeouts, QR entry/exit, capacity, and security.
+    """
+    def setUp(self):
+        self.user = User.objects.create_user(username='tester_driver', password='testpass123')
+        self.staff = User.objects.create_user(username='gate_officer', password='staffpass123', is_staff=True)
+        self.other_user = User.objects.create_user(username='other_driver', password='testpass123')
+
+        self.zone = ParkingZone.objects.create(
+            name='Central Riverside Garage',
+            khmer_name='ចំណតមាត់ទន្លេកណ្តាល',
+            slug='central-riverside-garage',
+            num_of_slots=5,
+            occupied_slots=1,
+            vacant_slots=4,
+            address='Preah Sisowath Quay, Phnom Penh',
+            district='Daun Penh',
+            price=4000,  # 4,000 KHR per day
+            operating_hours='24/7'
+        )
+
+        self.client = Client()
+
+    # -------------------------------------------------------------
+    # 1. BILLING CALCULATIONS (Prompt Exact Examples at 4,000 KHR/day)
+    # -------------------------------------------------------------
+    def test_billing_example_1_book_4_days_stay_2_days(self):
+        """
+        Book 4 days, stay 2:
+        Total = 8,000 KHR
+        With 4,000 KHR deposit: balance = 4,000 KHR
+        """
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-1111',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=4),
+            daily_rate=4000,
+            overstay_multiplier=2.0,
+            payment_method='DEPOSIT',
+            deposit_amount=4000,
+            payment_status='PARTIALLY_PAID',
+            status='CHECKED_IN',
+            checked_in_at=t0
+        )
+
+        actual_exit = t0 + timedelta(days=2)
+        bill = BillingService.calculate_bill(res, as_of=actual_exit)
+
+        self.assertEqual(bill['normal_days'], 2)
+        self.assertEqual(bill['overstay_days'], 0)
+        self.assertEqual(bill['normal_charge'], 8000)
+        self.assertEqual(bill['overstay_charge'], 0)
+        self.assertEqual(bill['total_amount'], 8000)
+        self.assertEqual(bill['deposit_deducted'], 4000)
+        self.assertEqual(bill['balance_due'], 4000)
+
+    def test_billing_example_2_book_4_days_stay_4_days(self):
+        """
+        Book 4 days, stay 4:
+        Total = 16,000 KHR
+        With deposit: balance = 12,000 KHR
+        """
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-2222',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=4),
+            daily_rate=4000,
+            overstay_multiplier=2.0,
+            payment_method='DEPOSIT',
+            deposit_amount=4000,
+            payment_status='PARTIALLY_PAID',
+            status='CHECKED_IN',
+            checked_in_at=t0
+        )
+
+        actual_exit = t0 + timedelta(days=4)
+        bill = BillingService.calculate_bill(res, as_of=actual_exit)
+
+        self.assertEqual(bill['normal_days'], 4)
+        self.assertEqual(bill['overstay_days'], 0)
+        self.assertEqual(bill['normal_charge'], 16000)
+        self.assertEqual(bill['overstay_charge'], 0)
+        self.assertEqual(bill['total_amount'], 16000)
+        self.assertEqual(bill['deposit_deducted'], 4000)
+        self.assertEqual(bill['balance_due'], 12000)
+
+    def test_billing_example_3_book_4_days_stay_5_days_double_rate(self):
+        """
+        Book 4 days, stay 5:
+        Normal portion = 4 × 4,000 = 16,000 KHR
+        Overstay portion = 1 × 8,000 = 8,000 KHR
+        Total = 24,000 KHR
+        With deposit: balance = 20,000 KHR
+
+        The double rate INCLUDES the normal charge for that overstay period (strictly 2x, not 3x).
+        """
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-3333',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=4),
+            daily_rate=4000,
+            overstay_multiplier=2.0,
+            payment_method='DEPOSIT',
+            deposit_amount=4000,
+            payment_status='PARTIALLY_PAID',
+            status='CHECKED_IN',
+            checked_in_at=t0
+        )
+
+        actual_exit = t0 + timedelta(days=5)
+        bill = BillingService.calculate_bill(res, as_of=actual_exit)
+
+        self.assertEqual(bill['normal_days'], 4)
+        self.assertEqual(bill['overstay_days'], 1)
+        self.assertEqual(bill['normal_charge'], 16000)
+        self.assertEqual(bill['overstay_charge'], 8000)
+        self.assertEqual(bill['total_amount'], 24000)
+        self.assertEqual(bill['deposit_deducted'], 4000)
+        self.assertEqual(bill['balance_due'], 2000)
+
+    def test_billing_example_4_book_4_days_stay_6_days(self):
+        """
+        Book 4 days, stay 6:
+        Total = 16,000 + 16,000 = 32,000 KHR
+        With deposit: balance = 28,000 KHR
+        """
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-4444',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=4),
+            daily_rate=4000,
+            overstay_multiplier=2.0,
+            payment_method='DEPOSIT',
+            deposit_amount=4000,
+            payment_status='PARTIALLY_PAID',
+            status='CHECKED_IN',
+            checked_in_at=t0
+        )
+
+        actual_exit = t0 + timedelta(days=6)
+        bill = BillingService.calculate_bill(res, as_of=actual_exit)
+
+        self.assertEqual(bill['normal_days'], 4)
+        self.assertEqual(bill['overstay_days'], 2)
+        self.assertEqual(bill['normal_charge'], 16000)
+        self.assertEqual(bill['overstay_charge'], 16000)
+        self.assertEqual(bill['total_amount'], 32000)
+        self.assertEqual(bill['deposit_deducted'], 4000)
+        self.assertEqual(bill['balance_due'], 28000)
+
+    def test_partial_days_and_exact_boundaries(self):
+        """
+        1-day minimum after entry.
+        Exact booked end exit has no overstay.
+        Partial overstay rounds up to started 24-hour block.
+        """
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Kandal 2B-5555',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=1),
+            daily_rate=4000,
+            overstay_multiplier=2.0,
+            payment_method='PAY_AT_EXIT',
+            status='CHECKED_IN',
+            checked_in_at=t0
+        )
+
+        # 1. Parked only 2 hours: minimum 1 billable day
+        bill_2h = BillingService.calculate_bill(res, as_of=t0 + timedelta(hours=2))
+        self.assertEqual(bill_2h['normal_days'], 1)
+        self.assertEqual(bill_2h['overstay_days'], 0)
+        self.assertEqual(bill_2h['total_amount'], 4000)
+
+        # 2. Exact finish time exit: 0 overstay
+        bill_exact = BillingService.calculate_bill(res, as_of=t0 + timedelta(days=1))
+        self.assertEqual(bill_exact['normal_days'], 1)
+        self.assertEqual(bill_exact['overstay_days'], 0)
+        self.assertEqual(bill_exact['total_amount'], 4000)
+
+        # 3. 1 minute past booked finish: rounds up to 1 full started overstay day (2x rate)
+        bill_over_1m = BillingService.calculate_bill(res, as_of=t0 + timedelta(days=1, minutes=1))
+        self.assertEqual(bill_over_1m['normal_days'], 1)
+        self.assertEqual(bill_over_1m['overstay_days'], 1)
+        self.assertEqual(bill_over_1m['total_amount'], 12000)  # 4000 + 8000
+
+    def test_price_snapshotting_protects_existing_bookings(self):
+        """
+        Changing the zone's daily rate later does NOT affect already created reservations.
+        """
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-9999',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=2),
+            daily_rate=4000,
+            payment_method='PAY_AT_EXIT',
+            status='CHECKED_IN',
+            checked_in_at=t0
+        )
+
+        # Zone price increases dramatically to 10,000 KHR
+        self.zone.price = 10000
+        self.zone.save()
+
+        bill = BillingService.calculate_bill(res, as_of=t0 + timedelta(days=2))
+        self.assertEqual(bill['daily_rate'], 4000)
+        self.assertEqual(bill['total_amount'], 8000)
+
+    # -------------------------------------------------------------
+    # 2. ARRIVAL EXPIRY & CAPACITY LIFECYCLE
+    # -------------------------------------------------------------
+    def test_three_hour_expiry_before_entry_but_never_after_entry(self):
+        """
+        Pay at exit holds expire after 3 hours if un-checked-in.
+        Once checked in, the 3-hour expiry stops applying forever.
+        """
+        t0 = timezone.now() - timedelta(hours=4)
+        res_unattended = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-0001',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=1),
+            payment_method='PAY_AT_EXIT',
+            arrival_deadline=t0 + timedelta(hours=3),
+            status='CONFIRMED',
+            created_on=t0
+        )
+
+        res_parked = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-0002',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=1),
+            payment_method='PAY_AT_EXIT',
+            arrival_deadline=t0 + timedelta(hours=3),
+            status='CHECKED_IN',
+            checked_in_at=t0 + timedelta(minutes=30),
+            created_on=t0
+        )
+
+        expired_count = ExpiryService.expire_unpaid_holds()
+        self.assertGreaterEqual(expired_count, 1)
+
+        res_unattended.refresh_from_db()
+        self.assertEqual(res_unattended.status, 'EXPIRED')
+
+        res_parked.refresh_from_db()
+        self.assertEqual(res_parked.status, 'CHECKED_IN')
+
+    def test_deposit_payment_failure_cancel_and_success(self):
+        """
+        Deposit payment failure and cancellation allow safe retry.
+        Successful payment confirms reservation and records transaction.
+        """
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-7771',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=2),
+            payment_method='DEPOSIT',
+            status='PAYMENT_PENDING'
+        )
+
+        txn = PaymentService.create_deposit_transaction(res)
+        self.assertEqual(txn.status, 'PENDING')
+
+        # 1. Simulate failure
+        success, msg = DemoPaymentAdapter.simulate_payment(txn.id, 'failure')
+        self.assertFalse(success)
+        txn.refresh_from_db()
+        self.assertEqual(txn.status, 'FAILED')
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'PAYMENT_PENDING')
+
+        # 2. Simulate cancellation
+        txn2 = PaymentService.create_deposit_transaction(res)
+        success, msg = DemoPaymentAdapter.simulate_payment(txn2.id, 'cancel')
+        self.assertFalse(success)
+        txn2.refresh_from_db()
+        self.assertEqual(txn2.status, 'CANCELLED')
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'PAYMENT_PENDING')
+
+        # 3. Simulate success
+        txn3 = PaymentService.create_deposit_transaction(res)
+        success, msg = DemoPaymentAdapter.simulate_payment(txn3.id, 'success')
+        self.assertTrue(success)
+        txn3.refresh_from_db()
+        self.assertEqual(txn3.status, 'COMPLETED')
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CONFIRMED')
+        self.assertEqual(res.payment_status, 'PARTIALLY_PAID')
+
+    # -------------------------------------------------------------
+    # 3. GATE ENTRY & EXIT WORKFLOW
+    # -------------------------------------------------------------
+    def test_gate_entry_and_duplicate_scan_prevention(self):
+        """
+        Entry converts hold to physical occupancy atomically.
+        Repeated scans do not alter capacity or record duplicate check-ins.
+        """
+        initial_occupied = self.zone.occupied_slots
+        t0 = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Siem Reap 2A-8888',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=1),
+            payment_method='PAY_AT_EXIT',
+            arrival_deadline=t0 + timedelta(hours=3),
+            status='CONFIRMED'
+        )
+
+        # 1. First entry scan: Success
+        is_valid, validated_res, msg = GateService.validate_entry(res.access_token, zone_id=self.zone.id)
+        self.assertTrue(is_valid)
+
+        success, confirmed_res, msg = GateService.confirm_entry(res.id, staff_user=self.staff)
+        self.assertTrue(success)
+        self.assertEqual(confirmed_res.status, 'CHECKED_IN')
+        self.assertIsNotNone(confirmed_res.checked_in_at)
+
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.occupied_slots, initial_occupied + 1)
+
+        # 2. Duplicate entry scan: Rejected
+        is_valid2, validated_res2, msg2 = GateService.validate_entry(res.access_token, zone_id=self.zone.id)
+        self.assertFalse(is_valid2)
+        self.assertIn('already checked in', msg2)
+
+        # Ensure capacity was not altered again
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.occupied_slots, initial_occupied + 1)
+
+    def test_gate_exit_settlement_and_departure_window(self):
+        """
+        Exit requires balance settlement.
+        Payment grants 5-minute departure window.
+        Physical exit releases space atomically.
+        """
+        t0 = timezone.now() - timedelta(days=2)
+        initial_occupied = self.zone.occupied_slots
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Takeo 2A-9999',
+            start_datetime=t0,
+            finish_datetime=t0 + timedelta(days=2),
+            daily_rate=4000,
+            payment_method='PAY_AT_EXIT',
+            status='CHECKED_IN',
+            checked_in_at=t0
+        )
+
+        # Prepare exit: balance due is 8,000 KHR
+        can_exit, r, bill, msg = GateService.prepare_exit(res.ticket_code)
+        self.assertFalse(can_exit)
+        self.assertEqual(bill['balance_due'], 8000)
+
+        # Attempting physical exit before payment fails
+        success, r, msg = GateService.confirm_physical_exit(res.id, staff_user=self.staff)
+        self.assertFalse(success)
+
+        # Settle payment at exit
+        PaymentService.record_exit_payment(res, amount=8000, provider='CASH')
+        res.refresh_from_db()
+        self.assertEqual(res.payment_status, 'PAID')
+        self.assertIsNotNone(res.exit_authorized_until)
+
+        # Now can exit
+        can_exit2, r2, bill2, msg2 = GateService.prepare_exit(res.ticket_code)
+        self.assertTrue(can_exit2)
+
+        # Confirm physical exit
+        success2, r_out, msg_out = GateService.confirm_physical_exit(res.id, staff_user=self.staff)
+        self.assertTrue(success2)
+        self.assertEqual(r_out.status, 'CHECKED_OUT')
+        self.assertTrue(r_out.checked_out)
+
+        # Capacity released
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.occupied_slots, initial_occupied - 1)
+
+    def test_unauthorized_staff_scanner_access(self):
+        """
+        Regular customers cannot access the staff gate scanner.
+        """
+        self.client.login(username='tester_driver', password='testpass123')
+        res = self.client.get(reverse('staff_gate_scanner'))
+        # Regular user raised PermissionDenied (HTTP 403)
+        self.assertEqual(res.status_code, 403)
+
+        # Staff can access
+        self.client.login(username='gate_officer', password='staffpass123')
+        res_staff = self.client.get(reverse('staff_gate_scanner'))
+        self.assertEqual(res_staff.status_code, 200)
+
+
+
 
