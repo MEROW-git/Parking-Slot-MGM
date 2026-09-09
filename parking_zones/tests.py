@@ -371,13 +371,62 @@ class VehiclePlateAndBookingFormTests(TestCase):
 
         # Live preview element
         self.assertContains(response, 'id="plate-preview-box"')
-        self.assertContains(response, 'Saved as (រក្សាទុកជា):')
+        self.assertContains(response, 'Plate preview (ការមើលស្លាកលេខជាមុន):')
         self.assertContains(response, 'id="plate-preview-text"')
+        self.assertContains(response, 'Enter your plate number to preview (សូមបញ្ចូលលេខផ្លាកដើម្បីមើលជាមុន)')
 
         # Accessibility attributes
         self.assertContains(response, 'autocapitalize="characters"')
         self.assertContains(response, 'spellcheck="false"')
         self.assertContains(response, 'autocomplete="off"')
+
+    def test_booking_page_redesigned_payment_section(self):
+        self.client.login(username='customer1', password='pass1234')
+        response = self.client.get(reverse('book'))
+        self.assertEqual(response.status_code, 200)
+
+        # 1. Simplified Payment Heading & Dynamic Facility Rate
+        self.assertContains(response, 'How would you like to pay? (តើអ្នកចង់ទូទាត់ប្រាក់ដោយរបៀបណា?)')
+        self.assertContains(response, 'Daily parking rate:')
+        self.assertContains(response, 'id="facility-rate-amount"')
+
+        # 2. Card A: Pay first day now
+        self.assertContains(response, 'id="card-pay-deposit"')
+        self.assertContains(response, 'Pay first day now')
+        self.assertContains(response, 'បង់ប្រាក់១ថ្ងៃដំបូងឥឡូវនេះ')
+        self.assertContains(response, 'Pay the remaining balance when you leave. Your first payment is deducted from the total.')
+        self.assertContains(response, 'Within your booked arrival window.')
+
+        # 3. Card B: Pay when you leave
+        self.assertContains(response, 'id="card-pay-exit"')
+        self.assertContains(response, 'Pay when you leave')
+        self.assertContains(response, 'បង់ប្រាក់នៅពេលអ្នកចេញ')
+        self.assertContains(response, '0 ៛')
+        self.assertContains(response, 'Pay for your actual parking time at exit.')
+        self.assertContains(response, 'Within 3 hours of booking. Same-day arrival only.')
+        self.assertContains(response, 'For future bookings, pay the first day now.')
+
+        # Verify removal of old badges and technical phrases
+        self.assertNotContains(response, 'RECOMMENDED')
+        self.assertNotContains(response, 'Select Payment Policy')
+        self.assertNotContains(response, 'Phnom Penh 2AZ-1234')
+
+        # 4. Compact Pricing Box & Accessible Disclosure
+        self.assertContains(response, 'Leave early? Pay only for the time you parked.')
+        self.assertContains(response, 'Stay past your booked end? Extra days cost 2× the daily rate.')
+        self.assertContains(response, 'Normal day (ថ្ងៃធម្មតា)')
+        self.assertContains(response, 'Each overstay day (រាល់ថ្ងៃលើសម៉ោង)')
+        self.assertContains(response, 'includes the normal daily charge.')
+        self.assertContains(response, 'How charges are calculated (របៀបគណនាថ្លៃសេវា)')
+
+        # 5. Pre-Submit Summary
+        self.assertContains(response, 'id="booking-submit-summary"')
+        self.assertContains(response, 'Due now (ចំនួនត្រូវបង់ឥឡូវនេះ):')
+        self.assertContains(response, 'Remaining parking charges are paid at exit.')
+        self.assertContains(response, 'Continue to payment (បន្តទៅការទូទាត់) →')
+
+        # 6. Dynamic JSON Data
+        self.assertContains(response, 'id="parking-zones-data"')
 
     def test_unbound_form_defaults_to_phnom_penh(self):
         form = ReservationForm()

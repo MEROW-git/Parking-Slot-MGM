@@ -59,6 +59,14 @@ class ParkingZone(models.Model):
         return f"{self.price:,} ៛"
 
     @property
+    def overstay_price(self):
+        return self.price * 2
+
+    @property
+    def overstay_price_khr_formatted(self):
+        return f"{self.price * 2:,} ៛"
+
+    @property
     def is_full(self):
         return self.vacant_slots <= 0
 

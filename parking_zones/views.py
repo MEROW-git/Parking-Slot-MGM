@@ -1,3 +1,4 @@
+import json
 from functools import wraps
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -69,12 +70,27 @@ def booking(request):
         )
         return redirect('ticket_code', ticket_code=active_reservation.ticket_code)
 
+    zones_list = list(ParkingZone.objects.all())
     selected_zone_slug = request.GET.get('zone')
     initial_data = {}
+    selected_zone = None
     if selected_zone_slug:
-        zone = ParkingZone.objects.filter(slug=selected_zone_slug).first()
-        if zone and zone.vacant_slots > 0:
-            initial_data['parking_zone'] = zone
+        selected_zone = next((z for z in zones_list if z.slug == selected_zone_slug and z.vacant_slots > 0), None)
+        if selected_zone:
+            initial_data['parking_zone'] = selected_zone
+
+    zones_meta = {
+        str(z.id): {
+            'id': z.id,
+            'name': z.name,
+            'price': z.price,
+            'price_formatted': f"{z.price:,} ៛",
+            'overstay_price': z.price * 2,
+            'overstay_formatted': f"{z.price * 2:,} ៛",
+        }
+        for z in zones_list
+    }
+    zones_meta_json = json.dumps(zones_meta)
 
     if request.method == 'POST':
         form = ReservationForm(request.POST)
@@ -94,6 +110,9 @@ def booking(request):
                             'form': form,
                             'title': 'Reserve Parking Slot | SomPark',
                             'active_reservation': active_reservation,
+                            'parking_zones': zones_list,
+                            'selected_zone': zone,
+                            'zones_meta_json': zones_meta_json,
                         })
 
                     # Check for duplicate active reservation for this user inside transaction
@@ -131,11 +150,23 @@ def booking(request):
         initial_data.setdefault('finish_date', today)
         form = ReservationForm(initial=initial_data)
 
+    if not selected_zone:
+        if form.is_bound:
+            zone_id = form.data.get('parking_zone')
+            if zone_id:
+                selected_zone = next((z for z in zones_list if str(z.id) == str(zone_id)), None)
+        elif initial_data.get('parking_zone'):
+            selected_zone = initial_data['parking_zone']
+    if not selected_zone and zones_list:
+        selected_zone = zones_list[0]
+
     context = {
         'form': form,
         'title': 'Reserve Parking Slot | SomPark',
         'active_reservation': active_reservation,
-        'parking_zones': ParkingZone.objects.all(),
+        'parking_zones': zones_list,
+        'selected_zone': selected_zone,
+        'zones_meta_json': zones_meta_json,
     }
     return render(request, 'parking_zones/booking.html', context)
 

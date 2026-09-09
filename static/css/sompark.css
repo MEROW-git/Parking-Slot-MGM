@@ -2864,15 +2864,56 @@ code {
    SomPark Workflow, Gate Operations, and QR Styles
    ========================================================================== */
 
-/* Payment Choice Radio Cards */
-.sp-payment-choices {
+/* Booking Form: Redesigned Payment Header & Facility Rate */
+.sp-payment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-block-end: var(--space-xs);
+}
+
+.sp-facility-rate-indicator {
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-3xs);
+}
+
+.sp-facility-rate-label {
+  color: var(--color-muted);
+}
+
+.sp-facility-rate-val {
+  font-family: var(--font-outlier);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.sp-facility-rate-kh {
+  color: var(--color-muted);
+  font-size: var(--text-2xs);
+}
+
+/* Two Selectable Payment Cards */
+.sp-payment-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--space-sm);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
   margin-block: var(--space-xs) var(--space-md);
 }
 
-.sp-payment-option {
+@media (max-width: 48rem) {
+  .sp-payment-cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-sm);
+  }
+}
+
+.sp-pay-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2881,61 +2922,341 @@ code {
   border: var(--rule-fine) solid var(--color-rule-2);
   border-radius: var(--radius-card);
   cursor: pointer;
-  transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
+  transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
+  min-width: 0;
 }
 
-.sp-payment-option:hover {
+.sp-pay-card:hover {
   border-color: var(--color-muted);
   background: var(--color-paper-3);
 }
 
-.sp-payment-option input[type="radio"] {
-  position: absolute;
-  top: var(--space-md);
-  right: var(--space-md);
-  accent-color: var(--color-accent);
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-}
-
-.sp-payment-option.is-selected {
+.sp-pay-card:has(input[type="radio"]:checked),
+.sp-pay-card.is-selected {
   border-color: var(--color-accent);
-  background: var(--color-paper-3);
+  background: rgba(234, 88, 12, 0.05);
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 
-.sp-payment-option.is-disabled {
+.sp-pay-card:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.sp-pay-card.is-disabled,
+.sp-pay-card:has(input[type="radio"]:disabled) {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.sp-payment-option-title {
+.sp-pay-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-block-end: var(--space-sm);
+}
+
+.sp-pay-card-radio {
+  accent-color: var(--color-accent);
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-block-start: 0.15rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sp-pay-card-radio:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.sp-pay-card-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.sp-pay-card-title {
   font-weight: 700;
   font-size: var(--text-base);
   color: var(--color-ink);
-  margin-block-end: var(--space-3xs);
+  line-height: 1.3;
 }
 
-.sp-payment-option-desc {
+.sp-pay-card-title-kh {
   font-size: var(--text-xs);
   color: var(--color-ink-2);
-  line-height: 1.45;
+  line-height: 1.4;
+}
+
+.sp-pay-card-rate {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
+  margin-block-end: var(--space-sm);
+  padding-block-end: var(--space-xs);
+  border-block-end: var(--rule-hair) solid var(--color-rule-2);
+}
+
+.sp-pay-amount {
+  font-family: var(--font-outlier);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-accent);
+  letter-spacing: 0.02em;
+}
+
+.sp-pay-amount-label {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.sp-pay-card-body {
+  margin-block-end: var(--space-sm);
+  flex-grow: 1;
+}
+
+.sp-pay-card-text {
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  line-height: 1.5;
+  margin-block-end: var(--space-2xs);
+}
+
+.sp-pay-card-text-kh {
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.sp-pay-card-footer {
+  margin-block-start: auto;
+  padding-block-start: var(--space-xs);
+  border-block-start: var(--rule-hair) solid var(--color-rule-2);
+  font-size: var(--text-2xs);
+}
+
+.sp-pay-arrival-note {
+  color: var(--color-ink-2);
+  line-height: 1.4;
+}
+
+.sp-pay-arrival-note-kh {
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin-block-start: 0.15rem;
+}
+
+.sp-pay-future-warning {
+  margin-block-start: var(--space-xs);
+  padding: var(--space-2xs) var(--space-xs);
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius-input);
+  color: #f87171;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+/* Compact Price Explanation & Disclosure */
+.sp-pricing-box {
+  background: var(--color-paper-2);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: var(--space-md);
+  margin-block: var(--space-md);
+}
+
+.sp-pricing-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+  margin-block-end: var(--space-md);
+  padding-block-end: var(--space-sm);
+  border-block-end: var(--rule-hair) solid var(--color-rule-2);
+}
+
+.sp-pricing-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sp-pricing-rule-title {
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.sp-pricing-rule-kh {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.sp-pricing-example {
+  background: var(--color-paper-3);
+  border-radius: var(--radius-input);
+  padding: var(--space-sm) var(--space-md);
+  margin-block-end: var(--space-sm);
+}
+
+.sp-pricing-table {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-sm);
+  margin-block-end: var(--space-2xs);
+}
+
+.sp-pricing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.sp-pricing-label {
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+}
+
+.sp-pricing-value {
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.sp-pricing-value.sp-overstay-val {
+  color: #ef4444;
+}
+
+.sp-pricing-clarification {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin-block-start: var(--space-2xs);
+}
+
+.sp-clarify-kh {
+  font-size: var(--text-2xs);
+  margin-inline-start: var(--space-2xs);
+}
+
+/* Accessible Details / Disclosure */
+.sp-billing-disclosure {
+  margin-block-start: var(--space-sm);
+  border-block-start: var(--rule-hair) solid var(--color-rule-2);
+  padding-block-start: var(--space-xs);
+}
+
+.sp-billing-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: var(--space-2xs) 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-accent);
+  list-style: none;
+  user-select: none;
+}
+
+.sp-billing-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sp-billing-summary:hover {
+  color: #fb923c;
+}
+
+.sp-summary-chevron {
+  display: inline-block;
+  transition: transform var(--dur-short) var(--ease-out);
+  font-size: var(--text-sm);
+}
+
+.sp-billing-disclosure[open] .sp-summary-chevron {
+  transform: rotate(180deg);
+}
+
+.sp-disclosure-content {
+  padding-block-start: var(--space-xs);
+}
+
+.sp-disclosure-list {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  line-height: 1.6;
+}
+
+.sp-disclosure-list li {
   margin-block-end: var(--space-xs);
 }
 
-.sp-payment-option-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  padding: 0.2rem 0.5rem;
-  border-radius: var(--radius-pill);
+.sp-kh-sub {
+  display: block;
   font-size: var(--text-2xs);
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin-block-start: 0.1rem;
+}
+
+/* Pre-Submit Summary */
+.sp-booking-submit-summary {
+  background: var(--color-paper-2);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm) var(--space-md);
+  margin-block: var(--space-md) var(--space-xs);
+}
+
+.sp-summary-due {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  margin-block-end: 0.2rem;
+}
+
+.sp-summary-due-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.sp-summary-due-amount {
+  font-family: var(--font-outlier);
+  font-size: var(--text-lg);
   font-weight: 700;
-  background: var(--color-paper);
-  border: var(--rule-hair) solid var(--color-rule-2);
   color: var(--color-accent);
-  width: fit-content;
+}
+
+.sp-summary-note {
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  line-height: 1.5;
+}
+
+.sp-summary-note-kh {
+  color: var(--color-muted);
+  font-size: var(--text-2xs);
+  margin-inline-start: var(--space-2xs);
+}
+
+/* Plate Preview Placeholder Style */
+.sp-plate-preview-val.is-placeholder {
+  color: var(--color-muted);
+  font-family: inherit;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: normal;
 }
 
 /* Countdown Badges & Boxes */

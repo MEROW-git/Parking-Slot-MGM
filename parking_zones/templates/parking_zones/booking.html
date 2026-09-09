@@ -122,8 +122,8 @@
           {% endif %}
 
           <div class="sp-plate-preview" id="plate-preview-box" aria-live="polite">
-            <span class="sp-plate-preview-label">Saved as (រក្សាទុកជា):</span>
-            <span class="sp-plate-preview-val" id="plate-preview-text">{% if form.plate_code.value %}{{ form.plate_province.value|default:"Phnom Penh" }} {{ form.plate_code.value|upper }}{% else %}Phnom Penh 2AZ-1234{% endif %}</span>
+            <span class="sp-plate-preview-label">Plate preview (ការមើលស្លាកលេខជាមុន):</span>
+            <span class="sp-plate-preview-val{% if not form.plate_code.value %} is-placeholder{% endif %}" id="plate-preview-text">{% if form.plate_code.value %}{{ form.plate_province.value|default:"Phnom Penh" }} {{ form.plate_code.value|upper }}{% else %}Enter your plate number to preview (សូមបញ្ចូលលេខផ្លាកដើម្បីមើលជាមុន){% endif %}</span>
           </div>
         </fieldset>
 
@@ -131,44 +131,87 @@
 
         <!-- Payment Choices Selection (Two Distinct Methods) -->
         <div class="sp-form-group" id="group_payment_choices" style="margin-top:1.5rem;">
-          <label class="sp-label" id="legend_payment_choice">
-            Select Payment Policy (ជម្រើសទូទាត់ប្រាក់)
-            <span class="sp-required" aria-hidden="true">*</span>
-          </label>
+          <div class="sp-payment-header">
+            <label class="sp-label" id="legend_payment_choice">
+              How would you like to pay? (តើអ្នកចង់ទូទាត់ប្រាក់ដោយរបៀបណា?)
+              <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <div class="sp-facility-rate-indicator" id="facility-rate-display">
+              <span class="sp-facility-rate-label">Daily parking rate:</span>
+              <strong class="sp-facility-rate-val" id="facility-rate-amount">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
+              <span class="sp-facility-rate-kh">(តម្លៃចំណតប្រចាំថ្ងៃ៖ <span id="facility-rate-amount-kh">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</span>)</span>
+            </div>
+          </div>
 
-          <div class="sp-payment-choices" role="radiogroup" aria-labelledby="legend_payment_choice">
-            <!-- Option A: Pay first day now -->
-            <label class="sp-payment-option" id="label-pay-deposit">
-              <input type="radio" name="payment_method" value="DEPOSIT" id="id_payment_method_deposit" {% if form.payment_method.value != 'PAY_AT_EXIT' %}checked{% endif %}>
-              <div class="sp-payment-content">
-                <div class="sp-payment-title">
-                  <strong>Pay first day now (កក់ប្រាក់១ថ្ងៃជាមុន)</strong>
-                  <span class="sp-avail-badge available" style="font-size:0.7rem;">RECOMMENDED</span>
+          <div class="sp-payment-cards" role="radiogroup" aria-labelledby="legend_payment_choice">
+            <!-- Card A: Pay first day now -->
+            <label class="sp-pay-card{% if form.payment_method.value != 'PAY_AT_EXIT' %} is-selected{% endif %}" id="card-pay-deposit" for="id_payment_method_deposit">
+              <div class="sp-pay-card-header">
+                <input type="radio" name="payment_method" value="DEPOSIT" id="id_payment_method_deposit" class="sp-pay-card-radio" {% if form.payment_method.value != 'PAY_AT_EXIT' %}checked{% endif %}>
+                <div class="sp-pay-card-heading">
+                  <span class="sp-pay-card-title">Pay first day now</span>
+                  <span class="sp-pay-card-title-kh">បង់ប្រាក់១ថ្ងៃដំបូងឥឡូវនេះ</span>
                 </div>
-                <p class="sp-payment-desc">
-                  Pay 1 day’s parking rate now as a secure deposit. Counts toward your final bill at exit.
-                  Guarantees your slot with no 3-hour arrival expiry. Required for future dates.
+              </div>
+
+              <div class="sp-pay-card-rate">
+                <strong class="sp-pay-amount" id="deposit-amount-display">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
+                <span class="sp-pay-amount-label">now (ឥឡូវនេះ)</span>
+              </div>
+
+              <div class="sp-pay-card-body">
+                <p class="sp-pay-card-text">
+                  Pay the remaining balance when you leave. Your first payment is deducted from the total.
                 </p>
-                <div style="font-size:0.78rem; color:var(--color-primary-light); margin-top:0.35rem;">
-                  ✓ Unlocks instant digital QR access pass upon verified deposit.
+                <p class="sp-pay-card-text-kh">
+                  បង់សមតុល្យដែលនៅសល់នៅពេលអ្នកចេញ។ ការទូទាត់លើកដំបូងរបស់អ្នកនឹងត្រូវកាត់ចេញពីចំនួនសរុប។
+                </p>
+              </div>
+
+              <div class="sp-pay-card-footer">
+                <div class="sp-pay-arrival-note">
+                  <strong>Arrival:</strong> Within your booked arrival window.
+                </div>
+                <div class="sp-pay-arrival-note-kh">
+                  <strong>ការមកដល់៖</strong> ក្នុងកំឡុងពេលមកដល់ដែលបានកក់ទុក។
                 </div>
               </div>
             </label>
 
-            <!-- Option B: Pay at exit -->
-            <label class="sp-payment-option" id="label-pay-at-exit">
-              <input type="radio" name="payment_method" value="PAY_AT_EXIT" id="id_payment_method_exit" {% if form.payment_method.value == 'PAY_AT_EXIT' %}checked{% endif %}>
-              <div class="sp-payment-content">
-                <div class="sp-payment-title">
-                  <strong>Pay at exit (ទូទាត់ពេលចេញ)</strong>
-                  <span class="sp-avail-badge" style="background:rgba(234,179,8,0.15); color:#facc15; font-size:0.7rem;">SAME-DAY ONLY</span>
+            <!-- Card B: Pay when you leave -->
+            <label class="sp-pay-card{% if form.payment_method.value == 'PAY_AT_EXIT' %} is-selected{% endif %}" id="card-pay-exit" for="id_payment_method_exit">
+              <div class="sp-pay-card-header">
+                <input type="radio" name="payment_method" value="PAY_AT_EXIT" id="id_payment_method_exit" class="sp-pay-card-radio" {% if form.payment_method.value == 'PAY_AT_EXIT' %}checked{% endif %}>
+                <div class="sp-pay-card-heading">
+                  <span class="sp-pay-card-title">Pay when you leave</span>
+                  <span class="sp-pay-card-title-kh">បង់ប្រាក់នៅពេលអ្នកចេញ</span>
                 </div>
-                <p class="sp-payment-desc">
-                  $0 due at booking. Holds capacity for <strong>3 hours</strong> from reservation creation.
-                  Must check in at the facility barrier before the 3-hour deadline, or the hold expires.
+              </div>
+
+              <div class="sp-pay-card-rate">
+                <strong class="sp-pay-amount">0 ៛</strong>
+                <span class="sp-pay-amount-label">now (ឥឡូវនេះ)</span>
+              </div>
+
+              <div class="sp-pay-card-body">
+                <p class="sp-pay-card-text">
+                  Pay for your actual parking time at exit.
                 </p>
-                <div id="future-date-warning" style="display:none; font-size:0.78rem; color:#f87171; margin-top:0.35rem;">
-                  ⚠ Future-date bookings require "Pay first day now". Select today's date to enable Pay at exit.
+                <p class="sp-pay-card-text-kh">
+                  បង់តាមរយៈពេលចតជាក់ស្តែងនៅពេលចេញ។
+                </p>
+              </div>
+
+              <div class="sp-pay-card-footer">
+                <div class="sp-pay-arrival-note">
+                  <strong>Arrival:</strong> Within 3 hours of booking. Same-day arrival only.
+                </div>
+                <div class="sp-pay-arrival-note-kh">
+                  <strong>ការមកដល់៖</strong> ក្នុងរយៈពេល ៣ ម៉ោងបន្ទាប់ពីការកក់។ សម្រាប់តែការមកដល់ក្នុងថ្ងៃតែមួយប៉ុណ្ណោះ។
+                </div>
+                <div class="sp-pay-future-warning" id="future-date-notice" style="display:none;">
+                  <span class="sp-future-warn-en">For future bookings, pay the first day now.</span>
+                  <span class="sp-future-warn-kh">(សម្រាប់ការកក់ទុកសម្រាប់ថ្ងៃខាងមុខ សូមបង់ប្រាក់ថ្ងៃដំបូងឥឡូវនេះ។)</span>
                 </div>
               </div>
             </label>
@@ -181,20 +224,101 @@
           {% endif %}
         </div>
 
-        <!-- Overstay and Billing Policy Disclosure -->
-        <div class="sp-form-note" style="border-left-color: var(--color-primary); background: rgba(30, 41, 59, 0.7); margin: 1.5rem 0;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
-            <strong style="color:var(--color-ink); font-size:0.92rem;">
-              📋 Transparent Billing & Overstay Policy (គោលការណ៍គិតថ្លៃ និងហួសម៉ោង)
-            </strong>
-            <span class="sp-overstay-badge">Overstay rate: 2× daily rate</span>
+        <!-- Compact Pricing Explanation & Detailed Rules Disclosure -->
+        <div class="sp-pricing-box" id="pricing-explanation-box">
+          <div class="sp-pricing-highlights">
+            <div class="sp-pricing-rule">
+              <strong class="sp-pricing-rule-title">Leave early? Pay only for the time you parked.</strong>
+              <span class="sp-pricing-rule-kh">ចាកចេញមុនម៉ោង? បង់តែតាមរយៈពេលដែលបានចតជាក់ស្តែងប៉ុណ្ណោះ។</span>
+            </div>
+            <div class="sp-pricing-rule">
+              <strong class="sp-pricing-rule-title">Stay past your booked end? Extra days cost 2× the daily rate.</strong>
+              <span class="sp-pricing-rule-kh">ចតលើសម៉ោងកំណត់? ថ្ងៃបន្ថែមគិតតម្លៃ ២ដង នៃតម្លៃប្រចាំថ្ងៃ។</span>
+            </div>
           </div>
-          <ul style="margin:0; padding-left:1.2rem; font-size:0.83rem; color:var(--color-ink-2); line-height:1.5;">
-            <li><strong>Pay for actual use:</strong> Every started 24-hour block counts as one billable day (1-day minimum after check-in).</li>
-            <li><strong>Deposit credit:</strong> Any deposit paid is deducted directly from your final bill at the exit barrier.</li>
-            <li><strong>Overstay multiplier:</strong> Staying beyond your booked exit is charged at <strong>DOUBLE (2×)</strong> the standard daily rate for each started overstay day (this 2× rate fully includes the normal charge).</li>
-            <li><strong>Exact boundary:</strong> Exiting on or before your exact booked end incurs zero overstay penalty. Rates are snapshotted at booking.</li>
-          </ul>
+
+          <div class="sp-pricing-example">
+            <div class="sp-pricing-table">
+              <div class="sp-pricing-row">
+                <span class="sp-pricing-label">Normal day (ថ្ងៃធម្មតា)</span>
+                <strong class="sp-pricing-value" id="example-normal-rate">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
+              </div>
+              <div class="sp-pricing-row">
+                <span class="sp-pricing-label">Each overstay day (រាល់ថ្ងៃលើសម៉ោង)</span>
+                <strong class="sp-pricing-value sp-overstay-val" id="example-overstay-rate">{{ selected_zone.overstay_price_khr_formatted|default:"8,000 ៛" }}</strong>
+              </div>
+            </div>
+            <div class="sp-pricing-clarification" id="example-overstay-clarify">
+              The <span id="clarify-overstay-amount">{{ selected_zone.overstay_price_khr_formatted|default:"8,000 ៛" }}</span> includes the normal daily charge.
+              <span class="sp-clarify-kh">(តម្លៃនេះរួមបញ្ចូលទាំងថ្លៃសេវាប្រចាំថ្ងៃធម្មតារួចហើយ។)</span>
+            </div>
+          </div>
+
+          <details class="sp-billing-disclosure" id="billing-disclosure">
+            <summary class="sp-billing-summary">
+              <span class="sp-summary-text">How charges are calculated (របៀបគណនាថ្លៃសេវា)</span>
+              <span class="sp-summary-chevron" aria-hidden="true">▾</span>
+            </summary>
+            <div class="sp-disclosure-content">
+              <ul class="sp-disclosure-list">
+                <li>
+                  <strong>24-hour billing unit:</strong> Each started 24-hour period counts as one day.
+                  <span class="sp-kh-sub">រាល់រយៈពេល ២៤ ម៉ោងដែលបានចាប់ផ្តើម រាប់ជា ១ ថ្ងៃ។</span>
+                </li>
+                <li>
+                  <strong>Minimum charge:</strong> Minimum charge after entry is one day.
+                  <span class="sp-kh-sub">ថ្លៃសេវាអប្បបរមាបន្ទាប់ពីចូលចតគឺ ១ ថ្ងៃ។</span>
+                </li>
+                <li>
+                  <strong>Separate rounding:</strong> Normal and overstay periods are rounded separately.
+                  <span class="sp-kh-sub">រយៈពេលធម្មតា និងរយៈពេលលើសកំណត់ត្រូវបានគណនាដោយឡែកពីគ្នា។</span>
+                </li>
+                <li>
+                  <strong>Payment credit:</strong> Any first-day payment is deducted from the final bill.
+                  <span class="sp-kh-sub">ការទូទាត់ថ្ងៃដំបូងណាមួយនឹងត្រូវកាត់ចេញពីវិក្កយបត្រចុងក្រោយនៅពេលចេញ។</span>
+                </li>
+                <li>
+                  <strong>Exact finish time:</strong> Exit on or before the booked end has no overstay penalty.
+                  <span class="sp-kh-sub">ការចាកចេញនៅត្រឹម ឬមុនម៉ោងកំណត់បញ្ចប់ មិនមានការផាកពិន័យលើសម៉ោងឡើយ។</span>
+                </li>
+                <li>
+                  <strong>Pay-at-exit arrival deadline:</strong> An unused pay-at-exit booking expires after its 3-hour arrival deadline.
+                  <span class="sp-kh-sub">ការកក់ប្រភេទបង់ប្រាក់ពេលចេញដែលមិនបានចូលចត នឹងផុតកំណត់បន្ទាប់ពីរយៈពេល ៣ ម៉ោង។</span>
+                </li>
+                <li>
+                  <strong>Deposit timeout & cancellation:</strong> First-day deposit checkout must be completed within 15 minutes. Bookings not checked in before the booked finish time expire, and the deposit is retained per policy. Paid bookings can be cancelled before check-in.
+                  <span class="sp-kh-sub">ការទូទាត់ប្រាក់កក់ត្រូវតែបញ្ចប់ក្នុងរយៈពេល ១៥ នាទី។ ការកក់ដែលមិនបានចូលចតមុនម៉ោងបញ្ចប់ នឹងត្រូវផុតកំណត់ ហើយប្រាក់កក់ត្រូវបានរក្សាទុកតាមគោលការណ៍។</span>
+                </li>
+              </ul>
+            </div>
+          </details>
+        </div>
+
+        <!-- Summary Above Submit Button -->
+        <div class="sp-booking-submit-summary" id="booking-submit-summary">
+          <!-- First-day payment summary -->
+          <div class="sp-summary-block" id="summary-deposit-block" {% if form.payment_method.value == 'PAY_AT_EXIT' %}style="display:none;"{% endif %}>
+            <div class="sp-summary-due">
+              <span class="sp-summary-due-label">Due now (ចំនួនត្រូវបង់ឥឡូវនេះ):</span>
+              <strong class="sp-summary-due-amount" id="summary-due-amount">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
+            </div>
+            <div class="sp-summary-note">
+              Remaining parking charges are paid at exit.
+              <span class="sp-summary-note-kh">(ថ្លៃចំណតដែលនៅសល់ត្រូវទូទាត់នៅពេលចេញ។)</span>
+            </div>
+          </div>
+
+          <!-- Pay at exit summary -->
+          <div class="sp-summary-block" id="summary-exit-block" {% if form.payment_method.value != 'PAY_AT_EXIT' %}style="display:none;"{% endif %}>
+            <div class="sp-summary-due">
+              <span class="sp-summary-due-label">Due now (ចំនួនត្រូវបង់ឥឡូវនេះ):</span>
+              <strong class="sp-summary-due-amount">0 ៛</strong>
+            </div>
+            <div class="sp-summary-note">
+              Enter within 3 hours after booking is confirmed.
+              <span class="sp-summary-note-kh">(សូមចូលចតក្នុងរយៈពេល ៣ ម៉ោង បន្ទាប់ពីការកក់ត្រូវបានបញ្ជាក់។)</span>
+            </div>
+          </div>
         </div>
 
         <div class="sp-form-actions">
@@ -202,7 +326,7 @@
             ← Cancel & Return
           </a>
           <button type="submit" class="sp-btn sp-btn-primary" id="btn-submit-booking">
-            Confirm Parking Reservation (បញ្ជាក់ការកក់) →
+            <span id="btn-submit-text">{% if form.payment_method.value == 'PAY_AT_EXIT' %}Reserve parking (កក់កន្លែងចំណត) →{% else %}Continue to payment (បន្តទៅការទូទាត់) →{% endif %}</span>
           </button>
         </div>
       </form>
@@ -212,66 +336,166 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script id="parking-zones-data" type="application/json">
+  {{ zones_meta_json|safe|default:"{}" }}
+</script>
 <script>
   (function() {
+    // 1. Vehicle Plate Preview
     var provEl = document.getElementById('id_plate_province');
     var codeEl = document.getElementById('id_plate_code');
     var prevValEl = document.getElementById('plate-preview-text');
 
-    if (provEl && codeEl && prevValEl) {
-      function updatePreview() {
-        var prov = provEl.value || 'Phnom Penh';
-        var raw = codeEl.value ? codeEl.value.trim().replace(/\s+/g, ' ') : '';
-        var code = raw ? raw.toUpperCase() : '2AZ-1234';
-        prevValEl.textContent = prov + ' ' + code;
+    function updatePlatePreview() {
+      if (!prevValEl) return;
+      var prov = provEl ? (provEl.value || 'Phnom Penh') : 'Phnom Penh';
+      var raw = codeEl ? codeEl.value.trim().replace(/\s+/g, ' ') : '';
+      if (raw) {
+        prevValEl.textContent = prov + ' ' + raw.toUpperCase();
+        prevValEl.classList.remove('is-placeholder');
+      } else {
+        prevValEl.textContent = 'Enter your plate number to preview (សូមបញ្ចូលលេខផ្លាកដើម្បីមើលជាមុន)';
+        prevValEl.classList.add('is-placeholder');
       }
+    }
 
-      codeEl.addEventListener('input', updatePreview);
+    if (codeEl) {
+      codeEl.addEventListener('input', updatePlatePreview);
       codeEl.addEventListener('blur', function() {
         if (codeEl.value) {
           codeEl.value = codeEl.value.trim().replace(/\s+/g, ' ').toUpperCase();
-          updatePreview();
+          updatePlatePreview();
         }
       });
-      provEl.addEventListener('change', updatePreview);
+    }
+    if (provEl) {
+      provEl.addEventListener('change', updatePlatePreview);
+    }
+    updatePlatePreview();
+
+    // 2. Dynamic Facility Rate Updates
+    var zoneSelect = document.getElementById('id_parking_zone');
+    var zonesData = {};
+    var zonesScript = document.getElementById('parking-zones-data');
+    if (zonesScript && zonesScript.textContent) {
+      try {
+        zonesData = JSON.parse(zonesScript.textContent);
+      } catch (e) {}
     }
 
-    // Dynamic disabling of Pay at Exit for future dates
+    function updateFacilityRates() {
+      if (!zoneSelect) return;
+      var zoneId = zoneSelect.value;
+      var zone = zonesData[zoneId];
+      if (!zone) return;
+
+      var rateAmtEl = document.getElementById('facility-rate-amount');
+      var rateAmtKhEl = document.getElementById('facility-rate-amount-kh');
+      if (rateAmtEl) rateAmtEl.textContent = zone.price_formatted;
+      if (rateAmtKhEl) rateAmtKhEl.textContent = zone.price_formatted;
+
+      var depositAmtEl = document.getElementById('deposit-amount-display');
+      if (depositAmtEl) depositAmtEl.textContent = zone.price_formatted;
+
+      var normRateEl = document.getElementById('example-normal-rate');
+      var overRateEl = document.getElementById('example-overstay-rate');
+      var clarifyAmtEl = document.getElementById('clarify-overstay-amount');
+      if (normRateEl) normRateEl.textContent = zone.price_formatted;
+      if (overRateEl) overRateEl.textContent = zone.overstay_formatted;
+      if (clarifyAmtEl) clarifyAmtEl.textContent = zone.overstay_formatted;
+
+      var sumDueEl = document.getElementById('summary-due-amount');
+      if (sumDueEl) sumDueEl.textContent = zone.price_formatted;
+    }
+
+    if (zoneSelect) {
+      zoneSelect.addEventListener('change', updateFacilityRates);
+      if (zoneSelect.value) {
+        updateFacilityRates();
+      }
+    }
+
+    // 3. Payment Method Selection & Date Policy
     var startDateEl = document.getElementById('id_start_date');
-    var radioExit = document.getElementById('id_payment_method_exit');
     var radioDeposit = document.getElementById('id_payment_method_deposit');
-    var labelExit = document.getElementById('label-pay-at-exit');
-    var warnExit = document.getElementById('future-date-warning');
+    var radioExit = document.getElementById('id_payment_method_exit');
+    var cardDeposit = document.getElementById('card-pay-deposit');
+    var cardExit = document.getElementById('card-pay-exit');
+    var futureNotice = document.getElementById('future-date-notice');
+    var sumDeposit = document.getElementById('summary-deposit-block');
+    var sumExit = document.getElementById('summary-exit-block');
+    var btnText = document.getElementById('btn-submit-text');
+
+    function updatePaymentUI() {
+      var isExit = radioExit && radioExit.checked;
+
+      if (cardDeposit) {
+        if (!isExit) {
+          cardDeposit.classList.add('is-selected');
+        } else {
+          cardDeposit.classList.remove('is-selected');
+        }
+      }
+
+      if (cardExit) {
+        if (isExit) {
+          cardExit.classList.add('is-selected');
+        } else {
+          cardExit.classList.remove('is-selected');
+        }
+      }
+
+      if (isExit) {
+        if (sumDeposit) sumDeposit.style.display = 'none';
+        if (sumExit) sumExit.style.display = 'block';
+        if (btnText) btnText.textContent = 'Reserve parking (កក់កន្លែងចំណត) →';
+      } else {
+        if (sumDeposit) sumDeposit.style.display = 'block';
+        if (sumExit) sumExit.style.display = 'none';
+        if (btnText) btnText.textContent = 'Continue to payment (បន្តទៅការទូទាត់) →';
+      }
+    }
 
     function checkDatePolicy() {
       if (!startDateEl || !radioExit) return;
       var todayStr = new Date().toISOString().split('T')[0];
       var chosenDate = startDateEl.value;
+      var isFuture = chosenDate && chosenDate > todayStr;
 
-      if (chosenDate && chosenDate > todayStr) {
-        // Future booking: disable pay at exit
+      if (isFuture) {
         radioExit.disabled = true;
-        if (labelExit) {
-          labelExit.style.opacity = '0.55';
-          labelExit.style.cursor = 'not-allowed';
+        if (cardExit) {
+          cardExit.classList.add('is-disabled');
         }
-        if (warnExit) warnExit.style.display = 'block';
+        if (futureNotice) {
+          futureNotice.style.display = 'block';
+        }
         if (radioExit.checked && radioDeposit) {
           radioDeposit.checked = true;
         }
       } else {
         radioExit.disabled = false;
-        if (labelExit) {
-          labelExit.style.opacity = '1';
-          labelExit.style.cursor = 'pointer';
+        if (cardExit) {
+          cardExit.classList.remove('is-disabled');
         }
-        if (warnExit) warnExit.style.display = 'none';
+        if (futureNotice) {
+          futureNotice.style.display = 'none';
+        }
       }
+      updatePaymentUI();
     }
 
+    if (radioDeposit) {
+      radioDeposit.addEventListener('change', updatePaymentUI);
+    }
+    if (radioExit) {
+      radioExit.addEventListener('change', updatePaymentUI);
+    }
     if (startDateEl) {
       startDateEl.addEventListener('change', checkDatePolicy);
       checkDatePolicy();
+    } else {
+      updatePaymentUI();
     }
   })();
 </script>
