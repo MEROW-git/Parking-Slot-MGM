@@ -22,48 +22,97 @@ class BillingService:
         overstay_multiplier = Decimal(str(reservation.overstay_multiplier or 2.0))
         overstay_rate = int(round(Decimal(daily_rate) * overstay_multiplier))
 
-        entry_time = reservation.checked_in_at or reservation.effective_start_time
-        booked_end = reservation.effective_finish_time
+        deposit_paid = reservation.deposit_amount or 0
+        balance_paid = reservation.balance_paid or 0
+        total_paid = deposit_paid + balance_paid
 
-        # If already checked out, use actual checkout timestamp
+        has_verified_entry = bool(reservation.checked_in_at)
+        reserved_days = reservation.effective_reserved_days
+
+        # BEFORE CHECK-IN (or unentered states: CONFIRMED, PAYMENT_PENDING, CANCELLED, EXPIRED without actual entry)
+        if not reservation.checked_in_at:
+            return {
+                'daily_rate': daily_rate,
+                'daily_rate_formatted': f"{daily_rate:,} ៛",
+                'overstay_multiplier': float(overstay_multiplier),
+                'overstay_rate': overstay_rate,
+                'overstay_rate_formatted': f"{overstay_rate:,} ៛",
+                'entry_time': None,
+                'exit_time': None,
+                'booked_end': reservation.effective_finish_time,
+                'parking_deadline': None,
+                'parking_deadline_formatted': 'Set when you enter',
+                'calculated_at': now,
+                'has_verified_entry': False,
+                'is_timestamp_inconsistent': (reservation.status == 'CHECKED_IN'),
+                'total_parked_seconds': 0.0,
+                'parked_duration_display': 'Parking charges start when you enter.',
+                'normal_seconds': 0.0,
+                'normal_hours': 0.0,
+                'normal_days': 0,
+                'normal_charge': 0,
+                'normal_charge_formatted': "0 ៛",
+                'overstay_seconds': 0.0,
+                'overstay_hours': 0.0,
+                'overstay_days': 0,
+                'overstay_duration_display': "0 min",
+                'overstay_charge': 0,
+                'overstay_charge_formatted': "0 ៛",
+                'total_charge': 0,
+                'total_charge_formatted': "0 ៛",
+                'total_amount': 0,
+                'deposit_paid': deposit_paid,
+                'deposit_deducted': 0,
+                'deposit_deducted_formatted': "0 ៛",
+                'balance_paid': balance_paid,
+                'balance_paid_formatted': f"{balance_paid:,} ៛",
+                'total_paid': total_paid,
+                'total_paid_formatted': f"{total_paid:,} ៛",
+                'balance_due': 0,
+                'balance_due_formatted': "0 ៛",
+                'is_overstay': False,
+                'message': 'Parking charges start when you enter.',
+            }
+
+        # AFTER CHECK-IN:
+        # A parking day means a full 24-hour period starting at actual check-in.
+        # parking_deadline = checked_in_at + N × 24 hours
+        entry_time = reservation.checked_in_at
+        parking_deadline = entry_time + timedelta(days=reserved_days)
         exit_time = reservation.checked_out_at or now
 
-        # Ensure exit_time >= entry_time
         if exit_time < entry_time:
             exit_time = entry_time
 
-        # Normal portion: time up to min(exit_time, booked_end)
-        normal_end = min(exit_time, booked_end)
-        normal_seconds = max(0.0, (normal_end - entry_time).total_seconds())
+        total_parked_seconds = max(0.0, (exit_time - entry_time).total_seconds())
 
-        # Every started 24-hour period is one billable day, with a 1-day minimum after entry
-        if normal_seconds == 0 and exit_time == entry_time:
-            normal_days = 1
-        else:
-            normal_days = max(1, math.ceil(normal_seconds / 86400.0))
-
-        normal_charge = normal_days * daily_rate
-
-        # Overstay portion: time after booked_end
-        overstay_seconds = max(0.0, (exit_time - booked_end).total_seconds())
-        if overstay_seconds > 0:
-            # Positive portion rounded up to 24-hour billing unit
-            overstay_days = math.ceil(overstay_seconds / 86400.0)
-        else:
+        if exit_time <= parking_deadline:
+            # Within reserved duration
+            overstay_seconds = 0.0
             overstay_days = 0
+            overstay_charge = 0
+            if total_parked_seconds == 0:
+                normal_days = 1
+            else:
+                normal_days = max(1, math.ceil(total_parked_seconds / 86400.0))
+            normal_days = min(reserved_days, normal_days)
+            normal_seconds = total_parked_seconds
+            normal_charge = normal_days * daily_rate
+        else:
+            # Overstay starts only after full reserved duration ends
+            normal_days = reserved_days
+            normal_seconds = reserved_days * 86400.0
+            normal_charge = normal_days * daily_rate
 
-        # Double rate includes the normal charge for that overstay period (i.e. 2x, not 1x + 2x)
-        overstay_charge = overstay_days * overstay_rate
+            overstay_seconds = (exit_time - parking_deadline).total_seconds()
+            overstay_days = max(1, math.ceil(overstay_seconds / 86400.0))
+            overstay_charge = overstay_days * overstay_rate
 
         total_charge = normal_charge + overstay_charge
-        deposit_paid = reservation.deposit_amount or 0
-        balance_paid = reservation.balance_paid or 0
-
-        total_paid = deposit_paid + balance_paid
+        deposit_deducted = min(deposit_paid, total_charge)
         balance_due = max(0, total_charge - total_paid)
 
-        # Duration elapsed
-        total_parked_seconds = max(0.0, (exit_time - entry_time).total_seconds())
+        # Elapsed formatting
         parked_hours = int(total_parked_seconds // 3600)
         parked_minutes = int((total_parked_seconds % 3600) // 60)
         if parked_hours > 0 and parked_minutes > 0:
@@ -73,7 +122,6 @@ class BillingService:
         else:
             parked_duration_display = f"{max(1, parked_minutes)} min"
 
-        # Overstay duration elapsed
         overstay_hours_int = int(overstay_seconds // 3600)
         overstay_minutes_int = int((overstay_seconds % 3600) // 60)
         if overstay_hours_int > 0 and overstay_minutes_int > 0:
@@ -85,9 +133,6 @@ class BillingService:
         else:
             overstay_duration_display = "0 min"
 
-        has_verified_entry = bool(reservation.checked_in_at)
-        is_timestamp_inconsistent = bool(reservation.status == 'CHECKED_IN' and not reservation.checked_in_at)
-
         return {
             'daily_rate': daily_rate,
             'daily_rate_formatted': f"{daily_rate:,} ៛",
@@ -96,10 +141,12 @@ class BillingService:
             'overstay_rate_formatted': f"{overstay_rate:,} ៛",
             'entry_time': entry_time,
             'exit_time': exit_time,
-            'booked_end': booked_end,
+            'booked_end': reservation.effective_finish_time,
+            'parking_deadline': parking_deadline,
+            'parking_deadline_formatted': parking_deadline.strftime('%d %b %Y, %H:%M'),
             'calculated_at': now,
-            'has_verified_entry': has_verified_entry,
-            'is_timestamp_inconsistent': is_timestamp_inconsistent,
+            'has_verified_entry': True,
+            'is_timestamp_inconsistent': False,
             'total_parked_seconds': total_parked_seconds,
             'parked_duration_display': parked_duration_display,
             'normal_seconds': normal_seconds,
@@ -117,8 +164,8 @@ class BillingService:
             'total_charge_formatted': f"{total_charge:,} ៛",
             'total_amount': total_charge,
             'deposit_paid': deposit_paid,
-            'deposit_deducted': deposit_paid,
-            'deposit_deducted_formatted': f"{deposit_paid:,} ៛",
+            'deposit_deducted': deposit_deducted,
+            'deposit_deducted_formatted': f"{deposit_deducted:,} ៛",
             'balance_paid': balance_paid,
             'balance_paid_formatted': f"{balance_paid:,} ៛",
             'total_paid': total_paid,
@@ -126,13 +173,16 @@ class BillingService:
             'balance_due': balance_due,
             'balance_due_formatted': f"{balance_due:,} ៛",
             'is_overstay': overstay_days > 0,
+            'message': 'Parking charges active.',
         }
 
     @staticmethod
-    def estimate_booking_cost(zone: ParkingZone, start_time: datetime, finish_time: datetime) -> dict:
+    def estimate_booking_cost(zone: ParkingZone, days: int = 1, start_time: datetime = None, finish_time: datetime = None) -> dict:
         daily_rate = zone.price
-        duration_seconds = max(0.0, (finish_time - start_time).total_seconds())
-        days = max(1, math.ceil(duration_seconds / 86400.0))
+        if finish_time and start_time:
+            duration_seconds = max(0.0, (finish_time - start_time).total_seconds())
+            days = max(1, math.ceil(duration_seconds / 86400.0))
+        days = max(1, days)
         estimated_total = days * daily_rate
         deposit_amount = daily_rate  # 1 day standard deposit
         return {
@@ -175,8 +225,21 @@ class CapacityService:
         return available > 0
 
     @staticmethod
-    def check_date_range_availability(zone_id: int, start_time: datetime, finish_time: datetime) -> bool:
-        """Verifies capacity for a specific date/time window."""
+    def check_date_range_availability(
+        zone_id: int,
+        start_time: datetime = None,
+        finish_time: datetime = None,
+        reserved_days: int = 1,
+        start_datetime: datetime = None,
+        finish_datetime: datetime = None
+    ) -> bool:
+        """
+        Verifies capacity for a specific date/time window.
+        Accounts for permitted arrival window and full reserved duration (N x 24h)
+        to prevent overbooking capacity that cannot be honored.
+        """
+        start_time = start_time or start_datetime
+        finish_time = finish_time or finish_datetime
         zone = ParkingZone.objects.select_for_update().get(id=zone_id)
         now = timezone.now()
 
@@ -185,17 +248,33 @@ class CapacityService:
             if not CapacityService.check_immediate_availability(zone_id):
                 return False
 
-        # Overlapping reservations during the window
-        overlapping = Reservation.objects.filter(
+        req_start = start_time
+        req_end = finish_time + timedelta(days=reserved_days)
+
+        active_res = Reservation.objects.filter(
             parking_zone=zone,
             status__in=['CONFIRMED', 'CHECKED_IN']
-        ).exclude(
-            finish_time__lte=start_time
-        ).exclude(
-            start_time__gte=finish_time
-        ).count()
+        )
 
-        # Include base occupied slots
+        overlapping = 0
+        for res in active_res:
+            res_days = res.effective_reserved_days
+            if res.status == 'CHECKED_IN':
+                res_start = res.checked_in_at or res.effective_start_time
+                res_deadline = res_start + timedelta(days=res_days)
+                res_end = max(now, res_deadline)
+            else:
+                res_start = res.effective_start_time
+                if res.payment_method == 'PAY_AT_EXIT' and res.arrival_deadline:
+                    res_arrival_end = res.arrival_deadline
+                else:
+                    res_arrival_end = res.effective_finish_time
+                res_end = res_arrival_end + timedelta(days=res_days)
+
+            # Check overlap between [req_start, req_end] and [res_start, res_end]
+            if not (res_end <= req_start or res_start >= req_end):
+                overlapping += 1
+
         total_demand = overlapping + zone.occupied_slots
         return total_demand < zone.num_of_slots
 

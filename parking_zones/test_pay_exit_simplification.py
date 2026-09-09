@@ -38,7 +38,7 @@ class PayExitSimplificationTests(TestCase):
             is_staff=True
         )
 
-    def _create_checked_in_reservation(self, hours_ago=5, booked_hours=1, daily_rate=4000, balance_paid=0):
+    def _create_checked_in_reservation(self, hours_ago=5, booked_hours=24, daily_rate=4000, balance_paid=0, reserved_days=1):
         t0 = timezone.now() - timedelta(hours=hours_ago)
         booked_end = t0 + timedelta(hours=booked_hours)
         return Reservation.objects.create(
@@ -56,6 +56,7 @@ class PayExitSimplificationTests(TestCase):
             payment_method='PAY_AT_EXIT',
             status='CHECKED_IN',
             checked_in_at=t0,
+            reserved_days=reserved_days,
         )
 
     def test_get_creates_and_cancels_no_payment_records(self):
@@ -199,8 +200,8 @@ class PayExitSimplificationTests(TestCase):
 
     def test_partial_payment_messaging(self):
         """Partial payment message states 'Payment received; balance remains', not 'Payment failed'."""
-        res = self._create_checked_in_reservation(hours_ago=5, booked_hours=1, daily_rate=4000)
-        # Total charge is 12,000 KHR (4,000 normal + 8,000 overstay)
+        res = self._create_checked_in_reservation(hours_ago=26, booked_hours=24, daily_rate=4000, reserved_days=1)
+        # Total charge is 12,000 KHR (4,000 normal + 8,000 overstay for 26h stay on 1-day booking)
         # Create a partial transaction of 6,000 KHR
         txn = PaymentService.create_exit_transaction(res, amount=6000)
 
@@ -319,14 +320,14 @@ class PayExitSimplificationTests(TestCase):
         """
         Billing explanation and verification of the 12,000 KHR scenario:
         - 4,000 KHR daily rate.
-        - Parked for 5 hours, booked for 1 hour.
+        - Parked for 26 hours, booked for 1 day (24 hours).
         - 1 minimum normal day = 4,000 KHR.
-        - Overstayed by 4 hours = 1 started extra day @ 2x rate = 8,000 KHR.
+        - Overstayed by 2 hours past 24h = 1 started extra day @ 2x rate = 8,000 KHR.
         - Total = 12,000 KHR.
         - UI shows parking charge, overstay, already paid, and amount to pay.
         - UI details show actual duration vs billable units.
         """
-        res = self._create_checked_in_reservation(hours_ago=5, booked_hours=1, daily_rate=4000)
+        res = self._create_checked_in_reservation(hours_ago=26, booked_hours=24, daily_rate=4000, reserved_days=1)
 
         bill = BillingService.calculate_bill(res, as_of=timezone.now())
         self.assertEqual(bill['normal_charge'], 4000)

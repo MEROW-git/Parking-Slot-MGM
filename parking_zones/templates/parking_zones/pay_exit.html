@@ -153,8 +153,8 @@
               {% endif %}
             </dd>
 
-            <dt>Booked end:</dt>
-            <dd>{{ bill.booked_end|date:"d M Y, g:i A" }}</dd>
+            <dt>Parking deadline:</dt>
+            <dd>{{ bill.parking_deadline|date:"d M Y, g:i A"|default:"Set when you enter" }}</dd>
 
             <dt>Calculated at:</dt>
             <dd>{{ bill.calculated_at|date:"d M Y, g:i A" }}</dd>

@@ -79,6 +79,32 @@ class ReservationForm(forms.ModelForm):
         label='Finish Date (កាលបរិច្ឆេទបញ្ចប់)'
     )
 
+    DURATION_CHOICES = [
+        (1, '1 day (24 hours after entry) — ១ ថ្ងៃ'),
+        (2, '2 days (48 hours after entry) — ២ ថ្ងៃ'),
+        (3, '3 days (72 hours after entry) — ៣ ថ្ងៃ'),
+        (4, '4 days (96 hours after entry) — ៤ ថ្ងៃ'),
+        (5, '5 days (120 hours after entry) — ៥ ថ្ងៃ'),
+        (6, '6 days (144 hours after entry) — ៦ ថ្ងៃ'),
+        (7, '7 days (168 hours after entry) — ៧ ថ្ងៃ'),
+        (14, '14 days (2 weeks) — ១៤ ថ្ងៃ'),
+        (30, '30 days (1 month) — ៣០ ថ្ងៃ'),
+    ]
+
+    reserved_days = forms.TypedChoiceField(
+        choices=DURATION_CHOICES,
+        coerce=int,
+        initial=1,
+        required=False,
+        widget=forms.Select(attrs={
+            'class': 'sp-input sp-select',
+            'id': 'id_reserved_days',
+            'aria-label': 'Reserved Duration (រយៈពេលកក់)',
+        }),
+        label='Reserved Duration (រយៈពេលកក់)',
+        help_text='1 day = 24 hours starting at actual gate entry (១ ថ្ងៃ = ២៤ ម៉ោងបន្ទាប់ពីចូលចត)'
+    )
+
     finish_time = forms.TimeField(
         initial='22:00',
         required=False,
@@ -152,13 +178,16 @@ class ReservationForm(forms.ModelForm):
 
     class Meta:
         model = Reservation
-        fields = ['parking_zone', 'start_date', 'finish_date', 'plate_number', 'phone_number', 'payment_method']
+        fields = ['parking_zone', 'start_date', 'finish_date', 'reserved_days', 'plate_number', 'phone_number', 'payment_method']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['plate_province'].initial = 'Phnom Penh'
         self.fields['plate_number'].required = False
         self.fields['payment_method'].initial = 'DEPOSIT'
+
+        if self.instance and self.instance.pk:
+            self.fields['reserved_days'].initial = self.instance.effective_reserved_days
 
         # If editing an existing reservation instance, extract province and code
         if self.instance and self.instance.pk and self.instance.plate_number:
@@ -221,6 +250,15 @@ class ReservationForm(forms.ModelForm):
 
             cleaned_data['start_datetime'] = start_dt
             cleaned_data['finish_datetime'] = finish_dt
+
+        reserved_days_val = cleaned_data.get('reserved_days')
+        if not reserved_days_val:
+            if start_date and finish_date:
+                diff_days = (finish_date - start_date).days
+                reserved_days_val = max(1, diff_days if diff_days > 0 else 1)
+            else:
+                reserved_days_val = 1
+        cleaned_data['reserved_days'] = int(reserved_days_val)
 
         # Business Rule: Pay at exit is only available for same-day immediate arrival
         if payment_method == 'PAY_AT_EXIT':
@@ -321,6 +359,9 @@ class ReservationForm(forms.ModelForm):
             instance.start_time = self.cleaned_data['start_datetime']
         if 'finish_datetime' in self.cleaned_data:
             instance.finish_time = self.cleaned_data['finish_datetime']
+        if 'reserved_days' in self.cleaned_data:
+            instance.reserved_days = self.cleaned_data['reserved_days']
+            instance._reserved_days_explicit = True
 
         # Price snapshot
         if instance.parking_zone_id:

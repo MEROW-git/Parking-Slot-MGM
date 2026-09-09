@@ -101,11 +101,14 @@ def booking(request):
             start_dt = form.cleaned_data.get('start_datetime')
             finish_dt = form.cleaned_data.get('finish_datetime')
             payment_method = form.cleaned_data.get('payment_method', 'DEPOSIT')
+            reserved_days = form.cleaned_data.get('reserved_days', 1)
 
             try:
                 with transaction.atomic():
                     # Check capacity atomically with select_for_update inside service
-                    has_capacity = CapacityService.check_date_range_availability(zone.id, start_dt, finish_dt)
+                    has_capacity = CapacityService.check_date_range_availability(
+                        zone.id, start_dt, finish_dt, reserved_days=reserved_days
+                    )
                     if not has_capacity:
                         messages.error(request, f'Sorry, {zone.name} does not have sufficient space available for this period.')
                         return render(request, 'parking_zones/booking.html', {

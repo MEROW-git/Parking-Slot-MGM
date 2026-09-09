@@ -339,6 +339,7 @@ class TicketViewBrandingTests(TestCase):
 
     def test_ticket_state_checked_in_actions(self):
         self.reservation.status = 'CHECKED_IN'
+        self.reservation.checked_in_at = self.now
         self.reservation.save()
 
         self.client.login(username='dara', password='secretpassword')

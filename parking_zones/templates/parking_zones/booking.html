@@ -35,16 +35,37 @@
 
         {% include "components/form_field.html" with field=form.parking_zone %}
 
-        <!-- Booked Time Interval -->
+        <!-- Explicit Reserved Duration Selection -->
+        <div class="sp-form-group" style="margin-bottom: 1.25rem;">
+          <label class="sp-label" for="id_reserved_days">
+            Reserved Duration (រយៈពេលកក់ទុក)
+            <span class="sp-required" aria-hidden="true">*</span>
+          </label>
+          {{ form.reserved_days }}
+          <div class="sp-field-help" style="margin-top: 0.35rem; font-size: 0.88rem; color: var(--sp-color-text-muted, #64748b);">
+            <strong>1 day = 24 hours after entry.</strong> Your parking deadline begins when you actually check in at the gate.
+            <div style="font-size: 0.8rem; color: #475569;">(១ ថ្ងៃ = ២៤ ម៉ោងបន្ទាប់ពីចូលចត។ ម៉ោងផុតកំណត់ចាប់ផ្តើមនៅពេលអ្នកចូលជាក់ស្តែងតាមច្រកទ្វារ។)</div>
+          </div>
+          {% if form.reserved_days.errors %}
+            <div class="sp-field-feedback">
+              {% for err in form.reserved_days.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Booked Arrival Window -->
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
           <div class="sp-form-group">
             <label class="sp-label" for="id_start_date">
-              Start Date & Arrival Time (មកដល់)
+              Arrival Date & Time (កាលបរិច្ឆេទ និងម៉ោងមកដល់)
               <span class="sp-required" aria-hidden="true">*</span>
             </label>
             <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 0.5rem;">
               {{ form.start_date }}
               {{ form.start_time }}
+            </div>
+            <div class="sp-field-help" style="font-size: 0.8rem; color: var(--sp-color-text-muted, #64748b); margin-top: 0.25rem;">
+              Start of permitted arrival window.
             </div>
             {% if form.start_date.errors or form.start_time.errors %}
               <div class="sp-field-feedback">
@@ -56,12 +77,15 @@
 
           <div class="sp-form-group">
             <label class="sp-label" for="id_finish_date">
-              Finish Date & Exit Deadline (ចេញផុតកំណត់)
+              Latest Arrival / Planned Date (កាលបរិច្ឆេទចុងក្រោយ)
               <span class="sp-required" aria-hidden="true">*</span>
             </label>
             <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 0.5rem;">
               {{ form.finish_date }}
               {{ form.finish_time }}
+            </div>
+            <div class="sp-field-help" style="font-size: 0.8rem; color: var(--sp-color-text-muted, #64748b); margin-top: 0.25rem;">
+              End of permitted arrival window.
             </div>
             {% if form.finish_date.errors or form.finish_time.errors %}
               <div class="sp-field-feedback">
@@ -262,32 +286,32 @@
             <div class="sp-disclosure-content">
               <ul class="sp-disclosure-list">
                 <li>
-                  <strong>24-hour billing unit:</strong> Each started 24-hour period counts as one day.
-                  <span class="sp-kh-sub">រាល់រយៈពេល ២៤ ម៉ោងដែលបានចាប់ផ្តើម រាប់ជា ១ ថ្ងៃ។</span>
+                  <strong>24-hour billing unit:</strong> A parking day means a full 24-hour period starting at actual check-in (1 day = 24 hours after entry).
+                  <span class="sp-kh-sub">រាល់រយៈពេល ២៤ ម៉ោងដែលបានចាប់ផ្តើម រាប់ជា ១ ថ្ងៃ ចាប់ពីពេលចូលជាក់ស្តែង។</span>
                 </li>
                 <li>
-                  <strong>Minimum charge:</strong> Minimum charge after entry is one day.
+                  <strong>Minimum charge:</strong> One-day minimum charge after actual gate entry.
                   <span class="sp-kh-sub">ថ្លៃសេវាអប្បបរមាបន្ទាប់ពីចូលចតគឺ ១ ថ្ងៃ។</span>
                 </li>
                 <li>
-                  <strong>Separate rounding:</strong> Normal and overstay periods are rounded separately.
-                  <span class="sp-kh-sub">រយៈពេលធម្មតា និងរយៈពេលលើសកំណត់ត្រូវបានគណនាដោយឡែកពីគ្នា។</span>
+                  <strong>Before check-in:</strong> Parking charges start when you enter. No parking usage or overstay charges accrue before physical gate check-in.
+                  <span class="sp-kh-sub">ថ្លៃចំណតចាប់ផ្តើមនៅពេលអ្នកចូល។ គ្មានការគិតថ្លៃប្រើប្រាស់ ឬលើសម៉ោងមុនពេលចូលឡើយ។</span>
                 </li>
                 <li>
-                  <strong>Payment credit:</strong> Any first-day payment is deducted from the final bill.
-                  <span class="sp-kh-sub">ការទូទាត់ថ្ងៃដំបូងណាមួយនឹងត្រូវកាត់ចេញពីវិក្កយបត្រចុងក្រោយនៅពេលចេញ។</span>
+                  <strong>Overstay deadline:</strong> Overstay begins only after the full reserved duration ends (checked-in time + reserved days × 24h). Each started overstay day costs 2× the standard rate (including normal charge).
+                  <span class="sp-kh-sub">ការលើសម៉ោងចាប់ផ្តើមបន្ទាប់ពីផុតកំណត់រយៈពេលកក់សរុប។ រាល់ថ្ងៃលើសម៉ោងគិតតម្លៃ ២ដង។</span>
                 </li>
                 <li>
-                  <strong>Exact finish time:</strong> Exit on or before the booked end has no overstay penalty.
-                  <span class="sp-kh-sub">ការចាកចេញនៅត្រឹម ឬមុនម៉ោងកំណត់បញ្ចប់ មិនមានការផាកពិន័យលើសម៉ោងឡើយ។</span>
+                  <strong>Payment credit:</strong> Any deposit or previous payments are deducted in full from the final exit bill.
+                  <span class="sp-kh-sub">ការទូទាត់ប្រាក់កក់នឹងត្រូវកាត់ចេញពីវិក្កយបត្រចុងក្រោយនៅពេលចេញ។</span>
                 </li>
                 <li>
-                  <strong>Pay-at-exit arrival deadline:</strong> An unused pay-at-exit booking expires after its 3-hour arrival deadline.
-                  <span class="sp-kh-sub">ការកក់ប្រភេទបង់ប្រាក់ពេលចេញដែលមិនបានចូលចត នឹងផុតកំណត់បន្ទាប់ពីរយៈពេល ៣ ម៉ោង។</span>
+                  <strong>Pay-at-exit arrival deadline:</strong> An unused pay-at-exit booking expires after its 3-hour arrival deadline. Once checked in, the 3-hour arrival deadline stops applying.
+                  <span class="sp-kh-sub">ការកក់ប្រភេទបង់ប្រាក់ពេលចេញមានសុពលភាពមកដល់ ៣ ម៉ោង។ នៅពេលចូលចតរួច កាលកំណត់ ៣ ម៉ោងលែងអនុវត្តទៀតហើយ។</span>
                 </li>
                 <li>
-                  <strong>Deposit timeout & cancellation:</strong> First-day deposit checkout must be completed within 15 minutes. Bookings not checked in before the booked finish time expire, and the deposit is retained per policy. Paid bookings can be cancelled before check-in.
-                  <span class="sp-kh-sub">ការទូទាត់ប្រាក់កក់ត្រូវតែបញ្ចប់ក្នុងរយៈពេល ១៥ នាទី។ ការកក់ដែលមិនបានចូលចតមុនម៉ោងបញ្ចប់ នឹងត្រូវផុតកំណត់ ហើយប្រាក់កក់ត្រូវបានរក្សាទុកតាមគោលការណ៍។</span>
+                  <strong>Deposit timeout & cancellation:</strong> First-day deposit checkout must be completed within 15 minutes. Paid bookings can be cancelled before check-in.
+                  <span class="sp-kh-sub">ការទូទាត់ប្រាក់កក់ត្រូវតែបញ្ចប់ក្នុងរយៈពេល ១៥ នាទី។ ការកក់អាចបោះបង់បានមុនពេលចូលចត។</span>
                 </li>
               </ul>
             </div>
@@ -491,8 +515,32 @@
     if (radioExit) {
       radioExit.addEventListener('change', updatePaymentUI);
     }
+    // 4. Synchronize reserved_days and finish_date
+    var reservedDaysEl = document.getElementById('id_reserved_days');
+    var finishDateEl = document.getElementById('id_finish_date');
+
+    function syncFinishDateFromDays() {
+      if (!startDateEl || !finishDateEl || !reservedDaysEl) return;
+      var startVal = startDateEl.value;
+      var daysVal = parseInt(reservedDaysEl.value, 10) || 1;
+      if (startVal) {
+        var d = new Date(startVal);
+        d.setDate(d.getDate() + daysVal);
+        var yyyy = d.getFullYear();
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        finishDateEl.value = yyyy + '-' + mm + '-' + dd;
+      }
+    }
+
+    if (reservedDaysEl) {
+      reservedDaysEl.addEventListener('change', syncFinishDateFromDays);
+    }
     if (startDateEl) {
-      startDateEl.addEventListener('change', checkDatePolicy);
+      startDateEl.addEventListener('change', function() {
+        checkDatePolicy();
+        syncFinishDateFromDays();
+      });
       checkDatePolicy();
     } else {
       updatePaymentUI();

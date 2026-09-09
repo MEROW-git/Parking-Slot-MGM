@@ -1,6 +1,7 @@
+import math
 import secrets
 import string
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -177,6 +178,9 @@ class Reservation(models.Model):
     total_amount = models.PositiveIntegerField(default=0, help_text='Final total billed in KHR')
     balance_paid = models.PositiveIntegerField(default=0, help_text='Exit balance paid in KHR')
 
+    # Reserved duration in 24-hour days
+    reserved_days = models.PositiveIntegerField(default=1, help_text='Reserved duration in 24-hour parking days')
+
     # Deadlines and actual gate execution timestamps
     payment_deadline = models.DateTimeField(null=True, blank=True, help_text='Checkout timeout for deposit payment')
     arrival_deadline = models.DateTimeField(null=True, blank=True, help_text='Arrival deadline for unpaid same-day holds (3 hours)')
@@ -225,11 +229,62 @@ class Reservation(models.Model):
             tz = timezone.get_current_timezone()
             self.finish_time = timezone.make_aware(datetime.combine(self.finish_date, time(22, 0)), tz)
 
+        # Infer reserved_days when omitted or defaulted to 1 and times/dates span multiple days
+        if not getattr(self, '_reserved_days_explicit', False):
+            if not self.reserved_days or self.reserved_days <= 1:
+                if self.finish_time and self.start_time:
+                    diff_secs = (self.finish_time - self.start_time).total_seconds()
+                    if diff_secs > 90000.0:
+                        self.reserved_days = max(1, math.ceil(diff_secs / 86400.0))
+                    elif not self.reserved_days:
+                        self.reserved_days = 1
+                elif self.finish_date and self.start_date:
+                    days = (self.finish_date - self.start_date).days
+                    if days > 1:
+                        self.reserved_days = days
+                    elif not self.reserved_days:
+                        self.reserved_days = 1
+                elif not self.reserved_days:
+                    self.reserved_days = 1
+        elif not self.reserved_days:
+            self.reserved_days = 1
+
         # Generate access token if not present
         if not self.access_token:
             self.access_token = generate_access_token()
 
         super().save(*args, **kwargs)
+
+    @property
+    def effective_reserved_days(self):
+        if self.reserved_days and self.reserved_days > 1:
+            return self.reserved_days
+        if getattr(self, '_reserved_days_explicit', False) and self.reserved_days:
+            return self.reserved_days
+        # Fallback for legacy records or un-saved instances
+        if self.finish_time and self.start_time:
+            diff_secs = (self.finish_time - self.start_time).total_seconds()
+            if diff_secs > 90000.0:
+                return max(1, math.ceil(diff_secs / 86400.0))
+        if self.finish_date and self.start_date:
+            days = (self.finish_date - self.start_date).days
+            if days > 1:
+                return days
+        return self.reserved_days if self.reserved_days else 1
+
+    @property
+    def start_datetime(self):
+        return self.effective_start_time
+
+    @property
+    def finish_datetime(self):
+        return self.effective_finish_time
+
+    @property
+    def parking_deadline(self):
+        if self.checked_in_at:
+            return self.checked_in_at + timedelta(days=self.effective_reserved_days)
+        return None
 
     @property
     def effective_start_time(self):
@@ -247,8 +302,8 @@ class Reservation(models.Model):
 
     @property
     def is_overstay(self):
-        if self.status == 'CHECKED_IN' and self.effective_finish_time:
-            return timezone.now() > self.effective_finish_time
+        if self.status == 'CHECKED_IN' and self.parking_deadline:
+            return timezone.now() > self.parking_deadline
         return False
 
     @property
@@ -260,11 +315,23 @@ class Reservation(models.Model):
         return f"{self.daily_rate:,} ៛"
 
     @property
+    def daily_rate_khr_formatted(self):
+        return f"{self.daily_rate:,} ៛"
+
+    @property
     def deposit_formatted(self):
         return f"{self.deposit_amount:,} ៛"
 
     @property
+    def deposit_amount_khr_formatted(self):
+        return f"{self.deposit_amount:,} ៛"
+
+    @property
     def total_formatted(self):
+        return f"{self.total_amount:,} ៛"
+
+    @property
+    def total_amount_khr_formatted(self):
         return f"{self.total_amount:,} ៛"
 
 

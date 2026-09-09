@@ -255,8 +255,11 @@
       </div>
 
       <div>
-        <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">VALIDITY PERIOD (កាលបរិច្ឆេទ)</span>
+        <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">ARRIVAL VALIDITY (សុពលភាពមកដល់)</span>
         <strong>{{ reservation.start_datetime|date:"d M Y, H:i" }}</strong> to <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
+        <div style="font-size:0.78rem; color:var(--color-print-muted); margin-top:0.25rem;">
+          Reserved: <strong>{{ reservation.effective_reserved_days }} day{{ reservation.effective_reserved_days|pluralize }}</strong> (24h/day after entry)
+        </div>
       </div>
     </div>
 
@@ -279,29 +282,50 @@
 
       <!-- Itemized Server-Calculated Bill Details -->
       <div style="font-size:0.88rem; color:var(--color-print-ink); line-height:1.6;">
-        <div style="display:flex; justify-content:space-between;">
-          <span>Normal Parking Duration ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }} @ {{ bill.daily_rate|default:reservation.daily_rate }} KHR):</span>
-          <strong style="font-family:var(--font-outlier);">{{ bill.normal_charge_formatted }}</strong>
-        </div>
+        {% if not reservation.checked_in_at %}
+          <div style="padding: 0.5rem 0.75rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; color: #1e40af; margin-bottom: 0.6rem; font-weight: 500;">
+            ℹ️ Parking charges start when you enter.
+            <div style="font-size: 0.78rem; color: #3b82f6;">(ថ្លៃចំណតនឹងចាប់ផ្តើមគិតនៅពេលអ្នកចូលតាមច្រកទ្វារជាក់ស្តែង)</div>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Accrued Parking Usage (រយៈពេលចត):</span>
+            <strong style="font-family:var(--font-outlier);">0 ៛</strong>
+          </div>
+          {% if reservation.deposit_amount > 0 %}
+            <div style="display:flex; justify-content:space-between; color:#15803d; margin-top:0.25rem;">
+              <span>Deposit Paid (ប្រាក់កក់បានបង់):</span>
+              <strong style="font-family:var(--font-outlier);">{{ reservation.deposit_amount_khr_formatted }}</strong>
+            </div>
+          {% endif %}
+          <div style="display:flex; justify-content:space-between; border-top:2px solid #0f172a; padding-top:0.4rem; margin-top:0.4rem; font-size:1.15rem; font-weight:800;">
+            <span>Additional Usage Due (សមតុល្យត្រូវបង់បន្ថែម):</span>
+            <span style="font-family:var(--font-outlier); color:#0f172a;">0 ៛</span>
+          </div>
+        {% else %}
+          <div style="display:flex; justify-content:space-between;">
+            <span>Normal Parking Duration ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }} @ {{ bill.daily_rate|default:reservation.daily_rate }} KHR):</span>
+            <strong style="font-family:var(--font-outlier);">{{ bill.normal_charge_formatted }}</strong>
+          </div>
 
-        {% if bill.overstay_days > 0 %}
-          <div style="display:flex; justify-content:space-between; color:#b91c1c;">
-            <span>Overstay Penalty ({{ bill.overstay_days }} day{{ bill.overstay_days|pluralize }} @ 2× rate):</span>
-            <strong style="font-family:var(--font-outlier);">+ {{ bill.overstay_charge_formatted }}</strong>
+          {% if bill.overstay_days > 0 %}
+            <div style="display:flex; justify-content:space-between; color:#b91c1c;">
+              <span>Overstay Penalty ({{ bill.overstay_days }} day{{ bill.overstay_days|pluralize }} @ 2× rate):</span>
+              <strong style="font-family:var(--font-outlier);">+ {{ bill.overstay_charge_formatted }}</strong>
+            </div>
+          {% endif %}
+
+          {% if bill.deposit_deducted > 0 %}
+            <div style="display:flex; justify-content:space-between; color:#15803d;">
+              <span>Deposit Credited (ប្រាក់កក់បានកាត់):</span>
+              <strong style="font-family:var(--font-outlier);">- {{ bill.deposit_deducted_formatted }}</strong>
+            </div>
+          {% endif %}
+
+          <div style="display:flex; justify-content:space-between; border-top:2px solid #0f172a; padding-top:0.4rem; margin-top:0.4rem; font-size:1.15rem; font-weight:800;">
+            <span>{% if reservation.checked_out or reservation.status == 'CHECKED_OUT' %}Total Paid (បានទូទាត់):{% else %}Estimated Balance Due (សមតុល្យត្រូវបង់):{% endif %}</span>
+            <span style="font-family:var(--font-outlier); color:#0f172a;">{{ bill.balance_due_formatted }}</span>
           </div>
         {% endif %}
-
-        {% if bill.deposit_deducted > 0 %}
-          <div style="display:flex; justify-content:space-between; color:#15803d;">
-            <span>Deposit Credited (ប្រាក់កក់បានកាត់):</span>
-            <strong style="font-family:var(--font-outlier);">- {{ bill.deposit_deducted_formatted }}</strong>
-          </div>
-        {% endif %}
-
-        <div style="display:flex; justify-content:space-between; border-top:2px solid #0f172a; padding-top:0.4rem; margin-top:0.4rem; font-size:1.15rem; font-weight:800;">
-          <span>{% if reservation.checked_out or reservation.status == 'CHECKED_OUT' %}Total Paid (បានទូទាត់):{% else %}Estimated Balance Due (សមតុល្យត្រូវបង់):{% endif %}</span>
-          <span style="font-family:var(--font-outlier); color:#0f172a;">{{ bill.balance_due_formatted }}</span>
-        </div>
       </div>
     </div>
 
@@ -311,10 +335,10 @@
         Checked In: <strong>{{ reservation.checked_in_at|date:"d M Y, H:i"|default:"Pending arrival" }}</strong>
       </div>
       <div>
-        Booked Exit: <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
+        Parking Deadline: <strong>{% if reservation.checked_in_at %}{{ reservation.parking_deadline|date:"d M Y, H:i" }}{% else %}Set when you enter{% endif %}</strong>
       </div>
       <div>
-        Checked Out: <strong>{{ reservation.checked_out_at|date:"d M Y, H:i"|default:"In session" }}</strong>
+        Checked Out: <strong>{% if reservation.checked_out_at %}{{ reservation.checked_out_at|date:"d M Y, H:i" }}{% elif reservation.checked_in_at %}In session{% else %}Not entered yet{% endif %}</strong>
       </div>
     </div>
 

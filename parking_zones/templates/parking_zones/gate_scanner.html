@@ -161,8 +161,8 @@
                 <span>{{ reservation.start_datetime|date:"d M Y, H:i" }}</span>
               </div>
               <div>
-                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Booked Exit</span>
-                <span>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</span>
+                <span style="color:var(--color-ink-2); display:block; font-size:0.72rem; text-transform:uppercase;">Reserved Duration</span>
+                <span>{{ reservation.effective_reserved_days }} day{{ reservation.effective_reserved_days|pluralize }} (24h/day after entry)</span>
               </div>
             </div>
 
