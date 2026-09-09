@@ -3,11 +3,11 @@
 {% block title %}Ticket #{{ reservation.ticket_code }} | SomPark Phnom Penh{% endblock %}
 
 {% block content %}
-<div class="no-print" style="max-width:650px; margin:0 auto 1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+<div class="no-print sp-ticket-actions-bar" id="ticket-actions-bar">
   <a href="{% url 'all_tickets' %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-back-history">
     ← Ticket History
   </a>
-  <div style="display:flex; gap:0.75rem;">
+  <div class="sp-ticket-actions-group">
     <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
       Print ticket (បោះពុម្ព)
     </button>
@@ -40,22 +40,22 @@
     </div>
     <div style="text-align:right;">
       {% if reservation.checked_out %}
-        <span style="background:var(--sp-bg-alt); color:var(--sp-text-muted); font-size:0.75rem; font-weight:800; padding:0.25rem 0.65rem; border:1px solid var(--sp-border-strong);">
+        <span class="sp-avail-badge" style="background:#e5e7eb; color:#4b5563; border:1px solid #9ca3af;">
           CHECKED OUT (បានចេញ)
         </span>
       {% else %}
-        <span style="background:var(--sp-green-light); color:var(--sp-green-dark); font-size:0.75rem; font-weight:800; padding:0.25rem 0.65rem; border:1px solid var(--sp-border-strong);">
+        <span class="sp-avail-badge available" style="border:1px solid #16a34a;">
           ACTIVE RESERVATION (កំពុងចត)
         </span>
       {% endif %}
-      <div style="font-size:0.75rem; color:var(--sp-text-muted); margin-top:0.35rem;">
+      <div style="font-size:0.75rem; color:var(--color-print-muted); margin-top:0.35rem;">
         Issued: {{ reservation.created_on|date:"d M Y, H:i" }}
       </div>
     </div>
   </div>
 
   <div style="text-align:center; margin:1.5rem 0 2rem;">
-    <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">
+    <div style="font-size:0.8rem; font-weight:700; color:var(--color-print-muted); text-transform:uppercase; letter-spacing:0.04em;">
       TICKET REFERENCE CODE (លេខកូដសំបុត្រ)
     </div>
     <div class="sp-ticket-barcode" id="ticket-barcode-val">
@@ -64,43 +64,43 @@
   </div>
 
   <!-- Ticket Metadata Grid -->
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; border-top:1px solid var(--sp-border); border-bottom:1px solid var(--sp-border); padding:1.25rem 0; margin-bottom:1.5rem; font-size:0.95rem;">
+  <div class="sp-ticket-meta-grid">
     <div>
-      <span style="font-size:0.8rem; color:var(--sp-text-muted); display:block;">PARKING FACILITY (ទីតាំង)</span>
-      <strong style="font-size:1.05rem;">{{ reservation.parking_zone.name }}</strong>
-      <div style="font-size:0.85rem; color:var(--sp-text-muted);">{{ reservation.parking_zone.address }}</div>
+      <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">PARKING FACILITY (ទីតាំង)</span>
+      <strong style="font-size:1.05rem; line-height:1.25;">{{ reservation.parking_zone.name }}</strong>
+      <div style="font-size:0.85rem; color:var(--color-print-muted);">{{ reservation.parking_zone.address }}</div>
     </div>
 
     <div>
-      <span style="font-size:0.8rem; color:var(--sp-text-muted); display:block;">CUSTOMER (អ្នកកក់)</span>
+      <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">CUSTOMER (អ្នកកក់)</span>
       <strong>{{ reservation.customer.username }}</strong>
-      <div style="font-size:0.85rem; color:var(--sp-text-muted);">Tel: {{ reservation.phone_number }}</div>
+      <div style="font-size:0.85rem; color:var(--color-print-muted);">Tel: {{ reservation.phone_number }}</div>
     </div>
 
     <div>
-      <span style="font-size:0.8rem; color:var(--sp-text-muted); display:block;">VEHICLE PLATE (ស្លាកលេខ)</span>
-      <strong style="font-family:var(--sp-font-mono); font-size:1.15rem; color:var(--sp-red);">{{ reservation.plate_number }}</strong>
+      <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">VEHICLE PLATE (ស្លាកលេខ)</span>
+      <strong style="font-family:var(--font-outlier); font-size:1.15rem; color:var(--color-print-ink);">{{ reservation.plate_number }}</strong>
     </div>
 
     <div>
-      <span style="font-size:0.8rem; color:var(--sp-text-muted); display:block;">VALIDITY DATES (កាលបរិច្ឆេទ)</span>
+      <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">VALIDITY DATES (កាលបរិច្ឆេទ)</span>
       <strong>{{ reservation.start_date|date:"d M Y" }}</strong> to <strong>{{ reservation.finish_date|date:"d M Y" }}</strong>
     </div>
   </div>
 
   <!-- Fee Calculation -->
-  <div style="background:var(--sp-bg); border:1px solid var(--sp-border); padding:1rem 1.25rem; margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:center;">
+  <div class="sp-ticket-rate-panel">
     <div>
       <div style="font-weight:700;">Daily Parking Rate (តម្លៃក្នុងមួយថ្ងៃ)</div>
-      <div style="font-size:0.8rem; color:var(--sp-text-muted);">Official rate payable at entry/exit</div>
+      <div style="font-size:0.8rem; color:var(--color-print-muted);">Official rate payable at entry/exit</div>
     </div>
-    <div style="font-size:1.5rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-text);">
+    <div style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-print-ink);">
       {{ reservation.parking_zone.price_khr_formatted }}
     </div>
   </div>
 
   <!-- Attendant Instructions -->
-  <div style="font-size:0.82rem; color:var(--sp-text-muted); border-top:1px dashed var(--sp-border); padding-top:1rem; text-align:center;">
+  <div style="font-size:0.82rem; color:var(--color-print-muted); border-top:1px dashed var(--color-print-rule); padding-top:1rem; text-align:center; line-height:1.45;">
     សូមបង្ហាញសំបុត្រនេះដល់បុគ្គលិកចំណតនៅពេលចេញ-ចូល។<br>
     Please show this ticket or barcode code to the barrier attendant. Hotline: +855 23 888 999.
   </div>

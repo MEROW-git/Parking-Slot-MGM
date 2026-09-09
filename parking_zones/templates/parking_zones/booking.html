@@ -5,14 +5,14 @@
 {% block content %}
 {% include "components/page_header.html" with title="Reserve a Parking Slot" subtitle="Lock in your guaranteed parking space in central Phnom Penh" khmer_tag="កក់កន្លែងចំណតទុកជាមុន" %}
 
-<div style="max-width:760px; margin:0 auto;" id="booking-container">
+<div class="sp-booking-container" id="booking-container">
   {% if active_reservation %}
     <div class="sp-alert sp-alert-warning">
       <div>
         <strong>Active Reservation Detected:</strong> You currently have an active parking spot at <strong>{{ active_reservation.parking_zone.name }}</strong> (Ticket #{{ active_reservation.ticket_code }}). Please check out before booking a new slot.
       </div>
     </div>
-    <div style="display:flex; gap:1rem;">
+    <div style="display:flex; gap:1rem; flex-wrap:wrap;">
       <a href="{% url 'ticket_code' active_reservation.ticket_code %}" class="sp-btn sp-btn-secondary" id="btn-booking-view-ticket">
         View Current Ticket
       </a>
@@ -25,7 +25,7 @@
       </form>
     </div>
   {% else %}
-    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2.5rem; box-shadow:var(--sp-shadow-hard-lg);">
+    <div class="sp-booking-card">
       <form action="{% url 'book' %}" method="post" id="reservation-form" novalidate>
         {% csrf_token %}
 
@@ -39,26 +39,26 @@
 
         {% include "components/form_field.html" with field=form.parking_zone %}
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+        <div class="sp-form-row">
           {% include "components/form_field.html" with field=form.start_date %}
           {% include "components/form_field.html" with field=form.finish_date %}
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+        <div class="sp-form-row">
           {% include "components/form_field.html" with field=form.plate_number %}
           {% include "components/form_field.html" with field=form.phone_number %}
         </div>
 
         <!-- Local Guidance Note -->
-        <div style="background:var(--sp-bg-alt); border-left:3px solid var(--sp-red); padding:1rem 1.25rem; margin:1.5rem 0; font-size:0.9rem; color:var(--sp-text);">
+        <div class="sp-form-note">
           <strong>ចំណាំ (Note):</strong> Parking fees are paid in Cambodian Riel (KHR / ៛) upon entry or digital validation. Please present your digital or printed ticket code to the facility attendant upon arrival.
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-top:2rem;">
+        <div class="sp-form-actions">
           <a href="{% url 'home' %}" class="sp-btn sp-btn-secondary" id="btn-cancel-booking">
             ← Cancel & Return
           </a>
-          <button type="submit" class="sp-btn sp-btn-primary" id="btn-submit-booking" style="font-size:1.05rem;">
+          <button type="submit" class="sp-btn sp-btn-primary" id="btn-submit-booking">
             Confirm Parking Reservation (បញ្ជាក់ការកក់) →
           </button>
         </div>

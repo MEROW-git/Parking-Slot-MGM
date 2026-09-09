@@ -69,14 +69,24 @@ h4,
   font-family: var(--font-display);
   font-style: normal;
   font-weight: 700;
-  line-height: 0.98;
+  line-height: 1.15;
   letter-spacing: -0.035em;
   overflow-wrap: anywhere;
 }
 
-h1 { font-size: clamp(2.75rem, 6vw, 5.5rem); }
-h2 { font-size: clamp(2.25rem, 4.5vw, 4.25rem); }
-h3 { font-size: clamp(1.5rem, 2.5vw, 2rem); }
+:lang(km),
+.sp-khmer,
+.sp-khmer-heading,
+[lang="km-KH"] h1,
+[lang="km-KH"] h2,
+[lang="km-KH"] h3,
+[lang="km-KH"] h4 {
+  line-height: 1.25;
+}
+
+h1 { font-size: clamp(2.5rem, 5.5vw, 5.5rem); }
+h2 { font-size: clamp(2rem, 4vw, 4.25rem); }
+h3 { font-size: clamp(1.4rem, 2.5vw, 2rem); }
 h4 { font-size: var(--text-lg); }
 
 p { margin-block-end: var(--space-sm); }
@@ -388,6 +398,20 @@ textarea {
   overflow: clip;
   border-radius: var(--radius-card);
   isolation: isolate;
+}
+
+@media (max-height: 34rem) and (orientation: landscape) {
+  .sp-hero-marquee {
+    min-height: min(52dvh, 20rem);
+  }
+
+  .sp-hero-copy {
+    padding: var(--space-md) clamp(var(--space-md), 4vw, var(--space-xl)) var(--space-lg);
+  }
+
+  .sp-hero h1 {
+    font-size: clamp(2.25rem, 7vw, 3.75rem);
+  }
 }
 
 .sp-hero-image,
@@ -766,14 +790,25 @@ textarea {
 /* Toast Notification System · Fixed-position stackable notifications */
 .sp-toast-container {
   position: fixed;
-  top: 1.5rem;
-  right: 1.5rem;
+  top: max(1.5rem, env(safe-area-inset-top) + 0.5rem);
+  right: max(1.5rem, env(safe-area-inset-right) + 0.5rem);
   z-index: 9999;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
-  width: min(26rem, calc(100vw - 2rem));
+  width: min(26rem, calc(100% - 2rem));
+  max-width: calc(100vw - 2rem);
   pointer-events: none;
+}
+
+@media (max-width: 36rem) {
+  .sp-toast-container {
+    top: max(0.75rem, env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+    left: max(0.75rem, env(safe-area-inset-left));
+    width: auto;
+    max-width: none;
+  }
 }
 
 .sp-toast {
@@ -1529,7 +1564,7 @@ code {
   font-family: var(--font-outlier);
 }
 
-@media (max-width: 60rem) {
+@media (max-width: 68rem) {
   .sp-nav-inner {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -1550,6 +1585,11 @@ code {
     border-block-end: var(--rule-hair) solid var(--color-rule);
     border-radius: 0;
     background: var(--color-paper-2);
+    max-height: calc(100dvh - 5.5rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: var(--shadow-lift);
+    z-index: 99;
   }
 
   .sp-nav-link {
@@ -2296,6 +2336,328 @@ code {
   .sp-dialog-actions form {
     width: 100%;
   }
+}
+
+/* ==================================================
+   SomPark Responsive Component Hardening Primitives
+   ================================================== */
+
+/* Universal Touch Target & Input Resiliency */
+.sp-btn,
+.sp-nav-link,
+.sp-filter-link,
+.sp-input,
+.sp-select {
+  min-height: 2.75rem; /* 44px minimum touch target */
+}
+
+@media (pointer: coarse) {
+  .sp-btn,
+  .sp-nav-link,
+  .sp-filter-link,
+  .sp-input,
+  .sp-select {
+    min-height: 3rem; /* 48px on coarse touch devices */
+  }
+}
+
+/* Auth Layout (Login & Signup) */
+.sp-auth-container {
+  width: 100%;
+  max-width: 32rem;
+  margin-inline: auto;
+  margin-block: var(--space-xl);
+  min-width: 0;
+}
+
+.sp-auth-card {
+  background: var(--color-paper-2);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: clamp(1.25rem, 5vw, 2.5rem);
+  box-shadow: var(--shadow-lift);
+  min-width: 0;
+}
+
+.sp-auth-header {
+  text-align: center;
+  margin-bottom: var(--space-xl);
+}
+
+.sp-auth-header .sp-brand {
+  justify-content: center;
+  margin-bottom: var(--space-xs);
+  margin-inline: auto;
+}
+
+.sp-auth-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: var(--space-3xs);
+  color: var(--color-ink);
+}
+
+.sp-auth-desc {
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.sp-auth-submit {
+  width: 100%;
+  margin-top: var(--space-lg);
+  font-size: var(--text-md);
+  min-height: 2.75rem;
+}
+
+.sp-auth-footer {
+  border-top: var(--rule-hair) solid var(--color-rule);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+.sp-auth-link {
+  font-weight: 700;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Zone Detail & Status */
+.sp-zone-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: var(--space-xl);
+  align-items: start;
+  min-width: 0;
+}
+
+@media (max-width: 56rem) {
+  .sp-zone-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-lg);
+  }
+}
+
+.sp-zone-status-card,
+.sp-zone-facility-card,
+.sp-zone-sidebar-card {
+  background: var(--color-paper-2);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: clamp(1.25rem, 4vw, 2rem);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+  margin-bottom: var(--space-xl);
+}
+
+.sp-zone-sidebar-card {
+  position: sticky;
+  top: 6.5rem;
+}
+
+@media (max-width: 56rem), (max-height: 40rem) {
+  .sp-zone-sidebar-card {
+    position: static;
+  }
+}
+
+.sp-zone-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  padding-top: var(--space-md);
+  text-align: center;
+  min-width: 0;
+}
+
+@media (max-width: 32rem) {
+  .sp-zone-metrics-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-sm);
+  }
+}
+
+.sp-amenities-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  min-width: 0;
+}
+
+@media (max-width: 36rem) {
+  .sp-amenities-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Booking & Form Layouts */
+.sp-booking-container {
+  width: 100%;
+  max-width: 48rem;
+  margin-inline: auto;
+  min-width: 0;
+}
+
+.sp-booking-card {
+  background: var(--color-paper-2);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: clamp(1.25rem, 5vw, 2.5rem);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.sp-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+@media (max-width: 44rem) {
+  .sp-form-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xs);
+  }
+}
+
+.sp-form-note {
+  background: var(--color-paper-3);
+  border-inline-start: var(--rule-bold) solid var(--color-accent);
+  padding: var(--space-sm) var(--space-md);
+  margin-block: var(--space-lg);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  line-height: 1.5;
+  border-radius: var(--radius-input);
+}
+
+.sp-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+@media (max-width: 36rem) {
+  .sp-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sp-form-actions .sp-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Ticket Details & Print Safety */
+.sp-ticket-actions-bar {
+  max-width: 42rem;
+  margin-inline: auto;
+  margin-block-end: var(--space-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.sp-ticket-actions-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+@media (max-width: 36rem) {
+  .sp-ticket-actions-bar,
+  .sp-ticket-actions-group {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .sp-ticket-actions-bar .sp-btn,
+  .sp-ticket-actions-group .sp-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.sp-ticket-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+  padding-block: var(--space-md);
+  margin-block-end: var(--space-lg);
+  font-size: var(--text-sm);
+  min-width: 0;
+}
+
+@media (max-width: 36rem) {
+  .sp-ticket-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sp-ticket-rate-panel {
+  background: var(--color-paper-3);
+  border: var(--rule-hair) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: var(--space-sm) var(--space-md);
+  margin-block-end: var(--space-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.sp-ticket-barcode {
+  font-family: var(--font-outlier);
+  font-size: clamp(1.35rem, 4.5vw, 2.25rem);
+  letter-spacing: 0.15em;
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+/* User Dashboard & Ticket Table Min-widths */
+#tickets-table {
+  min-width: 62rem;
+}
+
+#recent-tickets-table {
+  min-width: 58rem;
+}
+
+/* Dialog Containment for Mobile Landscape */
+.sp-dialog {
+  max-height: calc(100dvh - 2rem);
+}
+
+.sp-dialog-box {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media print {

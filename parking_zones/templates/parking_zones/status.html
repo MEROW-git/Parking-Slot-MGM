@@ -5,51 +5,51 @@
 {% block content %}
 {% include "components/page_header.html" with title=parking_zone.name subtitle=parking_zone.address khmer_tag=parking_zone.khmer_name %}
 
-<div style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:2rem;" id="zone-detail-grid">
+<div class="sp-zone-detail-grid" id="zone-detail-grid">
   <!-- Left Column: Overview & Availability -->
-  <div>
+  <div class="sp-zone-detail-main">
     <!-- Availability Card -->
-    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard-lg); margin-bottom:2rem;">
+    <div class="sp-zone-status-card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
         <div>
-          <span style="font-size:0.85rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Current Occupancy</span>
-          <h2 style="font-size:2rem; margin-top:0.25rem;">
-            {{ parking_zone.vacant_slots }} <span style="font-size:1.1rem; font-weight:600; color:var(--sp-text-muted);">/ {{ parking_zone.num_of_slots }} Vacant</span>
+          <span style="font-size:0.85rem; font-weight:700; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.05em;">Current Occupancy</span>
+          <h2 style="font-size:clamp(1.75rem, 3.5vw, 2.25rem); margin-top:0.25rem; line-height:1.2;">
+            {{ parking_zone.vacant_slots }} <span style="font-size:1.1rem; font-weight:600; color:var(--color-ink-2);">/ {{ parking_zone.num_of_slots }} Vacant</span>
           </h2>
         </div>
         {% include "components/availability_indicator.html" with status=parking_zone.availability_status vacant=parking_zone.vacant_slots total=parking_zone.num_of_slots id=parking_zone.slug %}
       </div>
 
       <!-- Custom Occupancy Bar -->
-      <div style="background:var(--sp-bg-alt); border:2px solid var(--sp-border-strong); height:24px; border-radius:var(--sp-radius-sm); overflow:hidden; display:flex; margin-bottom:1.5rem;">
-        <div style="background:var(--sp-red); width:{{ parking_zone.occupancy_percentage }}%; height:100%; transition:width 0.3s ease;" title="Occupied: {{ parking_zone.occupied_slots }}"></div>
+      <div style="background:var(--color-paper-3); border:var(--rule-fine) solid var(--color-rule-2); height:24px; border-radius:var(--radius-input); overflow:hidden; display:flex; margin-bottom:1.5rem;">
+        <div style="background:var(--color-accent); width:{{ parking_zone.occupancy_percentage }}%; height:100%; transition:width 0.3s ease;" title="Occupied: {{ parking_zone.occupied_slots }}"></div>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; border-top:1px solid var(--sp-border); padding-top:1.25rem; text-align:center;">
+      <div class="sp-zone-metrics-grid">
         <div>
-          <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle);">TOTAL SLOTS</div>
-          <div style="font-size:1.5rem; font-weight:800; font-family:var(--sp-font-mono);">{{ parking_zone.num_of_slots }}</div>
+          <div style="font-size:0.8rem; font-weight:700; color:var(--color-muted); letter-spacing:0.04em;">TOTAL SLOTS</div>
+          <div style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-ink);">{{ parking_zone.num_of_slots }}</div>
         </div>
         <div>
-          <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle);">OCCUPIED</div>
-          <div style="font-size:1.5rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-red);">{{ parking_zone.occupied_slots }}</div>
+          <div style="font-size:0.8rem; font-weight:700; color:var(--color-muted); letter-spacing:0.04em;">OCCUPIED</div>
+          <div style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-accent);">{{ parking_zone.occupied_slots }}</div>
         </div>
         <div>
-          <div style="font-size:0.8rem; font-weight:700; color:var(--sp-text-subtle);">AVAILABLE</div>
-          <div style="font-size:1.5rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-green);">{{ parking_zone.vacant_slots }}</div>
+          <div style="font-size:0.8rem; font-weight:700; color:var(--color-muted); letter-spacing:0.04em;">AVAILABLE</div>
+          <div style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-success);">{{ parking_zone.vacant_slots }}</div>
         </div>
       </div>
     </div>
 
     <!-- Facility Description -->
-    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard);">
-      <h3 style="margin-bottom:0.75rem;">Facility Information (ព័ត៌មានលម្អិត)</h3>
-      <p style="color:var(--sp-text); margin-bottom:1.25rem;">
+    <div class="sp-zone-facility-card">
+      <h3 style="margin-bottom:0.75rem; line-height:1.25;">Facility Information (ព័ត៌មានលម្អិត)</h3>
+      <p style="color:var(--color-ink-2); margin-bottom:1.25rem; line-height:1.55;">
         {{ parking_zone.description|default:"Secured municipal parking facility in Phnom Penh, equipped with 24-hour security guards, boom barriers, and high-resolution CCTV." }}
       </p>
 
-      <h4 style="font-size:0.95rem; margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em;">Amenities & Security</h4>
-      <ul style="list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.9rem; color:var(--sp-text-muted);">
+      <h4 style="font-size:0.95rem; margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-ink);">Amenities & Security</h4>
+      <ul class="sp-amenities-grid">
         <li>24/7 Security Personnel (សន្តិសុខ)</li>
         <li>High-Definition CCTV Surveillance</li>
         <li>Automated Barrier Gates</li>
@@ -59,28 +59,28 @@
   </div>
 
   <!-- Right Column: Booking Card -->
-  <div>
-    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard-lg); position:sticky; top:100px;">
-      <div style="border-bottom:2px solid var(--sp-border); padding-bottom:1.25rem; margin-bottom:1.25rem;">
-        <div style="font-size:0.85rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Daily Rate</div>
-        <div style="font-size:2.25rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-text);">
+  <div class="sp-zone-detail-sidebar">
+    <div class="sp-zone-sidebar-card">
+      <div style="border-bottom:var(--rule-fine) solid var(--color-rule); padding-bottom:1.25rem; margin-bottom:1.25rem;">
+        <div style="font-size:0.85rem; font-weight:700; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.04em;">Daily Rate</div>
+        <div style="font-size:2.25rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-ink); line-height:1.15; margin-block:0.25rem;">
           {{ parking_zone.price_khr_formatted }}
         </div>
-        <div style="font-size:0.85rem; color:var(--sp-text-muted);">Per booking / standard day</div>
+        <div style="font-size:0.85rem; color:var(--color-ink-2);">Per booking / standard day</div>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:0.85rem; margin-bottom:1.75rem;">
-        <div style="display:flex; justify-content:space-between; font-size:0.95rem;">
-          <span style="color:var(--sp-text-muted);">District:</span>
-          <strong>{{ parking_zone.district }}</strong>
+        <div style="display:flex; justify-content:space-between; font-size:0.95rem; gap:0.5rem;">
+          <span style="color:var(--color-ink-2);">District:</span>
+          <strong style="color:var(--color-ink); text-align:right;">{{ parking_zone.district }}</strong>
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:0.95rem;">
-          <span style="color:var(--sp-text-muted);">Hours:</span>
-          <strong>{{ parking_zone.operating_hours }}</strong>
+        <div style="display:flex; justify-content:space-between; font-size:0.95rem; gap:0.5rem;">
+          <span style="color:var(--color-ink-2);">Hours:</span>
+          <strong style="color:var(--color-ink); text-align:right;">{{ parking_zone.operating_hours }}</strong>
         </div>
-        <div style="display:flex; justify-content:space-between; font-size:0.95rem;">
-          <span style="color:var(--sp-text-muted);">Vehicle Types:</span>
-          <strong>Sedan, SUV, Pickup</strong>
+        <div style="display:flex; justify-content:space-between; font-size:0.95rem; gap:0.5rem;">
+          <span style="color:var(--color-ink-2);">Vehicle Types:</span>
+          <strong style="color:var(--color-ink); text-align:right;">Sedan, SUV, Pickup</strong>
         </div>
       </div>
 

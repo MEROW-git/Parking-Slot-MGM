@@ -17,7 +17,7 @@
         SomPark Smart Parking Operations & Reservation Workbench
       </p>
     </div>
-    <div style="display:flex; align-items:center; gap:var(--space-xs);">
+    <div style="display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-xs);">
       <a href="{% url 'home' %}#parking-zones" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-header-find-parking">
         Live City Map
       </a>
@@ -148,37 +148,37 @@
         </a>
       </div>
 
-      <div style="background:var(--color-paper-2); border:var(--rule-fine) solid var(--color-rule-2); box-shadow:var(--shadow-card); overflow-x:auto;">
-        <table style="width:100%; border-collapse:collapse; text-align:left; font-size:var(--text-sm);" id="recent-tickets-table">
+      <div class="sp-table-wrapper" id="recent-tickets-wrapper">
+        <table class="sp-table" id="recent-tickets-table">
           <thead>
-            <tr style="background:var(--color-paper-3); border-bottom:var(--rule-fine) solid var(--color-rule-2);">
-              <th style="padding:1rem 1.25rem; font-weight:800; font-size:var(--text-xs); text-transform:uppercase;">Ticket Code</th>
-              <th style="padding:1rem 1.25rem; font-weight:800; font-size:var(--text-xs); text-transform:uppercase;">Zone (ទីតាំង)</th>
-              <th style="padding:1rem 1.25rem; font-weight:800; font-size:var(--text-xs); text-transform:uppercase;">Vehicle Plate</th>
-              <th style="padding:1rem 1.25rem; font-weight:800; font-size:var(--text-xs); text-transform:uppercase;">Dates</th>
-              <th style="padding:1rem 1.25rem; font-weight:800; font-size:var(--text-xs); text-transform:uppercase;">Status</th>
-              <th style="padding:1rem 1.25rem; font-weight:800; font-size:var(--text-xs); text-transform:uppercase; text-align:right;">Actions</th>
+            <tr>
+              <th class="col-ticket">Ticket Code</th>
+              <th class="col-zone">Zone (ទីតាំង)</th>
+              <th class="col-plate">Vehicle Plate</th>
+              <th class="col-dates">Dates</th>
+              <th class="col-status">Status</th>
+              <th class="col-actions" style="text-align:right;">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for ticket in recent_reservations %}
-              <tr style="border-bottom:1px solid var(--color-rule);" id="row-recent-{{ ticket.ticket_code }}">
-                <td style="padding:1rem 1.25rem; font-family:var(--font-outlier); font-weight:700;">
+              <tr id="row-recent-{{ ticket.ticket_code }}">
+                <td class="col-ticket" style="font-family:var(--font-outlier); font-weight:700;">
                   <a href="{% url 'ticket_code' ticket.ticket_code %}" style="color:var(--color-ink); text-decoration:underline;">
                     {{ ticket.ticket_code }}
                   </a>
                 </td>
-                <td style="padding:1rem 1.25rem;">
+                <td class="col-zone">
                   <strong>{{ ticket.parking_zone.name }}</strong>
                   <div style="font-size:var(--text-xs); color:var(--color-ink-2);">{{ ticket.parking_zone.district }}</div>
                 </td>
-                <td style="padding:1rem 1.25rem; font-family:var(--font-outlier); font-weight:700;">
-                  {{ ticket.plate_number }}
+                <td class="col-plate" style="font-family:var(--font-outlier); font-weight:700;">
+                  <span class="sp-plate-badge">{{ ticket.plate_number }}</span>
                 </td>
-                <td style="padding:1rem 1.25rem; font-size:var(--text-xs); color:var(--color-ink-2);">
+                <td class="col-dates" style="font-size:var(--text-xs); color:var(--color-ink-2);">
                   {{ ticket.start_date|date:"d M Y" }} → {{ ticket.finish_date|date:"d M Y" }}
                 </td>
-                <td style="padding:1rem 1.25rem;">
+                <td class="col-status">
                   {% if ticket.checked_out %}
                     <span class="sp-avail-badge" style="background:var(--color-paper-3); color:var(--color-muted);">
                       COMPLETED
@@ -189,7 +189,7 @@
                     </span>
                   {% endif %}
                 </td>
-                <td style="padding:1rem 1.25rem; text-align:right;">
+                <td class="col-actions" style="text-align:right;">
                   <a href="{% url 'ticket_code' ticket.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-recent-view-{{ ticket.ticket_code }}">
                     View Pass
                   </a>

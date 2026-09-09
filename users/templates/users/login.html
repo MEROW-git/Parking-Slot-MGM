@@ -3,15 +3,15 @@
 {% block title %}Sign In | SomPark Phnom Penh{% endblock %}
 
 {% block content %}
-<div style="max-width:480px; margin:2rem auto;" id="login-container">
-  <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2.5rem; box-shadow:var(--sp-shadow-hard-lg);">
-    <div style="text-align:center; margin-bottom:2rem;">
-      <div class="sp-brand" style="justify-content:center; margin-bottom:0.5rem;">
+<div class="sp-auth-container" id="login-container">
+  <div class="sp-auth-card">
+    <div class="sp-auth-header">
+      <div class="sp-brand" aria-label="SomPark Phnom Penh">
         <span class="sp-brand-badge">ភ្នំពេញ</span>
         <span>SomPark</span>
       </div>
-      <h2 style="font-size:1.75rem; margin-bottom:0.25rem;">Sign In (ចូលប្រើ)</h2>
-      <p style="color:var(--sp-text-muted); font-size:0.95rem; margin-bottom:0;">
+      <h1 class="sp-auth-title">Sign In (ចូលប្រើ)</h1>
+      <p class="sp-auth-desc">
         Access your reservations and digital parking tickets
       </p>
     </div>
@@ -33,13 +33,13 @@
       {% include "components/form_field.html" with field=form.username %}
       {% include "components/form_field.html" with field=form.password %}
 
-      <button type="submit" class="sp-btn sp-btn-primary" style="width:100%; margin-top:1.5rem; font-size:1.05rem;" id="btn-submit-login">
+      <button type="submit" class="sp-btn sp-btn-primary sp-auth-submit" id="btn-submit-login">
         Sign In to SomPark →
       </button>
     </form>
 
-    <div style="border-top:1px solid var(--sp-border); margin-top:2rem; padding-top:1.25rem; text-align:center; font-size:0.9rem; color:var(--sp-text-muted);">
-      Don't have an account? <a href="{% url 'signup' %}" style="font-weight:700; color:var(--sp-red);" id="link-goto-signup">Register here (ចុះឈ្មោះ)</a>
+    <div class="sp-auth-footer">
+      Don't have an account? <a href="{% url 'signup' %}" class="sp-auth-link" id="link-goto-signup">Register here (ចុះឈ្មោះ)</a>
     </div>
   </div>
 </div>
