@@ -244,6 +244,8 @@ class BookingAndCheckoutWorkflowTests(TestCase):
             start_date=today,
             finish_date=today,
             ticket_code='SPK-CHECKOUT1',
+            status='CHECKED_IN',
+            deposit_amount=self.zone.price,
             checked_out=False
         )
         self.assertEqual(self.zone.occupied_slots, 1)
@@ -282,6 +284,7 @@ class TicketViewBrandingTests(TestCase):
             price=2500,
         )
         self.today = datetime.date.today()
+        self.now = timezone.now()
         self.reservation = Reservation.objects.create(
             customer=self.user,
             parking_zone=self.zone,
@@ -290,6 +293,9 @@ class TicketViewBrandingTests(TestCase):
             start_date=self.today,
             finish_date=self.today,
             ticket_code='SPK-TESTBRAND',
+            status='CONFIRMED',
+            payment_method='PAY_AT_EXIT',
+            arrival_deadline=self.now + datetime.timedelta(hours=3),
             checked_out=False
         )
 
@@ -298,7 +304,12 @@ class TicketViewBrandingTests(TestCase):
         response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
         self.assertEqual(response.status_code, 200)
 
-        # Confirm new consistent navigation branding
+        # Confirm single centered container and layout order
+        self.assertContains(response, 'id="ticket-page-container"')
+        self.assertContains(response, 'id="ticket-nav-bar"')
+        self.assertContains(response, '← Ticket History')
+        self.assertContains(response, 'id="ticket-actions-bar"')
+        self.assertContains(response, 'id="arrival-countdown-card"')
         self.assertContains(response, 'id="parking-ticket-sheet"')
         self.assertContains(response, 'id="ticket-brand"')
         self.assertContains(response, '<span class="sp-brand-mark" aria-hidden="true">P</span>')
@@ -314,11 +325,104 @@ class TicketViewBrandingTests(TestCase):
         self.assertContains(response, '* SPK-TESTBRAND *')
         self.assertContains(response, 'Wat Phnom Riverside Slot')
         self.assertContains(response, '2AZ-9999')
-        self.assertContains(response, 'Check Out (ចេញពីចំណត)')
         self.assertContains(response, 'Print ticket (បោះពុម្ព)')
+        self.assertContains(response, 'Show at Gate (បង្ហាញនៅរបាំង)')
+        self.assertContains(response, 'Cancel reservation (បោះបង់)')
 
-        # Confirm checkout button does not trigger browser confirm popup
-        self.assertNotContains(response, 'confirm(')
+        # Confirm checkout is NOT shown for a CONFIRMED hold waiting for entry
+        self.assertNotContains(response, 'Proceed to exit (ចេញពីចំណត)')
+        self.assertNotContains(response, 'id="btn-checkout-ticket"')
+
+        # Confirm accessible cancel confirmation dialog exists
+        self.assertContains(response, 'id="cancel-reservation-dialog"')
+        self.assertContains(response, 'id="btn-confirm-cancel"')
+
+    def test_ticket_state_checked_in_actions(self):
+        self.reservation.status = 'CHECKED_IN'
+        self.reservation.save()
+
+        self.client.login(username='dara', password='secretpassword')
+        response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
+        self.assertEqual(response.status_code, 200)
+
+        # Checked in: show at gate, print ticket, proceed to exit
+        self.assertContains(response, 'Show at Gate (បង្ហាញនៅរបាំង)')
+        self.assertContains(response, 'Print ticket (បោះពុម្ព)')
+        self.assertContains(response, 'Proceed to exit (ចេញពីចំណត)')
+        self.assertContains(response, 'id="btn-checkout-ticket"')
+
+        # No Cancel Hold button for checked in vehicle
+        self.assertNotContains(response, 'id="btn-open-cancel-dialog"')
+        self.assertNotContains(response, 'Cancel reservation (បោះបង់)')
+
+        # Arrival banner must be hidden after check-in
+        self.assertNotContains(response, 'id="arrival-countdown-card"')
+
+    def test_ticket_state_payment_pending_actions(self):
+        self.reservation.status = 'PAYMENT_PENDING'
+        self.reservation.save()
+
+        self.client.login(username='dara', password='secretpassword')
+        response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(response, 'Continue payment (បន្តទៅការទូទាត់)')
+        self.assertContains(response, 'id="btn-continue-payment"')
+        self.assertContains(response, 'Cancel reservation (បោះបង់)')
+        self.assertContains(response, 'Pass Inactive')
+        self.assertContains(response, 'Payment Required')
+        self.assertNotContains(response, 'id="btn-checkout-ticket"')
+
+    def test_ticket_state_checked_out_actions(self):
+        self.reservation.status = 'CHECKED_OUT'
+        self.reservation.checked_out = True
+        self.reservation.save()
+
+        self.client.login(username='dara', password='secretpassword')
+        response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(response, 'View / Print receipt (បោះពុម្ពបង្កាន់ដៃ)')
+        self.assertContains(response, 'id="btn-print-receipt"')
+        self.assertNotContains(response, 'id="btn-checkout-ticket"')
+        self.assertNotContains(response, 'id="btn-show-gate-mode"')
+        self.assertNotContains(response, 'id="btn-open-cancel-dialog"')
+
+    def test_ticket_state_cancelled_or_expired_actions(self):
+        self.reservation.status = 'EXPIRED'
+        self.reservation.save()
+
+        self.client.login(username='dara', password='secretpassword')
+        response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(response, 'Reserve again (កក់ម្តងទៀត)')
+        self.assertContains(response, 'id="btn-reserve-again"')
+        self.assertNotContains(response, 'id="btn-checkout-ticket"')
+        self.assertNotContains(response, 'id="btn-show-gate-mode"')
+
+    def test_arrival_banner_concise_copy_and_no_emoji(self):
+        self.client.login(username='dara', password='secretpassword')
+        response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
+        self.assertEqual(response.status_code, 200)
+
+        # Banner copy
+        self.assertContains(response, 'Arrive within 3 hours')
+        self.assertContains(response, 'Enter before')
+        self.assertContains(response, 'Time remaining:')
+        self.assertContains(response, 'id="arrival-timer"')
+
+        # No decorative emoji
+        self.assertNotContains(response, '🚗')
+
+    def test_server_checkout_rejected_when_not_checked_in(self):
+        # Confirmed hold attempting checkout
+        self.client.login(username='dara', password='secretpassword')
+        resp = self.client.post(reverse('checkout'), {'ticket_code': self.reservation.ticket_code}, follow=True)
+        self.assertContains(resp, 'Cannot check out a reservation that has not checked in')
+        self.reservation.refresh_from_db()
+        self.assertEqual(self.reservation.status, 'CONFIRMED')
+        self.assertFalse(self.reservation.checked_out)
 
 
 class VehiclePlateAndBookingFormTests(TestCase):

@@ -183,9 +183,9 @@ textarea {
 
 .sp-nav-inner {
   min-height: 5rem;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
 }
 
@@ -194,6 +194,7 @@ textarea {
   align-items: center;
   gap: var(--space-xs);
   width: max-content;
+  flex-shrink: 0;
   color: var(--color-ink);
 }
 
@@ -273,6 +274,7 @@ textarea {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-xs);
+  flex-shrink: 0;
 }
 
 .sp-user-greeting {
@@ -340,6 +342,19 @@ textarea {
 .sp-btn-destructive {
   border-color: var(--color-danger);
   background: transparent;
+  color: var(--color-danger);
+}
+
+.sp-btn-secondary.sp-btn-destructive {
+  background: transparent;
+  border-color: var(--color-rule-2);
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.sp-btn-secondary.sp-btn-destructive:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: var(--color-danger);
   color: var(--color-danger);
 }
 
@@ -1593,9 +1608,10 @@ code {
   font-family: var(--font-outlier);
 }
 
-@media (max-width: 68rem) {
+@media (max-width: 74rem) {
   .sp-nav-inner {
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
+    justify-content: space-between;
   }
 
   .sp-nav-links {
@@ -2669,27 +2685,61 @@ code {
   }
 }
 
-/* Ticket Details & Print Safety */
-.sp-ticket-actions-bar {
+/* Ticket Page Container, Navigation & Action Bars */
+.sp-ticket-page-container {
+  width: 100%;
   max-width: 42rem;
   margin-inline: auto;
-  margin-block-end: var(--space-md);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-sm);
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.sp-ticket-nav-bar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.sp-ticket-actions-bar {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .sp-ticket-actions-group {
   display: flex;
   width: 100%;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
   align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
 }
 
-@media (max-width: 36rem) {
+.sp-ticket-action-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+}
+
+.sp-ticket-nav-bar .sp-btn,
+.sp-ticket-actions-group .sp-btn,
+.sp-ticket-action-form .sp-btn {
+  min-height: 2.75rem; /* 44px minimum touch target */
+  line-height: 1.35; /* Generous for Khmer text */
+  text-align: center;
+}
+
+@media (max-width: 40rem) {
   .sp-ticket-actions-bar,
   .sp-ticket-actions-group {
     flex-direction: column;
@@ -2697,8 +2747,14 @@ code {
     width: 100%;
   }
 
+  .sp-ticket-action-form {
+    width: 100%;
+    display: flex;
+  }
+
   .sp-ticket-actions-bar .sp-btn,
-  .sp-ticket-actions-group .sp-btn {
+  .sp-ticket-actions-group .sp-btn,
+  .sp-ticket-action-form .sp-btn {
     width: 100%;
     justify-content: center;
   }
@@ -3281,6 +3337,100 @@ code {
   box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.3);
 }
 
+/* Redesigned Arrival Countdown Banner */
+.sp-arrival-banner {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: clamp(var(--space-sm), 3vw, var(--space-md)) clamp(var(--space-md), 4vw, var(--space-lg));
+  background: var(--color-paper-2);
+  border: var(--rule-fine) solid rgba(245, 158, 11, 0.45);
+  border-radius: var(--radius-card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  color: var(--color-ink);
+  min-width: 0;
+}
+
+.sp-arrival-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  min-width: 0;
+}
+
+.sp-arrival-banner-heading {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  color: var(--color-ink);
+  line-height: 1.3;
+}
+
+.sp-arrival-banner-deadline {
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  line-height: 1.45;
+}
+
+.sp-arrival-banner-deadline strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.sp-arrival-banner-timer-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.sp-arrival-timer-label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sp-arrival-timer-digits {
+  font-family: var(--font-outlier);
+  font-size: clamp(1.25rem, 3.5vw, 1.65rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+
+.sp-arrival-banner.sp-countdown-expired {
+  border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sp-arrival-banner.sp-countdown-expired .sp-arrival-timer-digits {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 38rem) {
+  .sp-arrival-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .sp-arrival-banner-timer-block {
+    align-items: flex-start;
+    width: 100%;
+    padding-top: var(--space-2xs);
+    border-top: var(--rule-hair) dashed var(--color-rule);
+  }
+}
+
 /* Scannable Parking Access QR Container */
 .sp-qr-sheet-card {
   display: flex;
@@ -3483,15 +3633,21 @@ code {
   .sp-navbar,
   .sp-footer,
   .no-print,
-  .sp-btn {
+  .sp-btn,
+  .sp-ticket-nav-bar,
+  .sp-ticket-actions-bar,
+  .sp-arrival-banner,
+  .sp-dialog {
     display: none !important;
   }
 
   .sp-main,
-  .sp-container {
+  .sp-container,
+  .sp-ticket-page-container {
     width: 100% !important;
     max-width: none !important;
     padding: 0 !important;
+    margin: 0 !important;
   }
 
   .sp-ticket-sheet {

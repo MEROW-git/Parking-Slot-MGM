@@ -21,25 +21,41 @@
 
         var diff = targetTime - now;
 
+        var parentArrivalBanner = el.closest('.sp-arrival-banner');
+        var parentCountdownBox = el.closest('.sp-countdown-box');
+
         if (diff <= 0) {
-          el.textContent = 'EXPIRED (ផុតកំណត់)';
+          if (parentArrivalBanner || el.id === 'arrival-timer') {
+            el.textContent = 'Arrival window expired (ផុតកំណត់ពេលមកដល់)';
+            if (parentArrivalBanner) {
+              parentArrivalBanner.classList.add('sp-countdown-expired');
+            }
+          } else {
+            el.textContent = 'EXPIRED (ផុតកំណត់)';
+            if (parentCountdownBox) {
+              parentCountdownBox.classList.add('sp-countdown-expired');
+            }
+          }
+
           el.classList.add('sp-timer-expired');
-          var parentBox = el.closest('.sp-countdown-box');
-          if (parentBox) {
-            parentBox.classList.add('sp-countdown-expired');
+
+          // Refresh authoritative reservation state from server once expired
+          if (!el.dataset.reloaded) {
+            el.dataset.reloaded = 'true';
+            setTimeout(function() {
+              window.location.reload();
+            }, 2500);
           }
         } else {
-          var hours = Math.floor(diff / (1000 * 60 * 60));
-          var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-          var seconds = Math.floor((diff % (1000 * 60)) / 1000);
+          var totalSeconds = Math.floor(diff / 1000);
+          var hours = Math.floor(totalSeconds / 3600);
+          var minutes = Math.floor((totalSeconds % 3600) / 60);
+          var seconds = totalSeconds % 60;
 
           var pad = function(n) { return n < 10 ? '0' + n : n; };
 
-          if (hours > 0) {
-            el.textContent = pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
-          } else {
-            el.textContent = pad(minutes) + ':' + pad(seconds);
-          }
+          // Consistent HH:MM:SS format with tabular numerals
+          el.textContent = pad(hours) + ':' + pad(minutes) + ':' + pad(seconds);
         }
       });
     }

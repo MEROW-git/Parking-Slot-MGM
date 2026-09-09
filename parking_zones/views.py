@@ -244,6 +244,10 @@ def cancel_booking(request, ticket_code):
         messages.error(request, 'Cannot cancel a vehicle that is physically parked. Please complete gate checkout.')
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
+    if reservation.status in ('CHECKED_OUT', 'CANCELLED', 'EXPIRED'):
+        messages.info(request, f'This reservation is already {reservation.get_status_display().lower()}.')
+        return redirect('dashboard')
+
     reservation.status = 'CANCELLED'
     reservation.staff_notes = (reservation.staff_notes + f"\nCancelled by {request.user.username} at {timezone.now().isoformat()}").strip()
     reservation.save(update_fields=['status', 'staff_notes'])
@@ -461,6 +465,7 @@ def checkout(request):
     """
     Customer checkout action.
     Validates ticket ownership, enforces settlement, and authorizes exit.
+    Only allows check out for reservations that are currently CHECKED_IN.
     """
     ticket_code = request.POST.get('ticket_code', '').strip()
     if ticket_code and Reservation.objects.filter(ticket_code=ticket_code).exclude(customer=request.user).exists() and not request.user.is_staff:
@@ -474,36 +479,27 @@ def checkout(request):
         messages.info(request, 'This parking ticket is already checked out.')
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
-    if reservation.status == 'CHECKED_IN':
-        bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
-        now = timezone.now()
-        if bill['balance_due'] > 0 and not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
-            messages.error(
-                request,
-                f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before checkout. Please present your pass at the gate barrier.'
-            )
-            return redirect('ticket_code', ticket_code=reservation.ticket_code)
+    if reservation.status != 'CHECKED_IN':
+        messages.error(
+            request,
+            'Cannot check out a reservation that has not checked in. If you wish to release your hold, please cancel the reservation.'
+        )
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
-        success, reservation, msg = GateService.confirm_physical_exit(reservation.pk, staff_user=request.user if request.user.is_staff else None)
-        if success:
-            messages.success(request, msg)
-        else:
-            messages.error(request, msg)
-        return redirect('dashboard')
+    bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
+    now = timezone.now()
+    if bill['balance_due'] > 0 and not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
+        messages.error(
+            request,
+            f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before checkout. Please present your pass at the gate barrier.'
+        )
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
-    with transaction.atomic():
-        zone = ParkingZone.objects.select_for_update().get(id=reservation.parking_zone_id)
-        reservation.status = 'CHECKED_OUT'
-        reservation.checked_out = True
-        reservation.checked_out_at = timezone.now()
-        reservation.save(update_fields=['status', 'checked_out', 'checked_out_at'])
-        if zone.occupied_slots > 0:
-            zone.increment_slot()
-
-    messages.success(
-        request,
-        f'ចេញពីចំណតដោយជោគជ័យ! Checked out from {reservation.parking_zone.name}. Ticket #{reservation.ticket_code} completed.'
-    )
+    success, reservation, msg = GateService.confirm_physical_exit(reservation.pk, staff_user=request.user if request.user.is_staff else None)
+    if success:
+        messages.success(request, msg)
+    else:
+        messages.error(request, msg)
     return redirect('dashboard')
 
 
