@@ -98,50 +98,31 @@ TEMPLATES = [
 WSGI_APPLICATION = 'parking_management.wsgi.application'
 ASGI_APPLICATION = 'parking_management.asgi.application'
 
-def database_config():
-    """Build the Django database configuration from DATABASE_URL."""
-    database_url = os.environ.get('DATABASE_URL', '').strip()
-    if not database_url:
-        return {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+def _normalize_pem(pem_str: str) -> str:
+    if not pem_str:
+        return ''
+    pem_str = pem_str.replace('\\n', '\n')
+    m = re.search(r'-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----', pem_str, re.DOTALL)
+    if m:
+        b64 = ''.join(m.group(1).split())
+        chunks = [b64[i:i+64] for i in range(0, len(b64), 64)]
+        return '-----BEGIN CERTIFICATE-----\n' + '\n'.join(chunks) + '\n-----END CERTIFICATE-----\n'
+    return pem_str
 
-    parsed = urlparse(database_url)
-    if parsed.scheme.lower() == 'sqlite':
-        sqlite_name = unquote(parsed.path.lstrip('/')) or 'db.sqlite3'
-        return {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': sqlite_name if sqlite_name == ':memory:' else BASE_DIR / sqlite_name,
-        }
 
-    if parsed.scheme.lower() not in {'mysql', 'mysql+pymysql'}:
-        raise ImproperlyConfigured(
-            'DATABASE_URL must use mysql://, mysql+pymysql://, or sqlite://.'
-        )
-
-    database_name = unquote(parsed.path.lstrip('/'))
-    if not all((parsed.hostname, parsed.username, database_name)):
-        raise ImproperlyConfigured(
-            'DATABASE_URL must include a host, username, and database name.'
-        )
-
-    options = {'charset': 'utf8mb4'}
+def _get_ssl_options():
+    """
+    Resolve SSL options for remote MySQL connections (e.g. Aiven).
+    Only applies certificate settings when explicitly configured via
+    MYSQL_SSL_CA or MYSQL_SSL_CA_PEM environment variables.
+    Never auto-enables SSL for local MySQL installations.
+    """
     ssl_ca = os.environ.get('MYSQL_SSL_CA', '').strip()
     ssl_ca_pem = os.environ.get('MYSQL_SSL_CA_PEM', '').strip()
 
-    def _normalize_pem(pem_str: str) -> str:
-        if not pem_str:
-            return ''
-        pem_str = pem_str.replace('\\n', '\n')
-        m = re.search(r'-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----', pem_str, re.DOTALL)
-        if m:
-            b64 = ''.join(m.group(1).split())
-            chunks = [b64[i:i+64] for i in range(0, len(b64), 64)]
-            return '-----BEGIN CERTIFICATE-----\n' + '\n'.join(chunks) + '\n-----END CERTIFICATE-----\n'
-        return pem_str
+    if not ssl_ca and not ssl_ca_pem:
+        return None
 
-    # Safely accept the PEM certificate from an environment variable
     raw_pem = None
     if 'BEGIN CERTIFICATE' in ssl_ca:
         raw_pem = _normalize_pem(ssl_ca)
@@ -154,27 +135,142 @@ def database_config():
     if raw_pem:
         if not ca_file_path.exists() or ca_file_path.read_text().strip() != raw_pem.strip():
             ca_file_path.write_text(raw_pem.strip() + '\n')
-        options['ssl'] = {'ca': str(ca_file_path.resolve())}
+        return {'ca': str(ca_file_path.resolve())}
     elif ssl_ca:
         ssl_ca_path = Path(ssl_ca).expanduser()
         if not ssl_ca_path.is_absolute():
             ssl_ca_path = BASE_DIR / ssl_ca_path
         if ssl_ca_path.exists():
-            options['ssl'] = {'ca': str(ssl_ca_path.resolve())}
-        elif ca_file_path.exists():
-            options['ssl'] = {'ca': str(ca_file_path.resolve())}
-    elif ca_file_path.exists():
-        options['ssl'] = {'ca': str(ca_file_path.resolve())}
+            return {'ca': str(ssl_ca_path.resolve())}
+        else:
+            raise ImproperlyConfigured(
+                f"Configured MYSQL_SSL_CA file not found: {ssl_ca}"
+            )
+    return None
 
+
+def database_config():
+    """
+    Build the Django database configuration with explicit precedence:
+    1. Separate DB_* configuration (if DB_CONNECTION is provided)
+    2. DATABASE_URL (e.g. Aiven MySQL deployment or SQLite URL)
+    3. SQLite fallback (db.sqlite3)
+    """
+    conn_max_age_raw = os.environ.get('DB_CONN_MAX_AGE', '60').strip()
+    try:
+        conn_max_age = int(conn_max_age_raw)
+    except ValueError:
+        conn_max_age = 60
+
+    # 1. Tier 1: Separate DB_* variables take highest precedence
+    db_connection = os.environ.get('DB_CONNECTION', '').strip().lower()
+    if db_connection:
+        if db_connection not in {'mysql', 'mysql+pymysql', 'sqlite'}:
+            raise ImproperlyConfigured(
+                f"Unsupported DB_CONNECTION '{db_connection}'. Supported connections: mysql, sqlite."
+            )
+
+        if db_connection == 'sqlite':
+            sqlite_name = os.environ.get('DB_DATABASE', '').strip() or 'db.sqlite3'
+            return {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': sqlite_name if sqlite_name == ':memory:' else BASE_DIR / sqlite_name,
+            }
+
+        # MySQL configuration via separate variables
+        db_host = os.environ.get('DB_HOST', '').strip()
+        db_port_raw = os.environ.get('DB_PORT', '3306').strip()
+        if not db_port_raw:
+            db_port_raw = '3306'
+        db_database = os.environ.get('DB_DATABASE', '').strip()
+        db_username = os.environ.get('DB_USERNAME', '').strip()
+        db_password = os.environ.get('DB_PASSWORD', '')
+
+        if not db_host or not db_database or not db_username:
+            missing = []
+            if not db_host:
+                missing.append('DB_HOST')
+            if not db_database:
+                missing.append('DB_DATABASE')
+            if not db_username:
+                missing.append('DB_USERNAME')
+            raise ImproperlyConfigured(
+                f"When DB_CONNECTION=mysql is set, required variables are missing: {', '.join(missing)}."
+            )
+
+        try:
+            db_port = int(db_port_raw)
+            if not (1 <= db_port <= 65535):
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise ImproperlyConfigured(
+                f"Invalid DB_PORT '{db_port_raw}'. Must be an integer between 1 and 65535."
+            )
+
+        options = {'charset': 'utf8mb4'}
+        ssl_opts = _get_ssl_options()
+        if ssl_opts:
+            options['ssl'] = ssl_opts
+
+        return {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': db_database,
+            'USER': db_username,
+            'PASSWORD': db_password,
+            'HOST': db_host,
+            'PORT': str(db_port),
+            'CONN_MAX_AGE': conn_max_age,
+            'OPTIONS': options,
+        }
+
+    # 2. Tier 2: DATABASE_URL configuration
+    database_url = os.environ.get('DATABASE_URL', '').strip()
+    if database_url:
+        parsed = urlparse(database_url)
+        if parsed.scheme.lower() == 'sqlite':
+            sqlite_name = unquote(parsed.path.lstrip('/')) or 'db.sqlite3'
+            return {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': sqlite_name if sqlite_name == ':memory:' else BASE_DIR / sqlite_name,
+            }
+
+        if parsed.scheme.lower() not in {'mysql', 'mysql+pymysql'}:
+            raise ImproperlyConfigured(
+                'DATABASE_URL must use mysql://, mysql+pymysql://, or sqlite://.'
+            )
+
+        database_name = unquote(parsed.path.lstrip('/'))
+        if not all((parsed.hostname, parsed.username, database_name)):
+            raise ImproperlyConfigured(
+                'DATABASE_URL must include a host, username, and database name.'
+            )
+
+        port = parsed.port or 3306
+        if not (1 <= port <= 65535):
+            raise ImproperlyConfigured(
+                f"Invalid port '{port}' in DATABASE_URL. Must be an integer between 1 and 65535."
+            )
+
+        options = {'charset': 'utf8mb4'}
+        ssl_opts = _get_ssl_options()
+        if ssl_opts:
+            options['ssl'] = ssl_opts
+
+        return {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': database_name,
+            'USER': unquote(parsed.username),
+            'PASSWORD': unquote(parsed.password or ''),
+            'HOST': parsed.hostname,
+            'PORT': str(port),
+            'CONN_MAX_AGE': conn_max_age,
+            'OPTIONS': options,
+        }
+
+    # 3. Tier 3: SQLite fallback
     return {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': database_name,
-        'USER': unquote(parsed.username),
-        'PASSWORD': unquote(parsed.password or ''),
-        'HOST': parsed.hostname,
-        'PORT': str(parsed.port or 3306),
-        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
-        'OPTIONS': options,
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 
 
