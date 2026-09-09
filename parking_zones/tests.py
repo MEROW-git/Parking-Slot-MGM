@@ -1380,54 +1380,47 @@ class CustomerExitPaymentTests(TestCase):
         )
 
         self.client.login(username='car_owner', password='testpass123')
+        # 1. GET is read-only and creates no transactions
         resp = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
         self.assertEqual(resp.status_code, 200)
+        self.assertEqual(res.transactions.filter(purpose='EXIT_BALANCE').count(), 0)
 
-        # 1. Verify pending transaction created
-        txn = res.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
-        self.assertIsNotNone(txn)
-        self.assertEqual(txn.amount, 3000)
-
-        # 2. Simulate failure
+        # 2. Simulate failure via POST action
         resp_fail = self.client.post(
-            reverse('payment_simulate', kwargs={'txn_id': txn.id}),
-            data={'outcome': 'failure'}
+            reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}),
+            data={'action': 'simulate_failure'}
         )
         self.assertRedirects(resp_fail, reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
-        txn.refresh_from_db()
-        self.assertEqual(txn.status, 'FAILED')
+        txn = res.transactions.filter(purpose='EXIT_BALANCE', status='FAILED').first()
+        self.assertIsNotNone(txn)
+        self.assertEqual(txn.amount, 3000)
         res.refresh_from_db()
         self.assertEqual(res.status, 'CHECKED_IN')
         self.assertIsNone(res.exit_authorized_until)
 
-        # 3. Re-open page creates a new pending transaction after failure
-        resp_retry = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
-        self.assertEqual(resp_retry.status_code, 200)
-        txn2 = res.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+        # 3. Simulate cancel via POST action returns to ticket with vehicle still checked in
+        resp_cancel = self.client.post(
+            reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}),
+            data={'action': 'cancel_payment'}
+        )
+        self.assertRedirects(resp_cancel, reverse('ticket_code', kwargs={'ticket_code': res.ticket_code}))
+        txn2 = res.transactions.filter(purpose='EXIT_BALANCE', status='CANCELLED').first()
         self.assertIsNotNone(txn2)
         self.assertNotEqual(txn.id, txn2.id)
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_IN')
 
-        # 4. Simulate cancel
-        resp_cancel = self.client.post(
-            reverse('payment_simulate', kwargs={'txn_id': txn2.id}),
-            data={'outcome': 'cancel'}
-        )
-        self.assertRedirects(resp_cancel, reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
-        txn2.refresh_from_db()
-        self.assertEqual(txn2.status, 'CANCELLED')
-
-        # 5. Re-open and simulate success
-        self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
-        txn3 = res.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+        # 4. Simulate success via POST pay
         resp_success = self.client.post(
-            reverse('payment_simulate', kwargs={'txn_id': txn3.id}),
-            data={'outcome': 'success'}
+            reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}),
+            data={'action': 'pay'}
         )
         self.assertRedirects(resp_success, reverse('ticket_code', kwargs={'ticket_code': res.ticket_code}))
 
         # Assert post-payment invariants:
         res.refresh_from_db()
-        txn3.refresh_from_db()
+        txn3 = res.transactions.filter(purpose='EXIT_BALANCE', status='SUCCESS').first()
+        self.assertIsNotNone(txn3)
         self.assertEqual(txn3.status, 'SUCCESS')
         self.assertEqual(res.status, 'CHECKED_IN')
         self.assertFalse(res.checked_out)

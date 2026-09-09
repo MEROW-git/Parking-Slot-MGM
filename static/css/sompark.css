@@ -3718,6 +3718,305 @@ code {
   letter-spacing: 0.05em;
 }
 
+/* ==========================================================================
+   SomPark Customer Exit Payment (.sp-pay-exit-*)
+   ========================================================================== */
+
+.sp-pay-exit-container {
+  width: 100%;
+  max-width: 36rem;
+  margin-inline: auto;
+  box-sizing: border-box;
+  padding: var(--space-sm);
+}
+
+.sp-pay-exit-card {
+  background: var(--color-paper-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-card);
+}
+
+.sp-pay-exit-header {
+  margin-bottom: var(--space-md);
+}
+
+.sp-pay-exit-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-bottom: var(--space-2xs);
+}
+
+.sp-pay-exit-title {
+  font-size: clamp(1.4rem, 4vw, 1.85rem);
+  color: var(--color-ink);
+  margin: 0 0 0.25rem;
+  line-height: 1.25;
+}
+
+.sp-pay-exit-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+  line-height: 1.4;
+}
+
+.sp-pay-exit-plate {
+  font-family: var(--font-outlier);
+  font-weight: 700;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.sp-pay-exit-hero {
+  text-align: center;
+  padding: var(--space-md) var(--space-sm);
+  background: var(--color-paper-3);
+  border: 1px solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  margin-bottom: var(--space-md);
+}
+
+.sp-pay-exit-hero-label {
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.sp-pay-exit-hero-amount {
+  font-family: var(--font-outlier);
+  font-size: clamp(2rem, 6vw, 2.75rem);
+  font-weight: 800;
+  color: var(--color-accent);
+  line-height: 1.1;
+  display: block;
+}
+
+.sp-pay-exit-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  margin-bottom: var(--space-md);
+}
+
+.sp-pay-exit-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.sp-pay-exit-row-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-ink-2);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.sp-pay-exit-row-label strong {
+  color: var(--color-ink);
+}
+
+.sp-pay-exit-row-value {
+  flex: 0 0 auto;
+  font-family: var(--font-outlier);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-ink);
+  text-align: right;
+}
+
+.sp-pay-exit-row-overstay .sp-pay-exit-row-label {
+  color: var(--color-danger);
+}
+
+.sp-pay-exit-row-overstay .sp-pay-exit-row-value {
+  color: var(--color-danger);
+}
+
+.sp-pay-exit-row-paid .sp-pay-exit-row-label,
+.sp-pay-exit-row-paid .sp-pay-exit-row-value {
+  color: var(--color-success);
+}
+
+.sp-pay-exit-divider {
+  height: 1px;
+  background: var(--color-rule-2);
+  margin-block: var(--space-2xs);
+}
+
+.sp-pay-exit-total {
+  padding-top: var(--space-2xs);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.sp-pay-exit-total .sp-pay-exit-row-label {
+  color: var(--color-ink);
+  font-size: var(--text-md);
+}
+
+.sp-pay-exit-total .sp-pay-exit-row-value {
+  font-size: clamp(1.2rem, 3.5vw, 1.45rem);
+  font-weight: 800;
+  color: var(--color-accent);
+}
+
+.sp-pay-exit-policy {
+  background: var(--color-paper-3);
+  border-left: 3px solid var(--color-accent);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-card);
+  margin-bottom: var(--space-md);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--color-ink-2);
+}
+
+.sp-pay-exit-policy p {
+  margin: 0 0 0.35rem;
+}
+
+.sp-pay-exit-policy p:last-child {
+  margin-bottom: 0;
+}
+
+.sp-pay-exit-form {
+  min-width: 0;
+  width: 100%;
+}
+
+.sp-pay-exit-main-btn {
+  width: 100%;
+  min-height: 3.25rem;
+  min-width: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  white-space: normal !important;
+  text-align: center;
+  justify-content: center;
+  line-height: 1.35;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.sp-pay-exit-disclaimer {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-align: center;
+  margin-top: 0.5rem;
+  margin-bottom: var(--space-md);
+}
+
+.sp-pay-exit-details-wrapper {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sp-pay-exit-details {
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-3);
+  font-size: var(--text-xs);
+}
+
+.sp-pay-exit-details summary {
+  padding: var(--space-xs) var(--space-sm);
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-ink-2);
+  user-select: none;
+  line-height: 1.4;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.sp-pay-exit-details summary:hover {
+  color: var(--color-ink);
+}
+
+.sp-pay-exit-details summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.sp-pay-exit-details-content {
+  padding: var(--space-sm);
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-ink-2);
+  line-height: 1.6;
+}
+
+.sp-pay-exit-details-content dl {
+  display: grid;
+  grid-template-columns: minmax(130px, auto) 1fr;
+  gap: 0.4rem 0.75rem;
+  margin: 0;
+}
+
+.sp-pay-exit-details-content dt {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.sp-pay-exit-details-content dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.sp-pay-exit-dev-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.sp-pay-exit-dev-btn {
+  min-height: 44px;
+  white-space: normal !important;
+  line-height: 1.35;
+  text-align: center;
+  justify-content: center;
+}
+
+.sp-dev-help-text {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 40rem) {
+  .sp-pay-exit-container {
+    padding: var(--space-2xs);
+  }
+  .sp-pay-exit-card {
+    padding: var(--space-sm);
+  }
+  .sp-pay-exit-details-content dl {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+  .sp-pay-exit-details-content dt {
+    margin-top: 0.4rem;
+  }
+}
+
 @media print {
   body {
     background: var(--color-print-paper) !important;

@@ -62,6 +62,32 @@ class BillingService:
         total_paid = deposit_paid + balance_paid
         balance_due = max(0, total_charge - total_paid)
 
+        # Duration elapsed
+        total_parked_seconds = max(0.0, (exit_time - entry_time).total_seconds())
+        parked_hours = int(total_parked_seconds // 3600)
+        parked_minutes = int((total_parked_seconds % 3600) // 60)
+        if parked_hours > 0 and parked_minutes > 0:
+            parked_duration_display = f"{parked_hours} hr {parked_minutes} min"
+        elif parked_hours > 0:
+            parked_duration_display = f"{parked_hours} hr"
+        else:
+            parked_duration_display = f"{max(1, parked_minutes)} min"
+
+        # Overstay duration elapsed
+        overstay_hours_int = int(overstay_seconds // 3600)
+        overstay_minutes_int = int((overstay_seconds % 3600) // 60)
+        if overstay_hours_int > 0 and overstay_minutes_int > 0:
+            overstay_duration_display = f"{overstay_hours_int} hr {overstay_minutes_int} min"
+        elif overstay_hours_int > 0:
+            overstay_duration_display = f"{overstay_hours_int} hr"
+        elif overstay_minutes_int > 0:
+            overstay_duration_display = f"{overstay_minutes_int} min"
+        else:
+            overstay_duration_display = "0 min"
+
+        has_verified_entry = bool(reservation.checked_in_at)
+        is_timestamp_inconsistent = bool(reservation.status == 'CHECKED_IN' and not reservation.checked_in_at)
+
         return {
             'daily_rate': daily_rate,
             'daily_rate_formatted': f"{daily_rate:,} ៛",
@@ -71,6 +97,11 @@ class BillingService:
             'entry_time': entry_time,
             'exit_time': exit_time,
             'booked_end': booked_end,
+            'calculated_at': now,
+            'has_verified_entry': has_verified_entry,
+            'is_timestamp_inconsistent': is_timestamp_inconsistent,
+            'total_parked_seconds': total_parked_seconds,
+            'parked_duration_display': parked_duration_display,
             'normal_seconds': normal_seconds,
             'normal_hours': round(normal_seconds / 3600.0, 2),
             'normal_days': normal_days,
@@ -79,6 +110,7 @@ class BillingService:
             'overstay_seconds': overstay_seconds,
             'overstay_hours': round(overstay_seconds / 3600.0, 2),
             'overstay_days': overstay_days,
+            'overstay_duration_display': overstay_duration_display,
             'overstay_charge': overstay_charge,
             'overstay_charge_formatted': f"{overstay_charge:,} ៛",
             'total_charge': total_charge,
@@ -279,11 +311,11 @@ class PaymentService:
             reservation.payment_status = 'PAID'
             reservation.exit_authorized_until = now + timedelta(minutes=exit_mins)
             reservation.save(update_fields=['balance_paid', 'payment_status', 'exit_authorized_until'])
-            return True, 'Exit payment successfully verified. 5-minute departure window authorized.'
+            return True, f'Exit payment successfully verified. {exit_mins}-minute departure window authorized.'
         else:
             reservation.payment_status = 'PARTIALLY_PAID'
             reservation.save(update_fields=['balance_paid', 'payment_status'])
-            return False, f'Partial payment of {txn.amount:,} KHR received. Remaining balance of {updated_bill["balance_due"]:,} KHR must be settled.'
+            return True, f'Payment received; balance remains of {updated_bill["balance_due"]:,} ៛.'
 
     @staticmethod
     @transaction.atomic

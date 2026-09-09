@@ -224,14 +224,21 @@ def payment_simulate(request, txn_id):
 
     if txn.purpose == 'EXIT_BALANCE':
         if success:
-            messages.success(request, 'Payment successful. You’re ready to leave.')
-            return redirect('ticket_code', ticket_code=reservation.ticket_code)
+            res_refresh = Reservation.objects.get(id=reservation.id)
+            bill = BillingService.calculate_bill(res_refresh, as_of=timezone.now())
+            if bill['balance_due'] == 0:
+                messages.success(request, 'Payment successful. You’re ready to leave.')
+                return redirect('ticket_code', ticket_code=reservation.ticket_code)
+            else:
+                messages.info(request, msg)
+                return redirect('pay_exit', ticket_code=reservation.ticket_code)
         else:
             if outcome == 'cancel':
-                messages.info(request, msg)
+                messages.info(request, 'Payment was cancelled. Your vehicle remains checked in.')
+                return redirect('ticket_code', ticket_code=reservation.ticket_code)
             else:
                 messages.error(request, msg)
-            return redirect('pay_exit', ticket_code=reservation.ticket_code)
+                return redirect('pay_exit', ticket_code=reservation.ticket_code)
     else:
         if success:
             messages.success(request, f'ការទូទាត់ប្រាក់កក់ទទួលបានជោគជ័យ! {msg}')
@@ -248,10 +255,11 @@ def payment_simulate(request, txn_id):
 def pay_exit(request, ticket_code):
     """
     Authenticated customer exit payment review and settlement screen.
-    Displays server-calculated breakdown (entry, booked deadline, normal & 2x overstay charges,
-    deposit deductions, prior balance payments, and net balance due).
-    Explains the 5-minute exit window policy upon confirmed payment.
-    Restricted to the reservation owner.
+    GET: Read-only. Calculates current bill and displays review screen.
+         Never creates or cancels payment transactions on GET!
+         If exit authorization is already active, redirects to ticket.
+    POST: Processes payment submission, developer failure simulation,
+          or cancellation atomically without duplicate payable attempts.
     """
     reservation = get_object_or_404(Reservation, ticket_code=ticket_code)
 
@@ -275,40 +283,77 @@ def pay_exit(request, ticket_code):
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
     now = timezone.now()
-    bill = BillingService.calculate_bill(reservation, as_of=now)
     exit_window_minutes = getattr(settings, 'EXIT_WINDOW_MINUTES', 5)
 
     is_exit_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
     is_exit_window_expired = bool(reservation.exit_authorized_until and now > reservation.exit_authorized_until)
 
-    # If already authorized with active window and no balance due, direct to ticket
-    if is_exit_authorized and bill['balance_due'] == 0:
-        messages.info(request, 'Payment already verified. Your departure window is active.')
+    # Rule 6: If already authorized with an active exit window, honor the settled bill and redirect to ticket!
+    if is_exit_authorized:
+        messages.info(request, 'Payment already verified. You’re ready to leave.')
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
-    pending_txn = None
-    if bill['balance_due'] > 0:
-        # Check existing pending transaction
-        pending_txn = reservation.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
-        if pending_txn and pending_txn.amount != bill['balance_due']:
-            # Stale quote: invalidate old pending txn and create new one
-            pending_txn.status = 'CANCELLED'
-            pending_txn.raw_response = {
-                'reason': 'Quote expired due to recalculated billing amount',
-                'old_amount': pending_txn.amount,
-                'new_amount': bill['balance_due'],
-                'cancelled_at': now.isoformat(),
-            }
-            pending_txn.save(update_fields=['status', 'raw_response', 'updated_at'])
-            pending_txn = None
+    bill = BillingService.calculate_bill(reservation, as_of=now)
 
-        if not pending_txn:
-            pending_txn = PaymentService.create_exit_transaction(reservation, amount=bill['balance_due'])
+    # HANDLE POST: Pay / Simulate Failure / Cancel
+    if request.method == 'POST':
+        action = request.POST.get('action', 'pay')
+
+        if not DemoPaymentAdapter.is_enabled():
+            messages.error(request, 'Online payment is currently unavailable. Please settle balance with staff at the barrier.')
+            return redirect('pay_exit', ticket_code=reservation.ticket_code)
+
+        if bill['balance_due'] == 0:
+            messages.info(request, 'No balance is due. Please activate your exit authorization pass.')
+            return redirect('pay_exit', ticket_code=reservation.ticket_code)
+
+        outcome = 'success' if action == 'pay' else ('failure' if action == 'simulate_failure' else 'cancel')
+
+        with transaction.atomic():
+            res_locked = Reservation.objects.select_for_update().get(id=reservation.id)
+            current_bill = BillingService.calculate_bill(res_locked, as_of=timezone.now())
+
+            # Find or reuse pending transaction with exact amount
+            pending_txn = res_locked.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+            if pending_txn and pending_txn.amount != current_bill['balance_due']:
+                pending_txn.status = 'CANCELLED'
+                pending_txn.raw_response = {
+                    'reason': 'Quote updated due to recalculated bill',
+                    'old_amount': pending_txn.amount,
+                    'new_amount': current_bill['balance_due'],
+                    'cancelled_at': timezone.now().isoformat(),
+                }
+                pending_txn.save(update_fields=['status', 'raw_response', 'updated_at'])
+                pending_txn = None
+
+            if not pending_txn:
+                pending_txn = PaymentService.create_exit_transaction(res_locked, amount=current_bill['balance_due'])
+
+            success, msg = DemoPaymentAdapter.simulate_payment(pending_txn.id, outcome=outcome)
+
+        if outcome == 'success':
+            res_locked.refresh_from_db()
+            post_bill = BillingService.calculate_bill(res_locked, as_of=timezone.now())
+            if post_bill['balance_due'] == 0:
+                messages.success(request, 'Payment successful. You’re ready to leave.')
+                return redirect('ticket_code', ticket_code=reservation.ticket_code)
+            else:
+                messages.info(request, msg)
+                return redirect('pay_exit', ticket_code=reservation.ticket_code)
+        elif outcome == 'failure':
+            messages.error(request, msg)
+            return redirect('pay_exit', ticket_code=reservation.ticket_code)
+        else:
+            messages.info(request, msg)
+            return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    # GET REQUEST: Pure read-only view. No transaction creation or cancellation!
+    existing_txn = reservation.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
 
     context = {
         'reservation': reservation,
         'bill': bill,
-        'transaction': pending_txn,
+        'transaction': existing_txn,
         'now': now,
         'exit_window_minutes': exit_window_minutes,
         'is_exit_authorized': is_exit_authorized,
@@ -325,6 +370,7 @@ def renew_exit_authorization(request, ticket_code):
     """
     Allows customer to renew or activate a server-validated exit authorization
     when balance_due == 0 without requiring another payment.
+    Repeated clicks while window is active do NOT extend the window.
     """
     reservation = get_object_or_404(Reservation, ticket_code=ticket_code)
 
@@ -336,6 +382,12 @@ def renew_exit_authorization(request, ticket_code):
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
     now = timezone.now()
+
+    # Rule 7: If window is already active, repeated clicks must NOT extend the deadline
+    if reservation.exit_authorized_until and now <= reservation.exit_authorized_until:
+        messages.info(request, 'Your exit authorization is already active. You are ready to leave.')
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
     bill = BillingService.calculate_bill(reservation, as_of=now)
 
     if bill['balance_due'] > 0:

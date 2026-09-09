@@ -67,6 +67,8 @@ class DemoPaymentAdapter:
                 'reason': 'Customer cancelled checkout flow'
             }
             txn.save(update_fields=['status', 'raw_response', 'updated_at'])
+            if txn.purpose == 'EXIT_BALANCE':
+                return False, 'Payment attempt was cancelled. Your vehicle remains checked in.'
             return False, 'Payment attempt was cancelled. Reservation hold remains active until timeout.'
 
         else:
