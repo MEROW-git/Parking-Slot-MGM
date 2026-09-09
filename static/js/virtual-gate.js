@@ -155,7 +155,7 @@
   }
 
   // Helper: wait for CSS transition with safety timeout fallback
-  function waitForTransition(element, expectedProp, maxMs) {
+  function waitForTransition(element, expectedProp, maxMs, eventName = 'transitionend') {
     return new Promise(resolve => {
       if (!element) {
         resolve();
@@ -165,24 +165,29 @@
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          element.removeEventListener('transitionend', onEnd);
+          element.removeEventListener(eventName, onEnd);
           resolve();
         }
       }, maxMs);
 
       function onEnd(e) {
-        if (e.target === element && (!expectedProp || e.propertyName === expectedProp)) {
+        if (e.target === element && (!expectedProp || e.propertyName === expectedProp || e.animationName === expectedProp)) {
           if (!resolved) {
             resolved = true;
             clearTimeout(timer);
-            element.removeEventListener('transitionend', onEnd);
+            element.removeEventListener(eventName, onEnd);
             resolve();
           }
         }
       }
 
-      element.addEventListener('transitionend', onEnd);
+      element.addEventListener(eventName, onEnd);
     });
+  }
+
+  function waitForArmOpening() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+    return waitForTransition(document.getElementById('vg-barrier-arm'), 'vg-arm-open', 900, 'animationend');
   }
 
   // Stop permit countdown
@@ -303,6 +308,17 @@
   // Initialize countdown if gate is open on page load
   if (permitSecondsEl && permitTimerBanner && passBtn && !passBtn.disabled) {
     startPermitCountdown();
+    if (sceneEl?.classList.contains('is-open')) {
+      passBtn.disabled = true;
+      if (statusText) statusText.textContent = 'BARRIER OPENING — PLEASE WAIT';
+      waitForArmOpening().then(() => {
+        // Input changes or permit expiry may have closed the gate while lifting.
+        if (sceneEl.classList.contains('is-open') && Date.now() / 1000 < permitExpiresAt) {
+          passBtn.disabled = false;
+          if (statusText) statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
+        }
+      });
+    }
   }
 
   // =========================================================================
@@ -554,6 +570,7 @@
 
       // Wait for paint
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await waitForArmOpening();
 
       // Animate crossing
       sceneEl.classList.add('is-moving');
@@ -589,13 +606,17 @@
 
       replayBtn.disabled = true;
 
-      // 1. Reset to initial raised position
-      sceneEl.classList.remove('is-passed', 'is-moving');
+      // Reset the vehicle without animating it backwards across a closed arm.
+      if (carTrack) carTrack.style.transition = 'none';
+      sceneEl.classList.remove('is-passed', 'is-moving', 'is-open');
+      void sceneEl.offsetWidth;
+      if (carTrack) carTrack.style.removeProperty('transition');
+      if (statusText) statusText.textContent = 'REPLAY — BARRIER OPENING';
       sceneEl.classList.add('is-open');
-
-      await new Promise(r => setTimeout(r, 150));
+      await waitForArmOpening();
 
       // 2. Animate vehicle crossing
+      if (statusText) statusText.textContent = 'REPLAY — VEHICLE CROSSING';
       sceneEl.classList.add('is-moving');
       if (!reducedMotion && carTrack) {
         await waitForTransition(carTrack, 'transform', 1500);
@@ -604,6 +625,7 @@
       }
 
       // 3. Lower barrier arm
+      if (statusText) statusText.textContent = 'REPLAY — BARRIER CLOSING';
       sceneEl.classList.remove('is-open');
       if (!reducedMotion && armEl) {
         await waitForTransition(armEl, 'transform', 900);
@@ -615,6 +637,7 @@
       sceneEl.classList.remove('is-moving');
       sceneEl.classList.add('is-passed');
 
+      if (statusText) statusText.textContent = 'VEHICLE PASSAGE CONFIRMED — BARRIER CLOSED';
       replayBtn.disabled = false;
       isCrossing = false;
     });
