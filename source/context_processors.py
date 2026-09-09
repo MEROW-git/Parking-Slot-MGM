@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils import timezone
 from parking_zones.models import Reservation
 
@@ -17,4 +18,5 @@ def sompark_context(request):
         'BRAND_TAGLINE_EN': 'Smart Parking for Phnom Penh Capital',
         'active_reservation': active_reservation,
         'current_date': timezone.localdate(),
+        'ASSET_VERSION': getattr(settings, 'ASSET_VERSION', '1.2.0'),
     }

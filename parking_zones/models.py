@@ -303,6 +303,10 @@ class PaymentTransaction(models.Model):
     def __str__(self):
         return f"{self.provider_ref} - {self.purpose} ({self.amount:,} KHR) [{self.status}]"
 
+    @property
+    def amount_formatted(self):
+        return f"{self.amount:,} ៛"
+
     def save(self, *args, **kwargs):
         if not self.provider_ref:
             self.provider_ref = generate_payment_ref()

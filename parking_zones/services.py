@@ -122,6 +122,7 @@ class BillingService:
             'balance_paid': balance_paid,
             'balance_paid_formatted': f"{balance_paid:,} ៛",
             'total_paid': total_paid,
+            'total_paid_formatted': f"{total_paid:,} ៛",
             'balance_due': balance_due,
             'balance_due_formatted': f"{balance_due:,} ៛",
             'is_overstay': overstay_days > 0,

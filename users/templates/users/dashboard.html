@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Dashboard | {{ request.user.username }} · SomPark Phnom Penh{% endblock %}
 
@@ -263,6 +264,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="/static/js/sompark-countdown.js"></script>
+<script src="{% static 'js/sompark-countdown.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
 {% endblock %}
 

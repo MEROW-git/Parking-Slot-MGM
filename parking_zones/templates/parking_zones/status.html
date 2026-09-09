@@ -22,8 +22,15 @@
 
       <!-- Custom Occupancy Bar -->
       <div style="background:var(--color-paper-3); border:var(--rule-fine) solid var(--color-rule-2); height:24px; border-radius:var(--radius-input); overflow:hidden; display:flex; margin-bottom:1.5rem;">
-        <div style="background:var(--color-accent); width:{{ parking_zone.occupancy_percentage }}%; height:100%; transition:width var(--dur-long) var(--ease-out);" title="Occupied: {{ parking_zone.occupied_slots }}"></div>
+        <div id="zone-occupancy-bar-fill" data-progress-width="{{ parking_zone.occupancy_percentage }}" style="background:var(--color-accent); height:100%; transition:width var(--dur-long) var(--ease-out);" title="Occupied: {{ parking_zone.occupied_slots }}"></div>
       </div>
+      <script>
+        (function() {
+          var el = document.getElementById('zone-occupancy-bar-fill');
+          if (el) el.style.width = (el.getAttribute('data-progress-width') || 0) + '%';
+        })();
+      </script>
+
 
       <div class="sp-zone-metrics-grid">
         <div>

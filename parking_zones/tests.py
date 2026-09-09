@@ -345,11 +345,11 @@ class TicketViewBrandingTests(TestCase):
         response = self.client.get(reverse('ticket_code', args=[self.reservation.ticket_code]))
         self.assertEqual(response.status_code, 200)
 
-        # Checked in: show at gate, print ticket, proceed to exit
+        # Checked in with balance due: show at gate, print ticket, pay & prepare to leave
         self.assertContains(response, 'Show at Gate (បង្ហាញនៅរបាំង)')
         self.assertContains(response, 'Print ticket (បោះពុម្ព)')
-        self.assertContains(response, 'Proceed to exit (ចេញពីចំណត)')
-        self.assertContains(response, 'id="btn-checkout-ticket"')
+        self.assertContains(response, 'Pay & prepare to leave')
+        self.assertContains(response, 'id="btn-pay-exit"')
 
         # No Cancel Hold button for checked in vehicle
         self.assertNotContains(response, 'id="btn-open-cancel-dialog"')

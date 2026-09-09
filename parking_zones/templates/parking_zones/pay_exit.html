@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static humanize %}
 
 {% block title %}Pay Before You Leave · Ticket #{{ reservation.ticket_code }} | SomPark Phnom Penh{% endblock %}
 
@@ -72,7 +73,7 @@
           <br><small style="color: var(--color-muted);">បានទូទាត់រួច</small>
         </span>
         <span class="sp-pay-exit-row-value">
-          {% if bill.total_paid > 0 %}- {{ bill.total_paid|stringformat:",d" }} &#x17DB;{% else %}0 &#x17DB;{% endif %}
+          {% if bill.total_paid > 0 %}- {{ bill.total_paid|intcomma }} &#x17DB;{% else %}0 &#x17DB;{% endif %}
         </span>
       </div>
 
@@ -195,7 +196,7 @@
           <div class="sp-pay-exit-details-content">
             {% if transaction %}
               <div style="font-family: var(--font-outlier); font-size: 0.75rem; color: var(--color-muted); margin-bottom: var(--space-xs);" id="pay-exit-txn-ref">
-                Active Quote Ref: {{ transaction.provider_ref }} &middot; Amount: {{ transaction.amount|stringformat:",d" }} &#x17DB;
+                Active Quote Ref: {{ transaction.provider_ref }} &middot; Amount: {{ transaction.amount|intcomma }} &#x17DB;
               </div>
             {% endif %}
 

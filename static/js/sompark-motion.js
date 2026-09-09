@@ -108,6 +108,8 @@
         }
       });
 
+      // Initialize dynamic progress and occupancy bars
+      initProgressBars();
     } catch (err) {
       // In case of any initialization error, ensure all content is visible
       console.warn('SomPark motion initialization bypassed:', err);
@@ -116,9 +118,23 @@
     }
   }
 
+  function initProgressBars() {
+    var bars = document.querySelectorAll('[data-progress-width]');
+    bars.forEach(function(bar) {
+      var w = bar.getAttribute('data-progress-width');
+      if (w !== null && w !== '') {
+        bar.style.width = w + '%';
+      }
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initMotion);
+    document.addEventListener('DOMContentLoaded', function() {
+      initProgressBars();
+      initMotion();
+    });
   } else {
+    initProgressBars();
     initMotion();
   }
 })();

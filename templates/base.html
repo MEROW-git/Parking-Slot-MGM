@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="km-KH">
 <head>
@@ -14,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+Khmer:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- SomPark Design System -->
-  <link rel="stylesheet" href="/static/css/sompark.css">
+  <link rel="stylesheet" href="{% static 'css/sompark.css' %}?v={{ ASSET_VERSION|default:'1.2.0' }}">
   {% block extra_head %}{% endblock %}
 </head>
 <body class="page-{{ request.resolver_match.url_name|default:'unknown' }}">
@@ -45,8 +46,8 @@
 
   {% include "components/footer.html" %}
   {% include "components/mobile_menu.html" %}
-  <script src="/static/js/sompark-toast.js"></script>
-  <script src="/static/js/sompark-motion.js" defer></script>
+  <script src="{% static 'js/sompark-toast.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
+  <script src="{% static 'js/sompark-motion.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}" defer></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>
