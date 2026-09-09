@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Operations Dashboard · SomPark Phnom Penh{% endblock %}
+
+{% block content %}
+<div class="sp-dashboard sp-admin-workbench" id="admin-dashboard-container">
+  <!-- Workbench Header -->
+  <header class="sp-dashboard-greeting sp-admin-header" id="admin-dashboard-header">
+    <div>
+      <div class="sp-dashboard-welcome-badge sp-admin-badge">
+        <span>រដ្ឋបាល SOMPARK</span> · <span>Central Operations Workbench</span>
+      </div>
+      <h1 class="sp-admin-title" id="admin-greeting-title">
+        Operations Dashboard
+      </h1>
+      <p class="sp-admin-subtitle">
+        Real-time Phnom Penh parking inventory, active pass verification, and spot management.
+      </p>
+    </div>
+    <div class="sp-admin-header-actions">
+      <a href="{% url 'home' %}#parking-zones" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-admin-map" title="View Public City Inventory">
+        Live City Map
+      </a>
+      <a href="{% url 'admin:index' %}" class="sp-btn sp-btn-dark sp-btn-sm" id="btn-admin-django" target="_blank" rel="noopener" title="Open Django Built-in Admin CRUD">
+        Django Admin (CRUD) ↗
+      </a>
+    </div>
+  </header>
+
+  <!-- 1. System Summary Cards (8 Real Database Metrics) -->
+  <section aria-labelledby="section-stats-heading" class="sp-workbench-section" id="admin-summary-stats">
+    <h2 id="section-stats-heading" class="sr-only">Live Operations Summary</h2>
+    <div class="sp-stat-grid" id="admin-stat-grid">
+      <!-- 1. Total parking zones -->
+      <div class="sp-stat-card" id="card-stat-zones">
+        <span class="sp-stat-label">Total Zones (ទីតាំង)</span>
+        <span class="sp-stat-number" id="stat-total-zones">{{ total_zones }}</span>
+        <span class="sp-stat-meta">Managed across Phnom Penh</span>
+      </div>
+
+      <!-- 2. Total parking capacity -->
+      <div class="sp-stat-card" id="card-stat-capacity">
+        <span class="sp-stat-label">Total Capacity</span>
+        <span class="sp-stat-number" id="stat-total-capacity">{{ total_capacity }}</span>
+        <span class="sp-stat-meta">Configured parking spaces</span>
+      </div>
+
+      <!-- 3. Currently occupied spaces -->
+      <div class="sp-stat-card" id="card-stat-occupied">
+        <span class="sp-stat-label">Occupied Spaces</span>
+        <span class="sp-stat-number sp-stat-amber" id="stat-occupied-slots">{{ total_occupied }}</span>
+        <span class="sp-stat-meta">Vehicles currently parked</span>
+      </div>
+
+      <!-- 4. Currently vacant spaces -->
+      <div class="sp-stat-card" id="card-stat-vacant">
+        <span class="sp-stat-label">Vacant Spaces</span>
+        <span class="sp-stat-number sp-stat-green" id="stat-vacant-slots">{{ total_vacant }}</span>
+        <span class="sp-stat-meta">Ready for immediate booking</span>
+      </div>
+
+      <!-- 5. Active reservations -->
+      <div class="sp-stat-card" id="card-stat-active-res">
+        <span class="sp-stat-label">Active Passes</span>
+        <span class="sp-stat-number sp-stat-accent" id="stat-active-reservations">{{ active_reservations_count }}</span>
+        <span class="sp-stat-meta">Currently in session</span>
+      </div>
+
+      <!-- 6. Completed reservations -->
+      <div class="sp-stat-card" id="card-stat-completed-res">
+        <span class="sp-stat-label">Completed Passes</span>
+        <span class="sp-stat-number" id="stat-completed-reservations">{{ completed_reservations_count }}</span>
+        <span class="sp-stat-meta">Successfully checked out</span>
+      </div>
+
+      <!-- 7. Registered customers (excluding staff) -->
+      <div class="sp-stat-card" id="card-stat-customers">
+        <span class="sp-stat-label">Registered Drivers</span>
+        <span class="sp-stat-number" id="stat-registered-customers">{{ registered_customers_count }}</span>
+        <span class="sp-stat-meta">Customer accounts (excl. staff)</span>
+      </div>
+
+      <!-- 8. Overall occupancy percentage -->
+      <div class="sp-stat-card" id="card-stat-occupancy-rate">
+        <span class="sp-stat-label">Overall Occupancy</span>
+        <span class="sp-stat-number {% if overall_occupancy_pct >= 90 %}sp-stat-red{% elif overall_occupancy_pct >= 70 %}sp-stat-amber{% else %}sp-stat-green{% endif %}" id="stat-occupancy-percentage">
+          {{ overall_occupancy_pct }}%
+        </span>
+        <span class="sp-stat-meta">City-wide utilization</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Parking Zone Status Section -->
+  <section class="sp-workbench-section" id="admin-zone-status-section" aria-labelledby="heading-zone-status" style="margin-top:var(--space-2xl);">
+    <div class="sp-section-bar">
+      <div>
+        <h2 id="heading-zone-status" style="font-size:clamp(1.75rem, 3vw, 2.25rem); margin-bottom:0.25rem;">
+          Parking Zone Status (ស្ថានភាពចំណត)
+        </h2>
+        <p style="color:var(--color-ink-2); font-size:var(--text-sm); margin:0;">
+          Live status ordered by highest occupancy first. Direct link to edit in Django Admin.
+        </p>
+      </div>
+      <div class="sp-section-bar-note">
+        <span class="sp-badge-count">{{ zones|length }} Zones Online</span>
+      </div>
+    </div>
+
+    {% if zones %}
+      <div class="sp-table-wrapper" id="zones-table-wrapper">
+        <table class="sp-table" id="admin-zones-table">
+          <thead>
+            <tr>
+              <th scope="col">Zone & District (ទីតាំង)</th>
+              <th scope="col" style="text-align:center;">Capacity</th>
+              <th scope="col" style="text-align:center;">Occupied</th>
+              <th scope="col" style="text-align:center;">Vacant</th>
+              <th scope="col" style="min-width:180px;">Occupancy Rate</th>
+              <th scope="col">Daily Rate</th>
+              <th scope="col">Status</th>
+              <th scope="col" style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for zone in zones %}
+              <tr id="zone-row-{{ zone.id }}">
+                <td>
+                  <div class="sp-cell-zone">
+                    <strong class="sp-zone-name">{{ zone.name }}</strong>
+                    {% if zone.khmer_name %}
+                      <span class="sp-zone-khmer">{{ zone.khmer_name }}</span>
+                    {% endif %}
+                    <small class="sp-zone-district">{{ zone.district }} · {{ zone.address }}</small>
+                  </div>
+                </td>
+                <td style="text-align:center; font-family:var(--font-outlier); font-weight:700;">
+                  {{ zone.num_of_slots }}
+                </td>
+                <td style="text-align:center; font-family:var(--font-outlier); font-weight:700; color:var(--color-warning);">
+                  {{ zone.occupied_slots }}
+                </td>
+                <td style="text-align:center; font-family:var(--font-outlier); font-weight:700; color:var(--color-success);">
+                  {{ zone.vacant_slots }}
+                </td>
+                <td>
+                  <div class="sp-progress-container">
+                    <div class="sp-progress-bar" role="progressbar" aria-valuenow="{{ zone.occupancy_percentage }}" aria-valuemin="0" aria-valuemax="100" title="{{ zone.occupancy_percentage }}% Occupied">
+                      <div class="sp-progress-fill {% if zone.is_full %}full{% elif zone.is_nearly_full %}limited{% else %}available{% endif %}" style="width: {{ zone.occupancy_percentage }}%;"></div>
+                    </div>
+                    <span class="sp-progress-text">{{ zone.occupancy_percentage }}%</span>
+                  </div>
+                </td>
+                <td style="font-family:var(--font-outlier); font-weight:700;">
+                  {{ zone.price_khr_formatted }}
+                </td>
+                <td>
+                  {% if zone.availability_status == 'available' %}
+                    <span class="sp-avail-badge available">
+                      <span class="sp-dot"></span> AVAILABLE
+                    </span>
+                  {% elif zone.availability_status == 'limited' %}
+                    <span class="sp-avail-badge limited">
+                      <span class="sp-dot"></span> LIMITED
+                    </span>
+                  {% else %}
+                    <span class="sp-avail-badge full">
+                      <span class="sp-dot"></span> FULL
+                    </span>
+                  {% endif %}
+                </td>
+                <td style="text-align:right;">
+                  <a href="{% url 'admin:parking_zones_parkingzone_change' zone.id %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-edit-zone-{{ zone.id }}" title="Edit zone in Django Admin">
+                    Edit in Admin ↗
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="sp-empty-panel">
+        <p>No parking zones currently registered in database.</p>
+        <a href="{% url 'admin:parking_zones_parkingzone_add' %}" class="sp-btn sp-btn-primary sp-btn-sm">+ Add Parking Zone in Admin</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- 3. Recent Active Reservations Section -->
+  <section class="sp-workbench-section" id="admin-active-reservations-section" aria-labelledby="heading-active-res" style="margin-top:var(--space-2xl);">
+    <div class="sp-section-bar">
+      <div>
+        <h2 id="heading-active-res" style="font-size:clamp(1.75rem, 3vw, 2.25rem); margin-bottom:0.25rem;">
+          Recent Active Reservations (ការកក់កំពុងដំណើរការ)
+        </h2>
+        <p style="color:var(--color-ink-2); font-size:var(--text-sm); margin:0;">
+          Live active parking sessions. Click "Check Out" to release space and complete pass.
+        </p>
+      </div>
+      <div class="sp-section-bar-note">
+        <span class="sp-badge-count">{{ active_reservations_count }} Active</span>
+      </div>
+    </div>
+
+    {% if active_reservations %}
+      <div class="sp-table-wrapper" id="active-reservations-wrapper">
+        <table class="sp-table" id="admin-active-reservations-table">
+          <thead>
+            <tr>
+              <th scope="col">Ticket Code</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Parking Zone</th>
+              <th scope="col">Vehicle Plate</th>
+              <th scope="col">Phone</th>
+              <th scope="col">Valid Dates</th>
+              <th scope="col">Booked On</th>
+              <th scope="col" style="text-align:right;">Admin Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for res in active_reservations %}
+              <tr id="row-active-res-{{ res.ticket_code }}">
+                <td>
+                  <a href="{% url 'ticket_code' res.ticket_code %}" class="sp-ticket-link" target="_blank" title="View Customer Pass">
+                    #{{ res.ticket_code }}
+                  </a>
+                </td>
+                <td>
+                  <strong>{{ res.customer.username }}</strong>
+                  {% if res.customer.email %}
+                    <div style="font-size:var(--text-xs); color:var(--color-ink-2);">{{ res.customer.email }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong>{{ res.parking_zone.name }}</strong>
+                  <div style="font-size:var(--text-xs); color:var(--color-ink-2);">{{ res.parking_zone.district }}</div>
+                </td>
+                <td>
+                  <span class="sp-plate-badge">{{ res.plate_number }}</span>
+                </td>
+                <td style="font-family:var(--font-outlier); font-size:var(--text-xs);">
+                  {{ res.phone_number }}
+                </td>
+                <td style="font-size:var(--text-xs); color:var(--color-ink-2);">
+                  {{ res.start_date|date:"d M Y" }} → {{ res.finish_date|date:"d M Y" }}
+                </td>
+                <td style="font-size:var(--text-xs); color:var(--color-muted);">
+                  {{ res.created_on|date:"d M Y, H:i" }}
+                </td>
+                <td style="text-align:right;">
+                  <div class="sp-action-btn-group">
+                    <a href="{% url 'admin:parking_zones_reservation_change' res.id %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-admin-view-{{ res.ticket_code }}" title="View or edit in Django Admin">
+                      Admin
+                    </a>
+                    <button type="button"
+                            class="sp-btn sp-btn-primary sp-btn-sm"
+                            id="btn-checkout-trigger-{{ res.ticket_code }}"
+                            data-admin-checkout-btn
+                            data-ticket-code="{{ res.ticket_code }}"
+                            data-plate-number="{{ res.plate_number }}"
+                            data-zone-name="{{ res.parking_zone.name }}"
+                            title="Check out reservation and free parking spot">
+                      Check Out (ចេញ)
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Active Reservations Pagination -->
+      {% if active_reservations.has_other_pages %}
+        <nav class="sp-pagination" aria-label="Active reservations pagination">
+          <div class="sp-pagination-info">
+            Showing page {{ active_reservations.number }} of {{ active_reservations.paginator.num_pages }}
+          </div>
+          <div class="sp-pagination-controls">
+            {% if active_reservations.has_previous %}
+              <a href="?active_page={{ active_reservations.previous_page_number }}#admin-active-reservations-section" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-active-prev">
+                ← Previous
+              </a>
+            {% endif %}
+            <span class="sp-pagination-current">Page {{ active_reservations.number }}</span>
+            {% if active_reservations.has_next %}
+              <a href="?active_page={{ active_reservations.next_page_number }}#admin-active-reservations-section" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-active-next">
+                Next →
+              </a>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
+    {% else %}
+      <div class="sp-empty-panel">
+        <p>No active reservations currently in session. All booked spaces have been checked out.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- 4. Recently Completed Reservations Section -->
+  <section class="sp-workbench-section" id="admin-completed-reservations-section" aria-labelledby="heading-completed-res" style="margin-top:var(--space-2xl);">
+    <div class="sp-section-bar">
+      <div>
+        <h2 id="heading-completed-res" style="font-size:clamp(1.75rem, 3vw, 2.25rem); margin-bottom:0.25rem;">
+          Recently Completed Reservations (បានចេញរួចរាល់)
+        </h2>
+        <p style="color:var(--color-ink-2); font-size:var(--text-sm); margin:0;">
+          Historical log of finished parking sessions and released spaces.
+        </p>
+      </div>
+      <div class="sp-section-bar-note">
+        <span class="sp-badge-count">{{ completed_reservations_count }} Completed</span>
+      </div>
+    </div>
+
+    {% if completed_reservations %}
+      <div class="sp-table-wrapper" id="completed-reservations-wrapper">
+        <table class="sp-table" id="admin-completed-reservations-table">
+          <thead>
+            <tr>
+              <th scope="col">Ticket Code</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Parking Zone</th>
+              <th scope="col">Vehicle Plate</th>
+              <th scope="col">Phone</th>
+              <th scope="col">Session Period</th>
+              <th scope="col">Status</th>
+              <th scope="col" style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for res in completed_reservations %}
+              <tr id="row-completed-res-{{ res.ticket_code }}">
+                <td>
+                  <a href="{% url 'ticket_code' res.ticket_code %}" class="sp-ticket-link" target="_blank" title="View Customer Receipt">
+                    #{{ res.ticket_code }}
+                  </a>
+                </td>
+                <td>
+                  <strong>{{ res.customer.username }}</strong>
+                </td>
+                <td>
+                  <strong>{{ res.parking_zone.name }}</strong>
+                  <div style="font-size:var(--text-xs); color:var(--color-ink-2);">{{ res.parking_zone.district }}</div>
+                </td>
+                <td>
+                  <span class="sp-plate-badge">{{ res.plate_number }}</span>
+                </td>
+                <td style="font-family:var(--font-outlier); font-size:var(--text-xs);">
+                  {{ res.phone_number }}
+                </td>
+                <td style="font-size:var(--text-xs); color:var(--color-ink-2);">
+                  {{ res.start_date|date:"d M Y" }} → {{ res.finish_date|date:"d M Y" }}
+                </td>
+                <td>
+                  <span class="sp-avail-badge" style="background:var(--color-paper-3); color:var(--color-muted);">
+                    COMPLETED
+                  </span>
+                </td>
+                <td style="text-align:right;">
+                  <a href="{% url 'admin:parking_zones_reservation_change' res.id %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-admin-completed-{{ res.ticket_code }}" title="View in Django Admin">
+                    Admin View ↗
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Completed Reservations Pagination -->
+      {% if completed_reservations.has_other_pages %}
+        <nav class="sp-pagination" aria-label="Completed reservations pagination">
+          <div class="sp-pagination-info">
+            Showing page {{ completed_reservations.number }} of {{ completed_reservations.paginator.num_pages }}
+          </div>
+          <div class="sp-pagination-controls">
+            {% if completed_reservations.has_previous %}
+              <a href="?completed_page={{ completed_reservations.previous_page_number }}#admin-completed-reservations-section" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-completed-prev">
+                ← Previous
+              </a>
+            {% endif %}
+            <span class="sp-pagination-current">Page {{ completed_reservations.number }}</span>
+            {% if completed_reservations.has_next %}
+              <a href="?completed_page={{ completed_reservations.next_page_number }}#admin-completed-reservations-section" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-completed-next">
+                Next →
+              </a>
+            {% endif %}
+          </div>
+        </nav>
+      {% endif %}
+    {% else %}
+      <div class="sp-empty-panel">
+        <p>No completed reservations recorded yet.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- 5. Accessible Confirmation Modal (<dialog>) -->
+  <dialog id="admin-checkout-dialog" class="sp-dialog" closedby="any" aria-labelledby="dialog-checkout-title" aria-describedby="dialog-checkout-desc">
+    <div class="sp-dialog-box" role="document">
+      <div class="sp-dialog-header">
+        <div class="sp-dialog-icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </div>
+        <div>
+          <h2 id="dialog-checkout-title" class="sp-dialog-title">
+            Check out this reservation?
+          </h2>
+          <span class="sp-dialog-subtitle">
+            រដ្ឋបាល SomPark · Operations Checkout Confirmation
+          </span>
+        </div>
+      </div>
+
+      <div class="sp-dialog-body">
+        <p id="dialog-checkout-desc" class="sp-dialog-message">
+          Ticket <strong id="dialog-ticket-code" class="sp-dialog-ticket-highlight"></strong> for vehicle <strong id="dialog-plate-number" class="sp-dialog-plate-highlight"></strong> will be marked as completed and one parking space will be released.
+        </p>
+      </div>
+
+      <div class="sp-dialog-actions">
+        <button type="button" class="sp-btn sp-btn-secondary" id="dialog-btn-cancel">
+          No, keep active
+        </button>
+        <form id="dialog-checkout-form" action="{% url 'admin_checkout' %}" method="post" class="sp-inline-form">
+          {% csrf_token %}
+          <input type="hidden" name="ticket_code" id="dialog-input-ticket-code" value="">
+          <button type="submit" class="sp-btn sp-btn-primary" id="dialog-btn-confirm">
+            Yes, check out
+          </button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="/static/js/sompark-admin.js"></script>
+{% endblock %}

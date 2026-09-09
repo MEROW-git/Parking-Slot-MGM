@@ -32,8 +32,8 @@
 
   <main class="sp-main" id="main-content">
     <div class="sp-container">
-      <!-- Global Active Reservation Banner (if not already on ticket view or dashboard) -->
-      {% if active_reservation and request.resolver_match.url_name != 'ticket' and request.resolver_match.url_name != 'ticket_code' and request.resolver_match.url_name != 'dashboard' %}
+      <!-- Global Active Reservation Banner (if not already on ticket view or dashboards) -->
+      {% if active_reservation and request.resolver_match.url_name != 'ticket' and request.resolver_match.url_name != 'ticket_code' and request.resolver_match.url_name != 'dashboard' and request.resolver_match.url_name != 'admin_dashboard' %}
         <div class="no-print">
           {% include "components/reservation_summary.html" with reservation=active_reservation allow_checkout=True %}
         </div>

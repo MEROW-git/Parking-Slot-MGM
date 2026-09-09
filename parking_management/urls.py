@@ -23,6 +23,10 @@ urlpatterns = [
     path('ticket/<str:ticket_code>/', pz_views.ticket_detail, name='ticket_code'),
     path('all_tickets/', pz_views.all_tickets, name='all_tickets'),
 
+    # Staff Operations Workbench
+    path('staff/dashboard/', pz_views.admin_dashboard, name='admin_dashboard'),
+    path('staff/checkout/', pz_views.admin_checkout, name='admin_checkout'),
+
     # Users & Auth
     path('dashboard/', user_views.dashboard, name='dashboard'),
     path('user/login/', user_views.login_user, name='login'),
