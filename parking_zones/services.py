@@ -64,8 +64,10 @@ class BillingService:
 
         return {
             'daily_rate': daily_rate,
+            'daily_rate_formatted': f"{daily_rate:,} ៛",
             'overstay_multiplier': float(overstay_multiplier),
             'overstay_rate': overstay_rate,
+            'overstay_rate_formatted': f"{overstay_rate:,} ៛",
             'entry_time': entry_time,
             'exit_time': exit_time,
             'booked_end': booked_end,
@@ -73,17 +75,23 @@ class BillingService:
             'normal_hours': round(normal_seconds / 3600.0, 2),
             'normal_days': normal_days,
             'normal_charge': normal_charge,
+            'normal_charge_formatted': f"{normal_charge:,} ៛",
             'overstay_seconds': overstay_seconds,
             'overstay_hours': round(overstay_seconds / 3600.0, 2),
             'overstay_days': overstay_days,
             'overstay_charge': overstay_charge,
+            'overstay_charge_formatted': f"{overstay_charge:,} ៛",
             'total_charge': total_charge,
+            'total_charge_formatted': f"{total_charge:,} ៛",
             'total_amount': total_charge,
             'deposit_paid': deposit_paid,
             'deposit_deducted': deposit_paid,
+            'deposit_deducted_formatted': f"{deposit_paid:,} ៛",
             'balance_paid': balance_paid,
+            'balance_paid_formatted': f"{balance_paid:,} ៛",
             'total_paid': total_paid,
             'balance_due': balance_due,
+            'balance_due_formatted': f"{balance_due:,} ៛",
             'is_overstay': overstay_days > 0,
         }
 
@@ -220,6 +228,64 @@ class PaymentService:
         return True, 'Deposit payment successfully verified.'
 
     @staticmethod
+    def create_exit_transaction(reservation: Reservation, amount: int) -> PaymentTransaction:
+        demo_enabled = getattr(settings, 'DEMO_PAYMENT_ENABLED', True)
+        txn = PaymentTransaction.objects.create(
+            reservation=reservation,
+            purpose='EXIT_BALANCE',
+            amount=amount,
+            currency='KHR',
+            status='PENDING',
+            provider='DEMO' if demo_enabled else 'BAKONG_KHQR',
+            is_demo=demo_enabled,
+        )
+        return txn
+
+    @staticmethod
+    @transaction.atomic
+    def confirm_exit_payment(txn_id: int, provider_ref: str = None) -> tuple[bool, str]:
+        """
+        Idempotent exit balance payment confirmation.
+        Verifies pending transaction, credits balance_paid, and authorizes departure window.
+        Keeps reservation in CHECKED_IN status and space physically occupied until gate passage.
+        """
+        txn = PaymentTransaction.objects.select_for_update().get(id=txn_id)
+        reservation = Reservation.objects.select_for_update().get(id=txn.reservation_id)
+
+        # Idempotency check: if already confirmed
+        if txn.status == 'SUCCESS':
+            return True, 'Exit balance payment already verified.'
+
+        if txn.status in ('CANCELLED', 'FAILED'):
+            return False, f'Cannot confirm transaction in status {txn.status}. Please initiate a new payment.'
+
+        now = timezone.now()
+
+        # Mark txn SUCCESS
+        txn.status = 'SUCCESS'
+        if provider_ref:
+            txn.provider_ref = provider_ref
+        txn.completed_at = now
+        txn.save()
+
+        # Credit payment towards reservation balance_paid
+        reservation.balance_paid += txn.amount
+
+        # Check whether updated balance due is 0
+        updated_bill = BillingService.calculate_bill(reservation, as_of=now)
+        exit_mins = getattr(settings, 'EXIT_WINDOW_MINUTES', 5)
+
+        if updated_bill['balance_due'] == 0:
+            reservation.payment_status = 'PAID'
+            reservation.exit_authorized_until = now + timedelta(minutes=exit_mins)
+            reservation.save(update_fields=['balance_paid', 'payment_status', 'exit_authorized_until'])
+            return True, 'Exit payment successfully verified. 5-minute departure window authorized.'
+        else:
+            reservation.payment_status = 'PARTIALLY_PAID'
+            reservation.save(update_fields=['balance_paid', 'payment_status'])
+            return False, f'Partial payment of {txn.amount:,} KHR received. Remaining balance of {updated_bill["balance_due"]:,} KHR must be settled.'
+
+    @staticmethod
     @transaction.atomic
     def record_exit_payment(reservation: Reservation, amount: int, provider: str = 'CASH', provider_ref: str = None) -> PaymentTransaction:
         now = timezone.now()
@@ -347,7 +413,7 @@ class GateService:
         return True, reservation, f'Entry confirmed! Barrier opened. Space occupied in {zone.name}.'
 
     @staticmethod
-    def prepare_exit(token_or_code: str) -> tuple[bool, Reservation | None, dict | None, str]:
+    def prepare_exit(token_or_code: str, zone_id: int = None) -> tuple[bool, Reservation | None, dict | None, str]:
         token_or_code = token_or_code.strip()
         reservation = (
             Reservation.objects
@@ -366,20 +432,32 @@ class GateService:
         if not reservation:
             return False, None, None, 'No reservation record found for this ticket code or access token.'
 
+        if zone_id and reservation.parking_zone_id != zone_id:
+            return False, reservation, None, f'Ticket is for "{reservation.parking_zone.name}", not this parking facility.'
+
         if reservation.status != 'CHECKED_IN':
             return False, reservation, None, f'Reservation is in status "{reservation.status}". Must be CHECKED_IN to process exit.'
 
         now = timezone.now()
         bill = BillingService.calculate_bill(reservation, as_of=now)
 
-        # Check if currently authorized to exit (balance 0 or within 5-min exit authorization window)
-        is_authorized = bool(
-            bill['balance_due'] == 0 or
-            (reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
-        )
-        msg = 'Exit authorized. Barrier ready to open.' if is_authorized else f"Outstanding balance of {bill['balance_due']:,} KHR must be settled before exit."
+        # 1. If exit authorization window was set and is active:
+        if reservation.exit_authorized_until and now <= reservation.exit_authorized_until:
+            return True, reservation, bill, 'Exit authorized. Barrier ready to open.'
 
-        return is_authorized, reservation, bill, msg
+        # 2. If exit authorization window was set and has expired:
+        if reservation.exit_authorized_until and now > reservation.exit_authorized_until:
+            if bill['balance_due'] > 0:
+                msg = f"Exit window expired. Outstanding balance of {bill['balance_due']:,} KHR must be settled before exit."
+            else:
+                msg = 'Exit window expired. Please renew exit authorization before exit.'
+            return False, reservation, bill, msg
+
+        # 3. If exit_authorized_until was not set (e.g. prepaid deposit covering stay or at-barrier settlement):
+        if bill['balance_due'] == 0:
+            return True, reservation, bill, 'Exit authorized. Barrier ready to open.'
+
+        return False, reservation, bill, f"Outstanding balance of {bill['balance_due']:,} KHR must be settled before exit."
 
     @staticmethod
     @transaction.atomic
@@ -397,10 +475,12 @@ class GateService:
 
         bill = BillingService.calculate_bill(reservation, as_of=now)
 
-        # Enforce that balance must be 0 or authorized departure window valid
-        if bill['balance_due'] > 0:
-            if not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
-                return False, reservation, f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before exit.'
+        # Check authorization
+        if reservation.exit_authorized_until and now > reservation.exit_authorized_until:
+            return False, reservation, 'Exit window expired. Please renew exit authorization or settle balance.'
+
+        if bill['balance_due'] > 0 and not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
+            return False, reservation, f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before exit.'
 
         # Finalize checkout
         reservation.status = 'CHECKED_OUT'
@@ -411,7 +491,7 @@ class GateService:
             reservation.staff_notes = (reservation.staff_notes + f"\nExit verified by staff {staff_user.username} at {now.isoformat()}").strip()
         reservation.save()
 
-        # Release physical space
+        # Release physical space exactly once
         zone.occupied_slots = max(0, zone.occupied_slots - 1)
         zone.vacant_slots = min(zone.num_of_slots, max(0, zone.num_of_slots - zone.occupied_slots))
         zone.save()

@@ -1197,6 +1197,404 @@ class WorkflowBillingAndGateTests(TestCase):
         self.assertEqual(res_staff.status_code, 200)
 
 
+class CustomerExitPaymentTests(TestCase):
+    def setUp(self):
+        self.zone1 = ParkingZone.objects.create(
+            name='Central Park Zone A',
+            slug='central-park-zone-a',
+            num_of_slots=20,
+            occupied_slots=5,
+            vacant_slots=15,
+            price=3000,
+            address='Phnom Penh City Center',
+            district='Daun Penh',
+        )
+        self.zone2 = ParkingZone.objects.create(
+            name='Riverside Zone B',
+            slug='riverside-zone-b',
+            num_of_slots=20,
+            occupied_slots=2,
+            vacant_slots=18,
+            price=4000,
+            address='Riverside Walk',
+            district='Daun Penh',
+        )
+        self.owner = User.objects.create_user(
+            username='car_owner',
+            email='owner@sompark.test',
+            password='testpass123'
+        )
+        self.other_user = User.objects.create_user(
+            username='stranger_driver',
+            email='stranger@sompark.test',
+            password='testpass123'
+        )
+        self.staff_user = User.objects.create_user(
+            username='staff_officer',
+            email='staff@sompark.test',
+            password='testpass123',
+            is_staff=True
+        )
+
+    def test_exit_payment_ownership_restriction(self):
+        """User B cannot view or process exit payment for User A's reservation (HTTP 403)."""
+        t0 = timezone.now() - timedelta(hours=5)
+        res = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-1111',
+            phone_number='+85512111222',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
+            daily_rate=3000,
+            status='CHECKED_IN',
+            checked_in_at=t0,
+        )
+
+        # Non-owner gets 403 Forbidden
+        self.client.login(username='stranger_driver', password='testpass123')
+        resp = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        self.assertEqual(resp.status_code, 403)
+
+        # Owner gets 200 OK
+        self.client.login(username='car_owner', password='testpass123')
+        resp_owner = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        self.assertEqual(resp_owner.status_code, 200)
+        self.assertContains(resp_owner, res.ticket_code)
+        self.assertContains(resp_owner, 'Central Park Zone A')
+
+    def test_exit_payment_only_after_checkin(self):
+        """Confirmed but un-checked-in, expired, cancelled, or completed reservations cannot access exit payment."""
+        now = timezone.now()
+        self.client.login(username='car_owner', password='testpass123')
+
+        # 1. CONFIRMED (not checked in yet)
+        res_conf = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-2222',
+            start_date=now.date(),
+            finish_date=(now + timedelta(days=1)).date(),
+            status='CONFIRMED',
+        )
+        resp_conf = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res_conf.ticket_code}))
+        self.assertRedirects(resp_conf, reverse('ticket_code', kwargs={'ticket_code': res_conf.ticket_code}))
+
+        # 2. CANCELLED
+        res_canc = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-3333',
+            start_date=now.date(),
+            finish_date=(now + timedelta(days=1)).date(),
+            status='CANCELLED',
+        )
+        resp_canc = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res_canc.ticket_code}))
+        self.assertRedirects(resp_canc, reverse('dashboard'))
+
+        # 3. EXPIRED
+        res_exp = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-4444',
+            start_date=now.date(),
+            finish_date=(now + timedelta(days=1)).date(),
+            status='EXPIRED',
+        )
+        resp_exp = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res_exp.ticket_code}))
+        self.assertRedirects(resp_exp, reverse('dashboard'))
+
+        # 4. CHECKED_OUT
+        res_out = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-5555',
+            start_date=now.date(),
+            finish_date=(now + timedelta(days=1)).date(),
+            status='CHECKED_OUT',
+            checked_out=True,
+        )
+        resp_out = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res_out.ticket_code}))
+        self.assertRedirects(resp_out, reverse('ticket_code', kwargs={'ticket_code': res_out.ticket_code}))
+
+    def test_normal_and_overstay_billing_and_deposit_deduction(self):
+        """Itemizes normal charges, 2x overstay charges, and deducts prepaid deposit."""
+        # Entry 60 hours ago, booked for 24 hours (1 day), stayed 60 hours (1 normal day + 2 overstay days)
+        t0 = timezone.now() - timedelta(hours=60)
+        booked_end = t0 + timedelta(hours=24)
+        res = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-6666',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=booked_end.date(),
+            finish_time=booked_end,
+            daily_rate=3000,
+            deposit_amount=3000,
+            payment_method='DEPOSIT',
+            payment_status='PARTIALLY_PAID',
+            status='CHECKED_IN',
+            checked_in_at=t0,
+        )
+
+        bill = BillingService.calculate_bill(res, as_of=timezone.now())
+        # Normal 1 day: 3,000 KHR
+        self.assertEqual(bill['normal_days'], 1)
+        self.assertEqual(bill['normal_charge'], 3000)
+        # Overstay 2 days @ 2x (6,000 KHR / day): 12,000 KHR
+        self.assertEqual(bill['overstay_days'], 2)
+        self.assertEqual(bill['overstay_charge'], 12000)
+        # Total charge: 15,000 KHR
+        self.assertEqual(bill['total_charge'], 15000)
+        # Deposit credited: 3,000 KHR
+        self.assertEqual(bill['deposit_deducted'], 3000)
+        # Net balance due: 12,000 KHR
+        self.assertEqual(bill['balance_due'], 12000)
+
+        # Check view output
+        self.client.login(username='car_owner', password='testpass123')
+        resp = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '12,000 ៛')
+        self.assertContains(resp, '3,000 ៛')
+
+    def test_payment_simulation_lifecycle_and_idempotency(self):
+        """Simulate success, failure, cancel, and prevent duplicate payments."""
+        t0 = timezone.now() - timedelta(hours=10)
+        initial_occupied = self.zone1.occupied_slots
+        res = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-7777',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
+            daily_rate=3000,
+            payment_method='PAY_AT_EXIT',
+            status='CHECKED_IN',
+            checked_in_at=t0,
+        )
+
+        self.client.login(username='car_owner', password='testpass123')
+        resp = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        self.assertEqual(resp.status_code, 200)
+
+        # 1. Verify pending transaction created
+        txn = res.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+        self.assertIsNotNone(txn)
+        self.assertEqual(txn.amount, 3000)
+
+        # 2. Simulate failure
+        resp_fail = self.client.post(
+            reverse('payment_simulate', kwargs={'txn_id': txn.id}),
+            data={'outcome': 'failure'}
+        )
+        self.assertRedirects(resp_fail, reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        txn.refresh_from_db()
+        self.assertEqual(txn.status, 'FAILED')
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_IN')
+        self.assertIsNone(res.exit_authorized_until)
+
+        # 3. Re-open page creates a new pending transaction after failure
+        resp_retry = self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        self.assertEqual(resp_retry.status_code, 200)
+        txn2 = res.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+        self.assertIsNotNone(txn2)
+        self.assertNotEqual(txn.id, txn2.id)
+
+        # 4. Simulate cancel
+        resp_cancel = self.client.post(
+            reverse('payment_simulate', kwargs={'txn_id': txn2.id}),
+            data={'outcome': 'cancel'}
+        )
+        self.assertRedirects(resp_cancel, reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        txn2.refresh_from_db()
+        self.assertEqual(txn2.status, 'CANCELLED')
+
+        # 5. Re-open and simulate success
+        self.client.get(reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+        txn3 = res.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+        resp_success = self.client.post(
+            reverse('payment_simulate', kwargs={'txn_id': txn3.id}),
+            data={'outcome': 'success'}
+        )
+        self.assertRedirects(resp_success, reverse('ticket_code', kwargs={'ticket_code': res.ticket_code}))
+
+        # Assert post-payment invariants:
+        res.refresh_from_db()
+        txn3.refresh_from_db()
+        self.assertEqual(txn3.status, 'SUCCESS')
+        self.assertEqual(res.status, 'CHECKED_IN')
+        self.assertFalse(res.checked_out)
+        self.assertEqual(res.payment_status, 'PAID')
+        self.assertEqual(res.balance_paid, 3000)
+        self.assertIsNotNone(res.exit_authorized_until)
+        # Capacity remains occupied!
+        self.zone1.refresh_from_db()
+        self.assertEqual(self.zone1.occupied_slots, initial_occupied)
+
+        # 6. Duplicate confirmation attempt is idempotent
+        success, msg = PaymentService.confirm_exit_payment(txn3.id)
+        self.assertTrue(success)
+        self.assertIn('already verified', msg)
+        res.refresh_from_db()
+        self.assertEqual(res.balance_paid, 3000)  # NOT double-credited!
+
+    def test_qr_refresh_does_not_extend_exit_window(self):
+        """Refreshing or reopening ticket/QR page does not extend the 5-minute deadline."""
+        t0 = timezone.now() - timedelta(hours=2)
+        res = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-8888',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
+            daily_rate=3000,
+            status='CHECKED_IN',
+            checked_in_at=t0,
+            exit_authorized_until=timezone.now() + timedelta(minutes=5)
+        )
+        initial_deadline = res.exit_authorized_until
+
+        self.client.login(username='car_owner', password='testpass123')
+        # Visit ticket page multiple times
+        self.client.get(reverse('ticket_code', kwargs={'ticket_code': res.ticket_code}))
+        self.client.get(reverse('ticket_gate_mode', kwargs={'ticket_code': res.ticket_code}))
+        self.client.get(reverse('ticket_code', kwargs={'ticket_code': res.ticket_code}))
+
+        res.refresh_from_db()
+        self.assertEqual(res.exit_authorized_until, initial_deadline)
+
+    def test_gate_facility_verification_for_exit(self):
+        """Paid QR authorizes exit only at the matching facility and is rejected at other facilities."""
+        t0 = timezone.now() - timedelta(hours=2)
+        res = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-9999',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
+            daily_rate=3000,
+            status='CHECKED_IN',
+            checked_in_at=t0,
+            exit_authorized_until=timezone.now() + timedelta(minutes=5)
+        )
+
+        # 1. Matching facility: Authorized
+        can_exit, r, bill, msg = GateService.prepare_exit(res.access_token, zone_id=self.zone1.id)
+        self.assertTrue(can_exit)
+        self.assertIn('Exit authorized', msg)
+
+        # 2. Different facility: Rejected
+        can_exit_wrong, r_wrong, bill_wrong, msg_wrong = GateService.prepare_exit(res.access_token, zone_id=self.zone2.id)
+        self.assertFalse(can_exit_wrong)
+        self.assertIn('not this parking facility', msg_wrong)
+
+    def test_expired_exit_window_with_and_without_additional_charges(self):
+        """
+        When exit window expires:
+        A. If balance_due == 0: gate rejects, but renewal succeeds without extra fee.
+        B. If balance_due > 0: gate rejects, renewal requires paying additional balance.
+        """
+        t0 = timezone.now() - timedelta(hours=10)
+        # Expired window (authorized until 10 minutes ago)
+        expired_window = timezone.now() - timedelta(minutes=10)
+        res = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-0000',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
+            daily_rate=3000,
+            balance_paid=3000,
+            payment_status='PAID',
+            status='CHECKED_IN',
+            checked_in_at=t0,
+            exit_authorized_until=expired_window,
+        )
+
+        # Gate check: Expired window is not authorized
+        can_exit, r, bill, msg = GateService.prepare_exit(res.ticket_code, zone_id=self.zone1.id)
+        self.assertFalse(can_exit)
+        self.assertIn('Exit window expired', msg)
+        self.assertEqual(bill['balance_due'], 0)
+
+        # A. Renew exit authorization without extra fee
+        self.client.login(username='car_owner', password='testpass123')
+        resp_renew = self.client.post(reverse('renew_exit_authorization', kwargs={'ticket_code': res.ticket_code}))
+        self.assertRedirects(resp_renew, reverse('ticket_code', kwargs={'ticket_code': res.ticket_code}))
+        res.refresh_from_db()
+        self.assertGreater(res.exit_authorized_until, timezone.now())
+
+        # Now gate authorizes
+        can_exit2, _, _, _ = GateService.prepare_exit(res.ticket_code, zone_id=self.zone1.id)
+        self.assertTrue(can_exit2)
+
+        # B. Expired window with overstay / additional balance
+        # Simulate rolling over into 2x overstay (3 days ago entry)
+        t_overstay = timezone.now() - timedelta(days=2)
+        res.checked_in_at = t_overstay
+        res.start_time = t_overstay
+        res.finish_time = t_overstay + timedelta(days=1)
+        res.exit_authorized_until = expired_window
+        res.save()
+
+        # Bill now has balance due
+        bill_overstay = BillingService.calculate_bill(res)
+        self.assertGreater(bill_overstay['balance_due'], 0)
+
+        # Renewal attempts reject and redirect to pay_exit
+        resp_renew_fail = self.client.post(reverse('renew_exit_authorization', kwargs={'ticket_code': res.ticket_code}))
+        self.assertRedirects(resp_renew_fail, reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+
+    def test_vehicle_passage_releases_capacity_exactly_once(self):
+        """Passage confirmation updates to CHECKED_OUT and decrements occupied_slots once."""
+        t0 = timezone.now() - timedelta(hours=3)
+        initial_occupied = self.zone1.occupied_slots
+        res = Reservation.objects.create(
+            customer=self.owner,
+            parking_zone=self.zone1,
+            plate_number='Phnom Penh 2AZ-1234',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=(t0 + timedelta(days=1)).date(),
+            finish_time=t0 + timedelta(days=1),
+            daily_rate=3000,
+            balance_paid=3000,
+            payment_status='PAID',
+            status='CHECKED_IN',
+            checked_in_at=t0,
+            exit_authorized_until=timezone.now() + timedelta(minutes=5),
+        )
+
+        # First passage confirmation: Success, space released
+        success1, r1, msg1 = GateService.confirm_physical_exit(res.id, staff_user=self.staff_user)
+        self.assertTrue(success1)
+        self.assertEqual(r1.status, 'CHECKED_OUT')
+        self.assertTrue(r1.checked_out)
+        self.zone1.refresh_from_db()
+        self.assertEqual(self.zone1.occupied_slots, initial_occupied - 1)
+
+        # Duplicate passage confirmation: Idempotent, space NOT decremented again!
+        success2, r2, msg2 = GateService.confirm_physical_exit(res.id, staff_user=self.staff_user)
+        self.assertTrue(success2)
+        self.assertEqual(r2.status, 'CHECKED_OUT')
+        self.zone1.refresh_from_db()
+        self.assertEqual(self.zone1.occupied_slots, initial_occupied - 1)
+
+
+
 
 
 

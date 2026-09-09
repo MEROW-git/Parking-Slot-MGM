@@ -23,9 +23,15 @@
 
         var parentArrivalBanner = el.closest('.sp-arrival-banner');
         var parentCountdownBox = el.closest('.sp-countdown-box');
+        var parentExitBanner = el.closest('.sp-exit-banner');
 
         if (diff <= 0) {
-          if (parentArrivalBanner || el.id === 'arrival-timer') {
+          if (parentExitBanner || el.id === 'exit-timer') {
+            el.textContent = 'Exit window expired (ផុតកំណត់ពេលចេញ)';
+            if (parentExitBanner) {
+              parentExitBanner.classList.add('sp-countdown-expired');
+            }
+          } else if (parentArrivalBanner || el.id === 'arrival-timer') {
             el.textContent = 'Arrival window expired (ផុតកំណត់ពេលមកដល់)';
             if (parentArrivalBanner) {
               parentArrivalBanner.classList.add('sp-countdown-expired');

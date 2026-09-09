@@ -1,5 +1,7 @@
 import json
+from datetime import timedelta
 from functools import wraps
+from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
@@ -220,15 +222,132 @@ def payment_simulate(request, txn_id):
     outcome = request.POST.get('outcome', 'success')
     success, msg = DemoPaymentAdapter.simulate_payment(txn.id, outcome)
 
-    if success:
-        messages.success(request, f'ការទូទាត់ប្រាក់កក់ទទួលបានជោគជ័យ! {msg}')
-        return redirect('ticket_code', ticket_code=reservation.ticket_code)
-    else:
-        if outcome == 'cancel':
-            messages.info(request, msg)
+    if txn.purpose == 'EXIT_BALANCE':
+        if success:
+            messages.success(request, 'Payment successful. You’re ready to leave.')
+            return redirect('ticket_code', ticket_code=reservation.ticket_code)
         else:
-            messages.error(request, msg)
-        return redirect('pay_deposit', ticket_code=reservation.ticket_code)
+            if outcome == 'cancel':
+                messages.info(request, msg)
+            else:
+                messages.error(request, msg)
+            return redirect('pay_exit', ticket_code=reservation.ticket_code)
+    else:
+        if success:
+            messages.success(request, f'ការទូទាត់ប្រាក់កក់ទទួលបានជោគជ័យ! {msg}')
+            return redirect('ticket_code', ticket_code=reservation.ticket_code)
+        else:
+            if outcome == 'cancel':
+                messages.info(request, msg)
+            else:
+                messages.error(request, msg)
+            return redirect('pay_deposit', ticket_code=reservation.ticket_code)
+
+
+@login_required
+def pay_exit(request, ticket_code):
+    """
+    Authenticated customer exit payment review and settlement screen.
+    Displays server-calculated breakdown (entry, booked deadline, normal & 2x overstay charges,
+    deposit deductions, prior balance payments, and net balance due).
+    Explains the 5-minute exit window policy upon confirmed payment.
+    Restricted to the reservation owner.
+    """
+    reservation = get_object_or_404(Reservation, ticket_code=ticket_code)
+
+    if reservation.customer != request.user and not request.user.is_staff:
+        raise PermissionDenied('Access denied to another user’s exit payment.')
+
+    if reservation.status == 'CONFIRMED':
+        messages.info(request, 'Vehicle has not checked in yet. Exit payment is only required when departing.')
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    if reservation.status in ('EXPIRED', 'CANCELLED'):
+        messages.error(request, f'This reservation is {reservation.get_status_display().lower()}. Exit payment cannot be processed.')
+        return redirect('dashboard')
+
+    if reservation.status == 'CHECKED_OUT' or reservation.checked_out:
+        messages.info(request, 'This parking session is already completed. Here is your final receipt.')
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    if reservation.status != 'CHECKED_IN':
+        messages.error(request, f'Cannot process exit payment for reservation in status: {reservation.status}.')
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    now = timezone.now()
+    bill = BillingService.calculate_bill(reservation, as_of=now)
+    exit_window_minutes = getattr(settings, 'EXIT_WINDOW_MINUTES', 5)
+
+    is_exit_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
+    is_exit_window_expired = bool(reservation.exit_authorized_until and now > reservation.exit_authorized_until)
+
+    # If already authorized with active window and no balance due, direct to ticket
+    if is_exit_authorized and bill['balance_due'] == 0:
+        messages.info(request, 'Payment already verified. Your departure window is active.')
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    pending_txn = None
+    if bill['balance_due'] > 0:
+        # Check existing pending transaction
+        pending_txn = reservation.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+        if pending_txn and pending_txn.amount != bill['balance_due']:
+            # Stale quote: invalidate old pending txn and create new one
+            pending_txn.status = 'CANCELLED'
+            pending_txn.raw_response = {
+                'reason': 'Quote expired due to recalculated billing amount',
+                'old_amount': pending_txn.amount,
+                'new_amount': bill['balance_due'],
+                'cancelled_at': now.isoformat(),
+            }
+            pending_txn.save(update_fields=['status', 'raw_response', 'updated_at'])
+            pending_txn = None
+
+        if not pending_txn:
+            pending_txn = PaymentService.create_exit_transaction(reservation, amount=bill['balance_due'])
+
+    context = {
+        'reservation': reservation,
+        'bill': bill,
+        'transaction': pending_txn,
+        'now': now,
+        'exit_window_minutes': exit_window_minutes,
+        'is_exit_authorized': is_exit_authorized,
+        'is_exit_window_expired': is_exit_window_expired,
+        'demo_enabled': DemoPaymentAdapter.is_enabled(),
+        'title': f'Pay & Prepare to Leave · Ticket #{reservation.ticket_code} | SomPark',
+    }
+    return render(request, 'parking_zones/pay_exit.html', context)
+
+
+@login_required
+@require_POST
+def renew_exit_authorization(request, ticket_code):
+    """
+    Allows customer to renew or activate a server-validated exit authorization
+    when balance_due == 0 without requiring another payment.
+    """
+    reservation = get_object_or_404(Reservation, ticket_code=ticket_code)
+
+    if reservation.customer != request.user and not request.user.is_staff:
+        raise PermissionDenied('Access denied to renew this exit pass.')
+
+    if reservation.status != 'CHECKED_IN':
+        messages.error(request, 'Exit authorization is only available for vehicles currently checked in.')
+        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    now = timezone.now()
+    bill = BillingService.calculate_bill(reservation, as_of=now)
+
+    if bill['balance_due'] > 0:
+        messages.error(request, f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before exit.')
+        return redirect('pay_exit', ticket_code=reservation.ticket_code)
+
+    exit_mins = getattr(settings, 'EXIT_WINDOW_MINUTES', 5)
+    reservation.exit_authorized_until = now + timedelta(minutes=exit_mins)
+    reservation.save(update_fields=['exit_authorized_until'])
+
+    messages.success(request, f'Exit pass authorized. You have {exit_mins} minutes to reach the gate barrier.')
+    return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
 
 @login_required
@@ -282,12 +401,16 @@ def ticket_detail(request, ticket_code=None):
     now = timezone.now()
     bill = BillingService.calculate_bill(reservation, as_of=now)
     qr_data_uri = generate_access_qr_base64(reservation.access_token)
+    is_exit_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
+    is_exit_window_expired = bool(reservation.exit_authorized_until and now > reservation.exit_authorized_until)
 
     context = {
         'reservation': reservation,
         'bill': bill,
         'qr_data_uri': qr_data_uri,
         'now': now,
+        'is_exit_authorized': is_exit_authorized,
+        'is_exit_window_expired': is_exit_window_expired,
         'title': f'Ticket #{reservation.ticket_code} - SomPark',
     }
     return render(request, 'parking_zones/ticket.html', context)
@@ -307,13 +430,19 @@ def ticket_gate_mode(request, ticket_code):
     else:
         reservation = get_object_or_404(Reservation, ticket_code=ticket_code, customer=request.user)
 
+    mode = request.GET.get('mode', 'entry')
     qr_data_uri = generate_access_qr_base64(reservation.access_token)
-    bill = BillingService.calculate_bill(reservation)
+    now = timezone.now()
+    bill = BillingService.calculate_bill(reservation, as_of=now)
+    is_exit_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
 
     context = {
         'reservation': reservation,
         'bill': bill,
         'qr_data_uri': qr_data_uri,
+        'now': now,
+        'mode': mode,
+        'is_exit_authorized': is_exit_authorized,
         'title': f'Gate Pass #{reservation.ticket_code} | SomPark',
     }
     return render(request, 'parking_zones/gate_pass_fullscreen.html', context)
@@ -402,7 +531,7 @@ def staff_gate_action(request):
 
     # Handle lookup for exit
     elif action == 'lookup_exit':
-        can_exit, reservation, bill, msg = GateService.prepare_exit(token_or_code)
+        can_exit, reservation, bill, msg = GateService.prepare_exit(token_or_code, zone_id=zone_id)
         if not reservation:
             messages.error(request, msg)
             return redirect('staff_gate_scanner')
@@ -489,11 +618,19 @@ def checkout(request):
     bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
     now = timezone.now()
     if bill['balance_due'] > 0 and not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
-        messages.error(
+        messages.info(
             request,
-            f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before checkout. Please present your pass at the gate barrier.'
+            f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before checkout.'
         )
-        return redirect('ticket_code', ticket_code=reservation.ticket_code)
+        return redirect('pay_exit', ticket_code=reservation.ticket_code)
+
+    if reservation.exit_authorized_until and now > reservation.exit_authorized_until:
+        if bill['balance_due'] > 0:
+            messages.warning(request, 'Your 5-minute exit window has expired. Please settle your remaining balance.')
+            return redirect('pay_exit', ticket_code=reservation.ticket_code)
+        else:
+            messages.warning(request, 'Your 5-minute exit window has expired. Please renew your exit pass.')
+            return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
     success, reservation, msg = GateService.confirm_physical_exit(reservation.pk, staff_user=request.user if request.user.is_staff else None)
     if success:

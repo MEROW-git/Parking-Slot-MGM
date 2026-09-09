@@ -1,6 +1,7 @@
 import logging
 import secrets
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from .models import PaymentTransaction
 from .services import PaymentService
@@ -44,7 +45,10 @@ class DemoPaymentAdapter:
 
         if outcome == 'success':
             ref = f"DEMO-OK-{secrets.token_hex(6).upper()}"
-            success, msg = PaymentService.confirm_deposit(txn_id=txn.id, provider_ref=ref)
+            if txn.purpose == 'EXIT_BALANCE':
+                success, msg = PaymentService.confirm_exit_payment(txn_id=txn.id, provider_ref=ref)
+            else:
+                success, msg = PaymentService.confirm_deposit(txn_id=txn.id, provider_ref=ref)
             return success, msg
 
         elif outcome == 'failure':

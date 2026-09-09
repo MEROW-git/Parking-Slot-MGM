@@ -27,19 +27,53 @@
         </button>
 
       {% elif reservation.status == 'CHECKED_IN' %}
-        <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-show-gate-mode" title="Fullscreen high-contrast QR for gate scanner">
-          Show at Gate (បង្ហាញនៅរបាំង)
-        </a>
-        <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
-          Print ticket (បោះពុម្ព)
-        </button>
-        <form action="{% url 'checkout' %}" method="post" class="sp-ticket-action-form" id="form-ticket-checkout">
-          {% csrf_token %}
-          <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
-          <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-ticket">
-            Proceed to exit (ចេញពីចំណត)
+        {% if is_exit_authorized %}
+          <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}?mode=exit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-show-exit-qr" title="Fullscreen high-contrast exit QR for barrier scanner">
+            Show exit QR (បង្ហាញ QR ចេញ)
+          </a>
+          <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
+            Print ticket (បោះពុម្ព)
           </button>
-        </form>
+          <form action="{% url 'checkout' %}" method="post" class="sp-ticket-action-form" id="form-ticket-checkout" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
+            <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-checkout-ticket">
+              Proceed to exit (ចេញពីចំណត)
+            </button>
+          </form>
+        {% elif bill.balance_due > 0 %}
+          <a href="{% url 'pay_exit' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-pay-exit" title="Pay outstanding balance and prepare for exit">
+            Pay & prepare to leave (ទូទាត់ និងត្រៀមចេញ)
+          </a>
+          <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-show-gate-mode" title="Fullscreen high-contrast QR for gate scanner">
+            Show at Gate (បង្ហាញនៅរបាំង)
+          </a>
+          <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
+            Print ticket (បោះពុម្ព)
+          </button>
+        {% else %}
+          {% if is_exit_window_expired %}
+            <form action="{% url 'renew_exit_authorization' reservation.ticket_code %}" method="post" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-renew-exit">
+                Renew exit pass (បន្តសុពលភាពចេញ)
+              </button>
+            </form>
+          {% else %}
+            <form action="{% url 'renew_exit_authorization' reservation.ticket_code %}" method="post" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-prepare-exit">
+                Prepare to leave (ត្រៀមចេញពីចំណត)
+              </button>
+            </form>
+          {% endif %}
+          <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-show-gate-mode">
+            Show at Gate (បង្ហាញនៅរបាំង)
+          </a>
+          <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
+            Print ticket (បោះពុម្ព)
+          </button>
+        {% endif %}
 
       {% elif reservation.status == 'PAYMENT_PENDING' %}
         <a href="{% url 'pay_deposit' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-continue-payment">
@@ -77,6 +111,26 @@
         <span class="sp-arrival-timer-label">Time remaining:</span>
         <span class="sp-countdown-timer sp-arrival-timer-digits" id="arrival-timer" data-target="{{ reservation.arrival_deadline|date:'c' }}" aria-live="off">
           --:--:--
+        </span>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Live Exit Window Countdown Banner (When Exit Authorized) -->
+  {% if reservation.status == 'CHECKED_IN' and is_exit_authorized and reservation.exit_authorized_until %}
+    <div class="no-print sp-exit-banner" id="exit-countdown-card" data-reveal="up">
+      <div class="sp-exit-banner-info">
+        <div class="sp-exit-banner-heading">
+          Payment verified &middot; Ready to leave (ការទូទាត់បានជោគជ័យ &middot; ត្រៀមចេញ)
+        </div>
+        <div class="sp-exit-banner-deadline">
+          Reach and scan at the exit barrier before <strong>{{ reservation.exit_authorized_until|date:"g:i:s A" }}</strong>.
+        </div>
+      </div>
+      <div class="sp-exit-banner-timer-block">
+        <span class="sp-exit-timer-label">Exit window:</span>
+        <span class="sp-countdown-timer sp-exit-timer-digits" id="exit-timer" data-target="{{ reservation.exit_authorized_until|date:'c' }}" aria-live="off">
+          --:--
         </span>
       </div>
     </div>
@@ -176,7 +230,7 @@
         * {{ reservation.ticket_code }} *
       </div>
       <div style="font-size:0.75rem; color:#64748b; margin-top:0.25rem;">
-        Opaque Token: <code style="font-size:0.72rem; color:#334155;">{{ reservation.access_token|slice:":12" }}...</code> (Validated server-side)
+        Server-verified gate access pass
       </div>
     </div>
 

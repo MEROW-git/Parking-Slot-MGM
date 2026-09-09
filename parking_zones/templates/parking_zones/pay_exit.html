@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Pay & Prepare to Leave · Ticket #{{ reservation.ticket_code }} | SomPark Phnom Penh{% endblock %}
+
+{% block content %}
+<div class="sp-ticket-page-container" id="pay-exit-page-container">
+
+  <!-- Navigation bar -->
+  <div class="sp-ticket-nav-bar" id="pay-exit-nav-bar" data-reveal="up">
+    <a href="{% url 'ticket_code' reservation.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-back-to-ticket">
+      &larr; Back to Ticket (ត្រឡប់ទៅសំបុត្រ)
+    </a>
+  </div>
+
+  <!-- Header and Title -->
+  <header class="sp-page-header" data-reveal="up" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem;">
+      <div>
+        <span class="sp-avail-badge available" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); margin-bottom: 0.4rem; display: inline-block;">
+          PARKED / CHECKED IN (កំពុងចត)
+        </span>
+        <h1 style="font-size: clamp(1.5rem, 3vw, 2rem); margin: 0 0 0.35rem; color: var(--color-ink);">
+          Pay & Prepare to Leave
+        </h1>
+        <div style="font-size: 0.9rem; color: var(--color-ink-2);">
+          ទូទាត់សមតុល្យចំណត និងត្រៀមចេញ &middot; Ticket <strong>#{{ reservation.ticket_code }}</strong>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <span style="font-size: 0.8rem; color: var(--color-ink-2); display: block;">Balance Due (សមតុល្យត្រូវបង់)</span>
+        <span style="font-family: var(--font-outlier); font-size: clamp(1.6rem, 3.5vw, 2.2rem); font-weight: 800; color: {% if bill.balance_due > 0 %}var(--color-primary-light){% else %}#4ade80{% endif %};" id="pay-exit-balance-due">
+          {{ bill.balance_due_formatted }}
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Session and Vehicle Metadata Card -->
+  <div class="sp-booking-card" data-reveal="up" data-reveal-delay="30" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; font-size: 0.88rem;">
+      <div>
+        <span style="color: var(--color-ink-2); display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">Parking Facility</span>
+        <strong style="font-size: 1rem; color: var(--color-ink);">{{ reservation.parking_zone.name }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-ink-2);">{{ reservation.parking_zone.address }}</div>
+      </div>
+
+      <div>
+        <span style="color: var(--color-ink-2); display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">Vehicle Plate</span>
+        <strong style="font-family: var(--font-outlier); font-size: 1.1rem; color: var(--color-ink);">{{ reservation.plate_number }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-ink-2);">Customer: {{ reservation.customer.username }}</div>
+      </div>
+
+      <div>
+        <span style="color: var(--color-ink-2); display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">Actual Entry Time</span>
+        <strong style="color: var(--color-ink);">{{ bill.entry_time|date:"d M Y, g:i A" }}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-ink-2);">Gate entry recorded</div>
+      </div>
+
+      <div>
+        <span style="color: var(--color-ink-2); display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">Booked Exit Deadline</span>
+        <strong style="color: var(--color-ink);">{{ bill.booked_end|date:"d M Y, g:i A" }}</strong>
+        <div style="font-size: 0.8rem; color: {% if bill.is_overstay %}#f87171{% else %}var(--color-ink-2){% endif %};">
+          {% if bill.is_overstay %}Overstayed booked deadline{% else %}Within booked window{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Itemized Server-Side Billing Breakdown Card -->
+  <div class="sp-booking-card" data-reveal="up" data-reveal-delay="60" style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem; color: var(--color-ink); border-bottom: 1px solid var(--color-surface-2); padding-bottom: 0.5rem;">
+      Itemized Billing Breakdown (ព័ត៌មានលម្អិតអំពីតម្លៃ)
+    </h3>
+
+    <div style="display: flex; flex-direction: column; gap: 0.65rem; font-size: 0.9rem; color: var(--color-ink);">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>Normal Parking Duration ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }} @ {{ bill.daily_rate_formatted }}):</span>
+        <strong style="font-family: var(--font-outlier);">{{ bill.normal_charge_formatted }}</strong>
+      </div>
+
+      {% if bill.overstay_days > 0 %}
+        <div style="display: flex; justify-content: space-between; align-items: center; color: #f87171;">
+          <span>2&times; Overstay Charges ({{ bill.overstay_days }} day{{ bill.overstay_days|pluralize }} @ {{ bill.overstay_rate_formatted }}):</span>
+          <strong style="font-family: var(--font-outlier);">+ {{ bill.overstay_charge_formatted }}</strong>
+        </div>
+      {% endif %}
+
+      <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; border-top: 1px solid var(--color-surface-2); padding-top: 0.5rem;">
+        <span>Total Gross Charges (តម្លៃសរុប):</span>
+        <strong style="font-family: var(--font-outlier);">{{ bill.total_charge_formatted }}</strong>
+      </div>
+
+      {% if bill.deposit_deducted > 0 %}
+        <div style="display: flex; justify-content: space-between; align-items: center; color: #4ade80;">
+          <span>First-day Deposit Credited (ប្រាក់កក់ថ្ងៃដំបូងបានកាត់):</span>
+          <strong style="font-family: var(--font-outlier);">- {{ bill.deposit_deducted_formatted }}</strong>
+        </div>
+      {% endif %}
+
+      {% if bill.balance_paid > 0 %}
+        <div style="display: flex; justify-content: space-between; align-items: center; color: #4ade80;">
+          <span>Prior Payments Credited (ការទូទាត់មុនបានកាត់):</span>
+          <strong style="font-family: var(--font-outlier);">- {{ bill.balance_paid_formatted }}</strong>
+        </div>
+      {% endif %}
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid var(--color-surface-2); padding-top: 0.75rem; margin-top: 0.25rem; font-size: 1.15rem; font-weight: 800;">
+        <span>Net Balance Due (សមតុល្យត្រូវទូទាត់):</span>
+        <span style="font-family: var(--font-outlier); color: {% if bill.balance_due > 0 %}var(--color-primary-light){% else %}#4ade80{% endif %};">
+          {{ bill.balance_due_formatted }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exit Window Policy Notice -->
+  <div class="sp-form-note" data-reveal="up" data-reveal-delay="80" style="border-left-color: var(--color-primary); background: rgba(15, 23, 42, 0.85); margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-radius: var(--radius-sm);">
+    <div style="font-weight: 700; color: var(--color-ink); margin-bottom: 0.35rem;">
+      Exit Authorization Window Policy (លក្ខខណ្ឌសុពលភាពចាកចេញ):
+    </div>
+    <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.83rem; line-height: 1.5; color: var(--color-ink-2);">
+      <li>Payment provides a 5-minute departure window to reach and scan at the exit barrier.</li>
+      <li>If the window expires before you depart, billing recalculates using standard rules, crediting all previous payments in full.</li>
+      <li>If no additional balance is due, exit authorization can be renewed without extra charge.</li>
+    </ul>
+  </div>
+
+  <!-- Settlement Flow: Zero Balance vs Outstanding Balance -->
+  {% if bill.balance_due == 0 %}
+    <div class="sp-booking-card" data-reveal="up" data-reveal-delay="100" style="border: 1px solid rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.05); margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h3 style="font-size: 1.1rem; color: #4ade80; margin: 0 0 0.25rem;">
+            No Balance Due (គ្មានសមតុល្យត្រូវបង់)
+          </h3>
+          <p style="margin: 0; font-size: 0.85rem; color: var(--color-ink-2);">
+            All charges for this parking stay are fully settled. Activate or renew your 5-minute departure window to open the barrier.
+          </p>
+        </div>
+        <form action="{% url 'renew_exit_authorization' reservation.ticket_code %}" method="post">
+          {% csrf_token %}
+          <button type="submit" class="sp-btn sp-btn-primary" id="btn-activate-exit-window">
+            Obtain Exit Authorization (ទទួលការអនុញ្ញាតចេញ) &rarr;
+          </button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <!-- Payment Integration Section -->
+    {% if demo_enabled %}
+      <div class="sp-booking-card" data-reveal="up" data-reveal-delay="100" style="background: rgba(15, 23, 42, 0.95); border: 2px dashed rgba(59, 130, 246, 0.4); margin-bottom: 1.5rem;" id="demo-payment-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="background: #2563eb; color: white; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.04em;">
+              DEMO PAYMENT ADAPTER
+            </span>
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-ink);">
+              Simulated Exit Settlement (ការទូទាត់សាកល្បង)
+            </span>
+          </div>
+          {% if transaction %}
+            <span style="font-size: 0.75rem; color: var(--color-ink-2); font-family: monospace;" id="pay-exit-txn-ref">
+              Ref: {{ transaction.provider_ref }}
+            </span>
+          {% endif %}
+        </div>
+
+        <p style="font-size: 0.82rem; color: var(--color-ink-2); margin-bottom: 1.25rem; line-height: 1.45;">
+          This demo payment flow provides verified confirmation simulation for development and testing. Real Bakong KHQR / PayWay banking gateway integration is pending configuration. Bank payment simulation is separate from your parking access pass.
+        </p>
+
+        {% if transaction %}
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+            <!-- Confirm Success -->
+            <form action="{% url 'payment_simulate' transaction.id %}" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="outcome" value="success">
+              <button type="submit" class="sp-btn sp-btn-primary" style="width: 100%; justify-content: center;" id="btn-demo-pay-success">
+                Confirm Demo Payment (បង់ប្រាក់)
+              </button>
+            </form>
+
+            <!-- Simulate Failure -->
+            <form action="{% url 'payment_simulate' transaction.id %}" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="outcome" value="failure">
+              <button type="submit" class="sp-btn sp-btn-secondary" style="width: 100%; justify-content: center; color: #f87171; border-color: rgba(239, 68, 68, 0.4);" id="btn-demo-pay-fail">
+                Simulate Failure (បរាជ័យ)
+              </button>
+            </form>
+
+            <!-- Cancel Attempt -->
+            <form action="{% url 'payment_simulate' transaction.id %}" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="outcome" value="cancel">
+              <button type="submit" class="sp-btn sp-btn-secondary" style="width: 100%; justify-content: center;" id="btn-demo-pay-cancel">
+                Cancel Payment (បោះបង់)
+              </button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="sp-alert sp-alert-warning" style="margin-bottom: 1.5rem;">
+        <div>
+          <strong>Production Payment Gateway:</strong> Real bank KHQR integration pending configuration. Please settle balance with the attendant at the barrier.
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <!-- Footer Help Link -->
+  <div style="text-align: center; margin-top: 1rem; font-size: 0.8rem; color: var(--color-ink-2);">
+    Need assistance? Ask staff at the gate barrier terminal or call support.
+  </div>
+
+</div>
+{% endblock %}

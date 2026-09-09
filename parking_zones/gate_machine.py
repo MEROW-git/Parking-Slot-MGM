@@ -136,7 +136,7 @@ def virtual_gate(request):
                             )
                             reservation.refresh_from_db()
 
-                        allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code)
+                        allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
                         context.update(reservation=reservation, bill=bill, notice=notice, gate_open=False)
                     return render(request, 'admin/virtual_gate.html', context)
 
@@ -145,7 +145,7 @@ def virtual_gate(request):
                     allowed, _, notice = GateService.validate_entry(reservation.ticket_code, zone.pk)
                     bill = None
                 else:
-                    allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code)
+                    allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
 
                 context.update(reservation=reservation, bill=bill, notice=notice)
 

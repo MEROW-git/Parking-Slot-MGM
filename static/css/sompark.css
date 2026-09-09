@@ -3431,6 +3431,100 @@ code {
   }
 }
 
+/* Live Exit Countdown Banner */
+.sp-exit-banner {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: clamp(var(--space-sm), 3vw, var(--space-md)) clamp(var(--space-md), 4vw, var(--space-lg));
+  background: rgba(16, 185, 129, 0.08);
+  border: var(--rule-fine) solid rgba(16, 185, 129, 0.45);
+  border-radius: var(--radius-card);
+  box-shadow: 0 2px 12px rgba(16, 185, 129, 0.06);
+  color: var(--color-ink);
+  min-width: 0;
+}
+
+.sp-exit-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  min-width: 0;
+}
+
+.sp-exit-banner-heading {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  color: #10b981;
+  line-height: 1.3;
+}
+
+.sp-exit-banner-deadline {
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  line-height: 1.45;
+}
+
+.sp-exit-banner-deadline strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.sp-exit-banner-timer-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.sp-exit-timer-label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: #10b981;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sp-exit-timer-digits {
+  font-family: var(--font-outlier);
+  font-size: clamp(1.25rem, 3.5vw, 1.65rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #10b981;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+
+.sp-exit-banner.sp-countdown-expired {
+  border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sp-exit-banner.sp-countdown-expired .sp-exit-timer-digits {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 38rem) {
+  .sp-exit-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .sp-exit-banner-timer-block {
+    align-items: flex-start;
+    width: 100%;
+    padding-top: var(--space-2xs);
+    border-top: var(--rule-hair) dashed var(--color-rule);
+  }
+}
+
 /* Scannable Parking Access QR Container */
 .sp-qr-sheet-card {
   display: flex;
@@ -3637,6 +3731,7 @@ code {
   .sp-ticket-nav-bar,
   .sp-ticket-actions-bar,
   .sp-arrival-banner,
+  .sp-exit-banner,
   .sp-dialog {
     display: none !important;
   }

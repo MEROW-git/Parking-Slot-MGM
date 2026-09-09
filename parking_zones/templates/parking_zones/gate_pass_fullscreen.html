@@ -137,9 +137,22 @@
     {% if reservation.checked_out %}
       <span class="gate-status-pill status-completed">COMPLETED / CHECKED OUT</span>
     {% elif reservation.status == 'CHECKED_IN' %}
-      <span class="gate-status-pill status-parked">PARKED · READY FOR EXIT SCAN</span>
+      {% if is_exit_authorized and reservation.exit_authorized_until %}
+        <span class="gate-status-pill status-parked" style="background:#dcfce7; color:#166534; border:1px solid #86efac;">
+          EXIT AUTHORIZED &middot; 5-MIN WINDOW (បានអនុញ្ញាតឱ្យចេញ)
+        </span>
+        <div style="font-size: 0.85rem; font-weight: 700; color: #166534; margin-top: 0.25rem;">
+          Exit barrier before {{ reservation.exit_authorized_until|date:"g:i:s A" }}
+        </div>
+      {% elif mode == 'exit' or bill.balance_due > 0 %}
+        <span class="gate-status-pill" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;">
+          PAYMENT REQUIRED BEFORE EXIT
+        </span>
+      {% else %}
+        <span class="gate-status-pill status-parked">PARKED &middot; READY FOR EXIT SCAN</span>
+      {% endif %}
     {% elif reservation.status == 'CONFIRMED' %}
-      <span class="gate-status-pill status-confirmed">RESERVED · READY FOR ENTRY SCAN</span>
+      <span class="gate-status-pill status-confirmed">RESERVED &middot; READY FOR ENTRY SCAN</span>
     {% else %}
       <span class="gate-status-pill">{{ reservation.get_status_display }}</span>
     {% endif %}
