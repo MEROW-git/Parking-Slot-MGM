@@ -1,0 +1,333 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block title %}Virtual Parking Gate · {{ block.super }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/virtual-gate.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a> &rsaquo;
+  <a href="{% url 'admin_virtual_gate' %}">Virtual Parking Gate</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="vg-wrapper">
+  <header class="vg-header">
+    <div class="vg-header-brand">
+      <span class="vg-brand-badge">SOMPARK TERMINAL</span>
+      <h1 class="vg-header-title">Virtual Parking Gate Simulator</h1>
+    </div>
+    <div class="vg-header-meta">
+      <span class="vg-operator-tag">Attendant: <strong>{{ request.user.username }}</strong></span>
+      <span class="vg-time-tag">{{ now|date:"H:i, d M Y" }}</span>
+    </div>
+  </header>
+
+  <div class="vg-layout">
+    <!-- Left Column: Terminal Control Panel -->
+    <section class="vg-panel vg-terminal-panel" aria-labelledby="heading-terminal-controls">
+      <div class="vg-panel-header">
+        <h2 id="heading-terminal-controls">Attendant Controls</h2>
+        <span class="vg-mode-badge">HARDWARE SIMULATOR</span>
+      </div>
+      <p class="vg-panel-subtext">
+        Hardware barrier arm simulator connected to live reservation and capacity inventory.
+        Opening the barrier does not change capacity; only confirmed vehicle passage updates physical occupancy.
+      </p>
+
+      <form method="post" id="gate-machine-form" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="vg-alert vg-alert-error" role="alert">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <!-- Facility Selection -->
+        <div class="vg-field {% if form.zone.errors %}has-error{% endif %}">
+          <label for="{{ form.zone.id_for_label }}"><strong>{{ form.zone.label }}</strong></label>
+          {{ form.zone }}
+          {% if form.zone.errors %}<div class="vg-field-error">{{ form.zone.errors }}</div>{% endif %}
+        </div>
+
+        <!-- Direction (Entrance / Exit) -->
+        <fieldset class="vg-field vg-direction-fieldset {% if form.mode.errors %}has-error{% endif %}">
+          <legend><strong>Gate Direction (ទិសដៅរបាំង)</strong></legend>
+          <div class="vg-direction-options">
+            {% for radio in form.mode %}
+              <label class="vg-direction-label {% if radio.data.selected %}is-selected{% endif %}">
+                {{ radio.tag }}
+                <span class="vg-direction-text">{{ radio.choice_label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          {% if form.mode.errors %}<div class="vg-field-error">{{ form.mode.errors }}</div>{% endif %}
+        </fieldset>
+
+        <!-- Ticket Code / QR Token Input -->
+        <div class="vg-field {% if form.code.errors %}has-error{% endif %}">
+          <label for="{{ form.code.id_for_label }}"><strong>{{ form.code.label }}</strong></label>
+          <div class="vg-input-wrap">
+            {{ form.code }}
+          </div>
+          <span class="vg-field-hint">Supports SPK-... ticket codes, 48-char opaque QR tokens, or USB scanner input (auto-checks on Enter).</span>
+          {% if form.code.errors %}<div class="vg-field-error">{{ form.code.errors }}</div>{% endif %}
+        </div>
+
+        <!-- Optical QR Camera Scanner Viewfinder -->
+        <div class="vg-camera-container" id="vg-camera-box" hidden>
+          <div class="vg-camera-frame">
+            <video id="vg-video" muted playsinline></video>
+            <div class="vg-camera-reticle" aria-hidden="true">
+              <span class="vg-reticle-corner top-left"></span>
+              <span class="vg-reticle-corner top-right"></span>
+              <span class="vg-reticle-corner bottom-left"></span>
+              <span class="vg-reticle-corner bottom-right"></span>
+              <span class="vg-reticle-laser"></span>
+            </div>
+          </div>
+        </div>
+        <p id="vg-camera-status" class="vg-camera-status" role="status" aria-live="polite"></p>
+
+        <!-- Standard Actions: Scan & Check Ticket -->
+        <div class="vg-actions">
+          <button type="button" id="vg-camera-toggle" class="vg-btn vg-btn-secondary">
+            <span class="vg-btn-icon" aria-hidden="true">&#128247;</span>
+            <span id="vg-camera-btn-text">Scan QR with camera</span>
+          </button>
+          <button type="submit" name="action" value="open" class="vg-btn vg-btn-primary" id="btn-check-open">
+            Check ticket &amp; open barrier
+          </button>
+        </div>
+
+        <!-- Passage Confirmation Actions (When Gate Is Open) -->
+        {% if gate_open %}
+          <div class="vg-pass-actions" id="vg-pass-actions-box">
+            <input type="hidden" name="permit" id="vg-permit-input" value="{{ permit }}">
+            <div class="vg-permit-banner" id="vg-permit-timer" role="status">
+              Barrier is OPEN. Authorization permit valid for <span id="vg-timer-seconds">120</span>s.
+            </div>
+            <p class="vg-pass-note">
+              Re-checks ticket status, deadlines, and facility capacity atomically at passage confirmation before recording vehicle movement.
+            </p>
+            <div class="vg-pass-buttons">
+              <button type="submit" name="action" value="pass" class="vg-btn vg-btn-success" id="vg-pass">
+                Vehicle passed &mdash; close barrier
+              </button>
+              <button type="submit" name="action" value="close" class="vg-btn vg-btn-secondary" id="vg-close">
+                Close without passage
+              </button>
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- Exit Settlement Actions (When Balance Is Due) -->
+        {% if bill.balance_due and not gate_open and not passed %}
+          <div class="vg-settlement-actions" id="vg-settlement-box">
+            <div class="vg-alert vg-alert-warning">
+              <strong>Exit Payment Required:</strong> An outstanding balance of <strong>{{ bill.balance_due|floatformat:"0" }} KHR</strong> must be settled before opening the exit barrier.
+            </div>
+            <div class="vg-settlement-buttons">
+              <button type="submit" name="action" value="settle" class="vg-btn vg-btn-primary" onclick="document.getElementById('payment-provider-input').value='CASH';">
+                Record Cash Settlement ({{ bill.balance_due|floatformat:"0" }} KHR)
+              </button>
+              {% if demo_enabled %}
+                <button type="submit" name="action" value="settle" class="vg-btn vg-btn-secondary" onclick="document.getElementById('payment-provider-input').value='DEMO';">
+                  Simulate Demo Exit Payment ({{ bill.balance_due|floatformat:"0" }} KHR)
+                </button>
+              {% endif %}
+              <input type="hidden" name="payment_provider" id="payment-provider-input" value="CASH">
+            </div>
+            <p class="vg-settlement-alt">
+              Or open the <a href="{% url 'staff_gate_scanner' %}?zone_id={{ form.zone.value|default:reservation.parking_zone_id }}&token={{ reservation.ticket_code }}&mode=exit&return_to=virtual_gate" class="vg-inline-link">full staff payment terminal</a> to process external settlement and return here.
+            </p>
+          </div>
+        {% endif %}
+      </form>
+    </section>
+
+    <!-- Right Column: Animated Barrier & Live Telemetry -->
+    <section class="vg-panel vg-display-panel" aria-labelledby="heading-barrier-telemetry">
+      <div class="vg-panel-header">
+        <h2 id="heading-barrier-telemetry">Virtual Barrier &amp; Telemetry</h2>
+        <span class="vg-live-indicator" aria-label="System active"><span class="vg-live-dot"></span> LIVE</span>
+      </div>
+
+      <!-- Animated SVG / CSS Barrier Scene -->
+      <div class="vg-scene {% if gate_open %}is-open{% endif %} {% if passed %}is-passed{% endif %}" id="vg-scene-viewport" aria-label="Barrier simulation graphic">
+        <div class="vg-sky"></div>
+        <div class="vg-road">
+          <div class="vg-road-curb left"></div>
+          <div class="vg-road-lane"></div>
+          <div class="vg-road-curb right"></div>
+        </div>
+        <div class="vg-machine">
+          <div class="vg-light" id="vg-beacon-light" title="Status light"></div>
+          <span class="vg-machine-label">SOMPARK</span>
+        </div>
+        <div class="vg-arm" id="vg-barrier-arm">
+          <div class="vg-arm-stripe"></div>
+        </div>
+        <div class="vg-car" id="vg-vehicle-object" title="Vehicle on sensor">
+          <div class="vg-car-windshield"></div>
+          <div class="vg-car-roof"></div>
+        </div>
+      </div>
+
+      <!-- High-Contrast LED Gate Status Display -->
+      <div class="vg-status-indicator {% if gate_open %}status-open{% elif passed %}status-passed{% else %}status-closed{% endif %}" id="vg-gate-status-banner">
+        <span class="vg-status-dot" aria-hidden="true"></span>
+        <span class="vg-status-text" id="vg-status-text">
+          {% if gate_open %}
+            BARRIER OPEN &mdash; WAITING FOR VEHICLE
+          {% elif passed %}
+            VEHICLE PASSAGE CONFIRMED &mdash; BARRIER CLOSED
+          {% else %}
+            BARRIER CLOSED
+          {% endif %}
+        </span>
+      </div>
+
+      <!-- Operational Notice Message -->
+      {% if notice %}
+        <div class="vg-notice {% if gate_open or passed %}is-success{% else %}is-info{% endif %}" role="status">
+          {{ notice }}
+        </div>
+      {% endif %}
+
+      <!-- Ticket & Reservation Details -->
+      {% if reservation %}
+        <div class="vg-telemetry-card">
+          <h3 class="vg-telemetry-heading">Reservation Record #{{ reservation.ticket_code }}</h3>
+          <dl class="vg-details-grid">
+            <dt>Ticket Code</dt>
+            <dd><span class="vg-code-badge">{{ reservation.ticket_code }}</span></dd>
+
+            <dt>Vehicle Plate</dt>
+            <dd><span class="vg-plate-badge">{{ reservation.plate_number }}</span></dd>
+
+            <dt>Parking Facility</dt>
+            <dd><strong>{{ reservation.parking_zone.name }}</strong> ({{ reservation.parking_zone.district }})</dd>
+
+            <dt>Reservation Status</dt>
+            <dd>
+              {% if reservation.status == 'CHECKED_IN' %}
+                <span class="vg-badge badge-green">PARKED IN SESSION ({{ reservation.get_status_display }})</span>
+              {% elif reservation.status == 'CONFIRMED' %}
+                <span class="vg-badge badge-blue">HOLD CONFIRMED ({{ reservation.get_status_display }})</span>
+              {% elif reservation.status == 'CHECKED_OUT' %}
+                <span class="vg-badge badge-muted">CHECKED OUT ({{ reservation.get_status_display }})</span>
+              {% elif reservation.status == 'EXPIRED' %}
+                <span class="vg-badge badge-red">EXPIRED</span>
+              {% elif reservation.status == 'CANCELLED' %}
+                <span class="vg-badge badge-red">CANCELLED</span>
+              {% else %}
+                <span class="vg-badge">{{ reservation.get_status_display }}</span>
+              {% endif %}
+            </dd>
+
+            <dt>Payment Policy &amp; Status</dt>
+            <dd>
+              <strong>{{ reservation.get_payment_method_display }}</strong> &middot;
+              {% if reservation.payment_status == 'PAID' %}
+                <span class="vg-badge badge-green">PAID</span>
+              {% elif reservation.payment_status == 'PARTIALLY_PAID' %}
+                <span class="vg-badge badge-blue">PARTIALLY PAID</span>
+              {% else %}
+                <span class="vg-badge badge-amber">UNPAID</span>
+              {% endif %}
+            </dd>
+
+            <dt>Booked Window</dt>
+            <dd>{{ reservation.start_time|date:"H:i, d M Y" }} &rarr; {{ reservation.finish_time|date:"H:i, d M Y" }}</dd>
+
+            {% if reservation.payment_method == 'PAY_AT_EXIT' and reservation.arrival_deadline %}
+              <dt>Arrival Deadline</dt>
+              <dd>
+                <strong>{{ reservation.arrival_deadline|date:"H:i, d M Y" }}</strong>
+                {% if now > reservation.arrival_deadline and reservation.status != 'CHECKED_IN' %}
+                  <span class="vg-badge badge-red">EXPIRED</span>
+                {% else %}
+                  <span class="vg-badge badge-blue">ACTIVE HOLD</span>
+                {% endif %}
+              </dd>
+            {% endif %}
+
+            {% if reservation.checked_in_at %}
+              <dt>Checked In</dt>
+              <dd>{{ reservation.checked_in_at|date:"H:i:s, d M Y" }}</dd>
+            {% endif %}
+
+            {% if reservation.checked_out_at %}
+              <dt>Checked Out</dt>
+              <dd>{{ reservation.checked_out_at|date:"H:i:s, d M Y" }}</dd>
+            {% endif %}
+
+            {% if reservation.exit_authorized_until %}
+              <dt>Departure Window</dt>
+              <dd>Authorized until <strong>{{ reservation.exit_authorized_until|date:"H:i:s" }}</strong></dd>
+            {% endif %}
+          </dl>
+
+          <!-- Itemized Exit Bill Breakdown -->
+          {% if bill %}
+            <div class="vg-bill-box">
+              <h4 class="vg-bill-title">Itemized Exit Billing Breakdown (KHR / ៛)</h4>
+              <div class="vg-bill-row">
+                <span>Normal Parking Duration ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }} @ {{ bill.daily_rate|floatformat:"0" }} KHR):</span>
+                <strong>{{ bill.normal_charge|floatformat:"0" }} KHR</strong>
+              </div>
+
+              {% if bill.overstay_days > 0 %}
+                <div class="vg-bill-row vg-overstay-row">
+                  <span>Overstay Duration ({{ bill.overstay_days }} day{{ bill.overstay_days|pluralize }} @ {{ bill.overstay_rate|floatformat:"0" }} KHR &mdash; 2&times; daily rate):</span>
+                  <strong style="color: #dc2626;">+{{ bill.overstay_charge|floatformat:"0" }} KHR</strong>
+                </div>
+              {% endif %}
+
+              <div class="vg-bill-row vg-subtotal-row">
+                <span>Total Parking Charges:</span>
+                <strong>{{ bill.total_charge|floatformat:"0" }} KHR</strong>
+              </div>
+
+              {% if bill.deposit_paid > 0 %}
+                <div class="vg-bill-row vg-credit-row">
+                  <span>Deposit Credited:</span>
+                  <strong>-{{ bill.deposit_paid|floatformat:"0" }} KHR</strong>
+                </div>
+              {% endif %}
+
+              {% if bill.balance_paid > 0 %}
+                <div class="vg-bill-row vg-credit-row">
+                  <span>Exit Payments Recorded:</span>
+                  <strong>-{{ bill.balance_paid|floatformat:"0" }} KHR</strong>
+                </div>
+              {% endif %}
+
+              <div class="vg-bill-row vg-balance-row">
+                <span>Remaining Balance Due:</span>
+                <strong class="vg-balance-amount {% if bill.balance_due == 0 %}is-zero{% endif %}">
+                  {{ bill.balance_due|floatformat:"0" }} KHR
+                </strong>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="vg-idle-box">
+          <p class="vg-idle-title">Terminal in Standby</p>
+          <p class="vg-idle-desc">Select a facility, choose Entrance or Exit mode, and scan or type a ticket code to inspect reservation details.</p>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+
+<script src="{% static 'js/virtual-gate.js' %}" defer></script>
+{% endblock %}

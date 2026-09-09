@@ -1,0 +1,26 @@
+{% extends "admin/index.html" %}
+{% load i18n static %}
+
+{% block content %}
+<div class="module" id="virtual-gate-operations-module" style="margin-bottom: 24px; border-left: 5px solid var(--primary, #eb891e); box-shadow: 0 1px 3px rgba(0,0,0,0.08); background: var(--darkened-bg, #f8f8f8);">
+  <h2 style="background: var(--primary, #eb891e); color: var(--primary-fg, #fff); font-weight: 700; letter-spacing: 0.02em;">
+    Gate Hardware Simulator · Terminal Operations
+  </h2>
+  <div style="padding: 16px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px;">
+    <div style="flex: 1 1 320px; min-width: 0;">
+      <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: 700; color: var(--body-fg, #333);">
+        Virtual Parking Gate Attendant Terminal
+      </p>
+      <p style="margin: 0; font-size: 13px; line-height: 1.5; color: var(--body-quiet-color, #666);">
+        Simulate physical barrier arm operations for Entrance and Exit. Inspect QR access tokens, re-check capacity and arrival deadlines, verify 2× overstay billing, and record vehicle passage with atomic inventory updates.
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'admin_virtual_gate' %}" class="button default" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+        <span>Open Virtual Parking Gate &rarr;</span>
+      </a>
+    </div>
+  </div>
+</div>
+{{ block.super }}
+{% endblock %}

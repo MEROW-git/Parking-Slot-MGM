@@ -3,12 +3,14 @@ from django.urls import path
 from source import views as source_views
 from parking_zones import views as pz_views
 from users import views as user_views
+from parking_zones.gate_machine import virtual_gate
 
 admin.site.site_header = 'SomPark Phnom Penh Administration (រដ្ឋបាល SomPark)'
 admin.site.site_title = 'SomPark Admin'
 admin.site.index_title = 'Smart Parking Operations Dashboard'
 
 urlpatterns = [
+    path('admin/virtual-gate/', admin.site.admin_view(virtual_gate), name='admin_virtual_gate'),
     path('admin/', admin.site.urls),
 
     # Core Source Views

@@ -293,8 +293,15 @@ class GateService:
         if reservation.status == 'PAYMENT_PENDING':
             return False, reservation, 'First-day deposit payment is still pending. Ticket not activated.'
 
+        if now < reservation.effective_start_time:
+            return False, reservation, 'The booked arrival window has not started yet.'
+        if now >= reservation.effective_finish_time:
+            return False, reservation, 'The booked arrival window has ended.'
+        if reservation.payment_method == 'DEPOSIT' and reservation.deposit_amount < reservation.daily_rate:
+            return False, reservation, 'First-day deposit has not been recorded.'
+
         # Enforce 3-hour arrival deadline for unpaid holds
-        if reservation.payment_method == 'PAY_AT_EXIT' and reservation.arrival_deadline and now > reservation.arrival_deadline:
+        if reservation.payment_method == 'PAY_AT_EXIT' and reservation.arrival_deadline and now >= reservation.arrival_deadline:
             reservation.status = 'EXPIRED'
             reservation.save(update_fields=['status'])
             return False, reservation, 'The 3-hour arrival window for this unpaid booking has expired.'
@@ -319,6 +326,10 @@ class GateService:
 
         if reservation.status != 'CONFIRMED':
             return False, reservation, f'Cannot check in reservation with status: {reservation.status}.'
+
+        allowed, _, message = GateService.validate_entry(reservation.ticket_code, zone.pk)
+        if not allowed:
+            return False, reservation, message
 
         # Atomic check-in
         reservation.status = 'CHECKED_IN'

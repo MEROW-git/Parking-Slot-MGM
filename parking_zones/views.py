@@ -402,6 +402,9 @@ def staff_gate_action(request):
         else:
             messages.info(request, 'No outstanding balance due. Departure authorized.')
 
+        return_to = request.POST.get('return_to') or request.GET.get('return_to')
+        if return_to == 'virtual_gate':
+            return redirect(f"{reverse('admin_virtual_gate')}?zone={reservation.parking_zone_id}&mode=exit&code={reservation.ticket_code}")
         return redirect(f"{redirect('staff_gate_scanner').url}?token={reservation.ticket_code}&mode=exit")
 
     # Handle physical gate exit completion
@@ -412,6 +415,9 @@ def staff_gate_action(request):
             messages.success(request, msg)
         else:
             messages.error(request, msg)
+        return_to = request.POST.get('return_to') or request.GET.get('return_to')
+        if return_to == 'virtual_gate' and reservation:
+            return redirect(f"{reverse('admin_virtual_gate')}?zone={reservation.parking_zone_id}&mode=exit&code={reservation.ticket_code}")
         return redirect('staff_gate_scanner')
 
     messages.error(request, 'Invalid gate operation requested.')
@@ -423,7 +429,7 @@ def staff_gate_action(request):
 def checkout(request):
     """
     Customer checkout action.
-    Routes to gate preparation/bill view instead of arbitrary unverified release.
+    Validates ticket ownership, enforces settlement, and authorizes exit.
     """
     ticket_code = request.POST.get('ticket_code', '').strip()
     if ticket_code and Reservation.objects.filter(ticket_code=ticket_code).exclude(customer=request.user).exists() and not request.user.is_staff:
@@ -436,6 +442,23 @@ def checkout(request):
     if reservation.checked_out or reservation.status == 'CHECKED_OUT':
         messages.info(request, 'This parking ticket is already checked out.')
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    if reservation.status == 'CHECKED_IN':
+        bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
+        now = timezone.now()
+        if bill['balance_due'] > 0 and not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
+            messages.error(
+                request,
+                f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before checkout. Please present your pass at the gate barrier.'
+            )
+            return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+        success, reservation, msg = GateService.confirm_physical_exit(reservation.pk, staff_user=request.user if request.user.is_staff else None)
+        if success:
+            messages.success(request, msg)
+        else:
+            messages.error(request, msg)
+        return redirect('dashboard')
 
     with transaction.atomic():
         zone = ParkingZone.objects.select_for_update().get(id=reservation.parking_zone_id)
@@ -473,6 +496,23 @@ def admin_checkout(request):
             request,
             f'Ticket #{reservation.ticket_code} ({reservation.plate_number}) has already checked out. Occupancy unchanged.'
         )
+        return redirect('admin_dashboard')
+
+    if reservation.status == 'CHECKED_IN':
+        bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
+        now = timezone.now()
+        if bill['balance_due'] > 0 and not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
+            messages.error(
+                request,
+                f'Cannot check out ticket #{reservation.ticket_code}. Outstanding balance of {bill["balance_due"]:,} KHR must be settled before exit.'
+            )
+            return redirect('admin_dashboard')
+
+        success, reservation, msg = GateService.confirm_physical_exit(reservation.pk, staff_user=request.user)
+        if success:
+            messages.success(request, msg)
+        else:
+            messages.error(request, msg)
         return redirect('admin_dashboard')
 
     with transaction.atomic():
