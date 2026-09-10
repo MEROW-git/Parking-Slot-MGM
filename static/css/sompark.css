@@ -4170,6 +4170,280 @@ code {
   background: var(--color-paper-3);
 }
 
+/* ==========================================================================
+   Google Maps InfoWindow & Custom Popup Styling
+   ========================================================================== */
+
+/* Remove Google Maps empty header row so content starts cleanly at the top */
+.gm-style .gm-style-iw-chr,
+.gm-style .gm-style-iw-ch {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  z-index: 15 !important;
+}
+
+.gm-style .gm-style-iw {
+  padding: 0 !important;
+}
+
+/* Outer InfoWindow Container */
+.gm-style .gm-style-iw-c {
+  background-color: #121927 !important;
+  color: #f8fafc !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.gm-style .gm-style-iw-d {
+  overflow: hidden !important;
+  max-height: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* InfoWindow Tail / Triangle */
+.gm-style .gm-style-iw-tc::after {
+  background-color: #121927 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+/* InfoWindow Close Button ("X") aligned cleanly in top-right corner */
+.gm-style button.gm-ui-hover-effect {
+  position: absolute !important;
+  top: 10px !important;
+  right: 10px !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0.85 !important;
+  transition: all 0.2s ease !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 20 !important;
+}
+
+.gm-style button.gm-ui-hover-effect:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  opacity: 1 !important;
+  transform: scale(1.08);
+}
+
+.gm-style button.gm-ui-hover-effect span {
+  background-color: #ffffff !important;
+  margin: 0 !important;
+}
+
+/* SomPark InfoWindow Inner Card */
+.sp-infowindow {
+  width: 285px;
+  padding: 12px 14px 14px 14px;
+  font-family: var(--font-body, "Plus Jakarta Sans", sans-serif);
+  color: var(--color-ink, #f8fafc);
+  box-sizing: border-box;
+}
+
+.sp-iw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding-right: 32px; /* Leaves clear space for the close button */
+  min-height: 22px;
+}
+
+.sp-iw-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sp-iw-district {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent, #f97316);
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.sp-iw-hours {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.sp-iw-title {
+  margin: 0 0 3px 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.sp-iw-khmer {
+  font-family: var(--font-khmer, "Noto Sans Khmer", sans-serif);
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+
+.sp-iw-address {
+  margin: 0 0 12px 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.35;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.sp-iw-pin-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-accent, #f97316);
+}
+
+/* Meta Bar: Availability & Price */
+.sp-iw-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+
+.sp-iw-avail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sp-iw-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.sp-iw-avail.sp-avail-available {
+  color: #10b981;
+}
+.sp-iw-avail.sp-avail-available .sp-iw-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.sp-iw-avail.sp-avail-limited {
+  color: #f59e0b;
+}
+.sp-iw-avail.sp-avail-limited .sp-iw-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.sp-iw-avail.sp-avail-full {
+  color: #ef4444;
+}
+.sp-iw-avail.sp-avail-full .sp-iw-dot {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+.sp-iw-price {
+  text-align: right;
+}
+
+.sp-iw-amount {
+  font-family: var(--font-outlier, "Barlow Condensed", sans-serif);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+}
+
+/* Action Buttons */
+.sp-iw-actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.sp-iw-btn {
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s ease-out;
+  box-sizing: border-box;
+}
+
+.sp-iw-btn-book {
+  flex: 1;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35);
+  border: none;
+}
+
+.sp-iw-btn-book:hover {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.45);
+}
+
+.sp-iw-btn-disabled {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: #64748b !important;
+  cursor: not-allowed;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sp-iw-btn-details {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding-inline: 12px;
+}
+
+.sp-iw-btn-details:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
 /* Map Fallback Directory */
 .sp-map-fallback {
   padding: 1.75rem;

@@ -180,23 +180,36 @@
 
       var statusText = zone.availability_status === 'full'
         ? 'Currently Full (ពេញ)'
-        : zone.vacant_slots + ' / ' + zone.num_of_slots + ' Spaces Available';
+        : zone.vacant_slots + ' / ' + zone.num_of_slots + ' Spaces Free';
 
       var infoContent = [
-        '<div class="sp-infowindow" style="padding: 0.5rem; font-family: system-ui, -apple-system, sans-serif; color: #1e293b;">',
-        '  <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 2px;">' + (zone.district || 'Phnom Penh') + '</div>',
-        '  <h4 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; line-height: 1.2;">' + zone.name + '</h4>',
-        zone.khmer_name ? '  <div style="font-size: 0.85rem; color: #475569; margin-bottom: 6px;">' + zone.khmer_name + '</div>' : '',
-        '  <p style="margin: 0 0 8px 0; font-size: 0.82rem; color: #64748b;">' + zone.address + '</p>',
-        '  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 6px 8px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">',
-        '    <span style="font-size: 0.82rem; font-weight: 700; color: ' + statusBadgeColor + ';">● ' + statusText + '</span>',
-        '    <span style="font-size: 0.85rem; font-weight: 800; color: #0f172a;">' + zone.price_formatted + '</span>',
+        '<div class="sp-infowindow">',
+        '  <div class="sp-iw-header">',
+        '    <div class="sp-iw-tags">',
+        '      <span class="sp-iw-district">' + (zone.district || 'Phnom Penh') + '</span>',
+        '      <span class="sp-iw-hours">' + (zone.operating_hours || '24/7 Access') + '</span>',
+        '    </div>',
         '  </div>',
-        '  <div style="display: flex; gap: 6px;">',
+        '  <h4 class="sp-iw-title">' + zone.name + '</h4>',
+        zone.khmer_name ? '  <div class="sp-iw-khmer">' + zone.khmer_name + '</div>' : '',
+        '  <p class="sp-iw-address">',
+        '    <svg class="sp-iw-pin-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+        '    <span>' + zone.address + '</span>',
+        '  </p>',
+        '  <div class="sp-iw-meta-bar">',
+        '    <div class="sp-iw-avail sp-avail-' + zone.availability_status + '">',
+        '      <span class="sp-iw-dot"></span>',
+        '      <span class="sp-iw-avail-text">' + statusText + '</span>',
+        '    </div>',
+        '    <div class="sp-iw-price">',
+        '      <span class="sp-iw-amount">' + zone.price_formatted + '</span>',
+        '    </div>',
+        '  </div>',
+        '  <div class="sp-iw-actions">',
         zone.availability_status !== 'full'
-          ? '    <a href="' + zone.book_url + '" class="sp-btn sp-btn-primary" style="flex: 1; text-align: center; text-decoration: none; padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; background: #ea580c; color: #ffffff; font-weight: 700; display: inline-block;">Reserve Spot (កក់) →</a>'
-          : '    <span style="flex: 1; text-align: center; padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; background: #e2e8f0; color: #94a3b8; font-weight: 700; display: inline-block;">Zone Full (ពេញ)</span>',
-        '    <a href="' + zone.detail_url + '" class="sp-btn sp-btn-secondary" style="text-align: center; text-decoration: none; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; background: #f1f5f9; color: #334155; font-weight: 600; border: 1px solid #cbd5e1; display: inline-block;">Info</a>',
+          ? '    <a href="' + zone.book_url + '" class="sp-iw-btn sp-iw-btn-book"><span>Reserve Spot (កក់)</span> <span class="sp-iw-arrow">&rarr;</span></a>'
+          : '    <span class="sp-iw-btn sp-iw-btn-disabled">Zone Full (ពេញ)</span>',
+        '    <a href="' + zone.detail_url + '" class="sp-iw-btn sp-iw-btn-details">Details</a>',
         '  </div>',
         '</div>'
       ].join('');
@@ -232,13 +245,33 @@
       icon: createPinIcon(zone.availability_status)
     });
 
+    var singleInfoContent = [
+      '<div class="sp-infowindow" style="width: 270px; padding: 14px 16px;">',
+      '  <div class="sp-iw-header">',
+      '    <div class="sp-iw-tags">',
+      '      <span class="sp-iw-district">' + (zone.district || 'Phnom Penh') + '</span>',
+      '    </div>',
+      '  </div>',
+      '  <h4 class="sp-iw-title">' + zone.name + '</h4>',
+      zone.khmer_name ? '  <div class="sp-iw-khmer">' + zone.khmer_name + '</div>' : '',
+      '  <p class="sp-iw-address">',
+      '    <svg class="sp-iw-pin-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+      '    <span>' + zone.address + '</span>',
+      '  </p>',
+      '  <div class="sp-iw-meta-bar" style="margin-bottom:0;">',
+      '    <div class="sp-iw-avail sp-avail-' + zone.availability_status + '">',
+      '      <span class="sp-iw-dot"></span>',
+      '      <span class="sp-iw-avail-text">' + zone.vacant_slots + ' / ' + zone.num_of_slots + ' Vacant</span>',
+      '    </div>',
+      '    <div class="sp-iw-price">',
+      '      <span class="sp-iw-amount">' + zone.price_formatted + '</span>',
+      '    </div>',
+      '  </div>',
+      '</div>'
+    ].join('');
+
     var infoWindow = new google.maps.InfoWindow({
-      content: [
-        '<div style="padding: 6px; font-family: system-ui, sans-serif;">',
-        '  <strong style="font-size: 1rem; color: #0f172a;">' + zone.name + '</strong>',
-        '  <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #64748b;">' + zone.address + '</p>',
-        '</div>'
-      ].join('')
+      content: singleInfoContent
     });
 
     marker.addListener('click', function () {

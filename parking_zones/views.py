@@ -20,7 +20,7 @@ from .forms import ReservationForm
 from .services import BillingService, CapacityService, PaymentService, GateService, ExpiryService, AntiSpamService
 from .qr import generate_access_qr_base64, render_access_qr_response, generate_demo_payment_qr_base64
 from .payments import DemoPaymentAdapter
-from .ai import check_ai_rate_limit, GeminiService
+from .ai import check_ai_rate_limit, sanitize_input, GeminiService
 
 
 def staff_required(view_func):
@@ -1040,7 +1040,9 @@ def ai_parking_assistant(request):
     - Limits queries to 5 requests per user per minute to control API costs.
     - Caps user query length at 500 characters.
     - Scrubs customer PII (phone numbers, license plates, QR tokens) before sending to Gemini.
-    - Returns AI recommendations with live zone availability and direct booking links.
+    - Maintains short, session-scoped conversation context with strict privacy filtering.
+    - Ranks parking by verified proximity or prompts for landmarks if location is unresolved.
+    - Returns AI recommendations with live zone availability, KHR rates, and direct booking links.
     """
     # 1. Rate limiting check (max 5 requests per minute per user)
     if not check_ai_rate_limit(request.user.id, max_requests=5, window_seconds=60):
@@ -1049,6 +1051,11 @@ def ai_parking_assistant(request):
             'code': 'RATE_LIMIT_EXCEEDED',
             'message': 'Rate limit reached (max 5 requests per minute). Please wait a moment before asking again.'
         }, status=429)
+
+    # Check if user requested to clear session conversation history
+    if request.POST.get('clear_history') == 'true':
+        request.session['sp_ai_history'] = []
+        request.session.modified = True
 
     # 2. Input validation & length cap
     raw_query = request.POST.get('query', '').strip()
@@ -1066,7 +1073,10 @@ def ai_parking_assistant(request):
             'message': 'Query exceeds maximum allowed length of 500 characters.'
         }, status=400)
 
-    # 3. Fetch live available zones with non-sensitive metadata
+    # 3. Retrieve session conversation context (max 6 items / 3 turns)
+    conversation_history = request.session.get('sp_ai_history', [])
+
+    # 4. Fetch live available zones with complete spatial coordinates
     zones = ParkingZone.objects.filter(vacant_slots__gt=0).order_by('-vacant_slots', 'price')
     available_zones_data = []
     for z in zones:
@@ -1077,23 +1087,43 @@ def ai_parking_assistant(request):
             'slug': z.slug,
             'address': z.address,
             'district': z.district,
+            'latitude': z.latitude,
+            'longitude': z.longitude,
             'price': z.price,
             'price_formatted': z.price_khr_formatted,
             'vacant_slots': z.vacant_slots,
             'num_of_slots': z.num_of_slots,
+            'availability_status': z.availability_status,
+            'is_full': z.is_full,
             'operating_hours': z.operating_hours,
             'book_url': reverse('book') + f'?zone={z.slug}',
             'detail_url': reverse('zone_detail', kwargs={'slug': z.slug}),
         })
 
-    # 4. Call Gemini service (safely scrubs PII inside service)
-    result = GeminiService.recommend_parking(raw_query, available_zones_data)
+    # 5. Call Gemini service (safely resolves location, scrubs PII, ranks proximity)
+    result = GeminiService.recommend_parking(
+        user_query=raw_query,
+        available_zones=available_zones_data,
+        conversation_history=conversation_history
+    )
 
     if result.get('success'):
+        # Update session-scoped conversation history with privacy scrubbing
+        clean_user_turn = sanitize_input(raw_query)
+        clean_model_turn = sanitize_input(result.get('recommendation', ''))
+        conversation_history.append({"role": "user", "text": clean_user_turn})
+        conversation_history.append({"role": "model", "text": clean_model_turn})
+        request.session['sp_ai_history'] = conversation_history[-6:]
+        request.session.modified = True
+
         return JsonResponse({
             'status': 'success',
             'recommendation': result.get('recommendation', ''),
-            'zones': available_zones_data[:4]
+            'zones': result.get('zones', available_zones_data[:4]),
+            'location_resolved': result.get('location_resolved', False),
+            'resolved_location': result.get('resolved_location'),
+            'truncated': result.get('truncated', False),
+            'finish_reason': result.get('finish_reason', 'STOP')
         })
     else:
         # Graceful fallback response
@@ -1101,6 +1131,11 @@ def ai_parking_assistant(request):
             'status': 'fallback',
             'code': result.get('reason', 'FALLBACK'),
             'recommendation': result.get('message', 'AI assistant is currently unavailable. Here are top parking options:'),
-            'zones': available_zones_data[:4]
+            'zones': result.get('zones', available_zones_data[:4]),
+            'location_resolved': result.get('location_resolved', False),
+            'resolved_location': result.get('resolved_location'),
+            'truncated': False,
+            'finish_reason': 'ERROR'
         })
+
 

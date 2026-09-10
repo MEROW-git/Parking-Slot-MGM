@@ -181,7 +181,7 @@
 
 {% block extra_scripts %}
   {% load static %}
-  <script src="{% static 'js/sompark-map.js' %}"></script>
+  <script src="{% static 'js/sompark-map.js' %}?v={{ ASSET_VERSION|default:'1.4.0' }}"></script>
   {% if google_maps_api_key %}
     <script async defer
       src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initSomParkMap"

@@ -146,11 +146,15 @@
 
       <div id="ai-response-container" class="sp-ai-response" style="display:none;" aria-live="polite">
         <div class="sp-ai-response-bubble">
-          <div class="sp-ai-response-meta">
-            <strong style="color:var(--color-accent);">SomPark Assistant</strong>
-            <span id="ai-response-time" style="font-size:0.75rem; color:var(--color-muted);">Just now</span>
+          <div class="sp-ai-response-meta" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong style="color:var(--color-accent);">SomPark Assistant</strong>
+              <span id="ai-response-time" style="font-size:0.75rem; color:var(--color-muted); margin-left:0.5rem;">Just now</span>
+            </div>
+            <button type="button" id="btn-clear-ai" class="sp-btn sp-btn-secondary sp-btn-sm" style="font-size:0.72rem; padding:0.2rem 0.5rem; line-height:1.2;">New Question</button>
           </div>
-          <div id="ai-response-text" class="sp-ai-text"></div>
+          <div id="ai-response-text" class="sp-ai-text" style="margin-top:0.4rem;"></div>
+          <div id="ai-verified-zones" class="sp-ai-zones-container" style="display:none; margin-top:0.85rem;"></div>
         </div>
       </div>
     {% else %}
@@ -200,7 +204,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{% static 'js/sompark-map.js' %}"></script>
+  <script src="{% static 'js/sompark-map.js' %}?v={{ ASSET_VERSION|default:'1.4.0' }}"></script>
   {% if google_maps_api_key %}
     <script async defer
       src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initSomParkMap"
@@ -228,6 +232,197 @@
       var btnSpinner = document.getElementById('ai-btn-spinner');
       var resContainer = document.getElementById('ai-response-container');
       var resText = document.getElementById('ai-response-text');
+      var verifiedZonesContainer = document.getElementById('ai-verified-zones');
+      var btnClear = document.getElementById('btn-clear-ai');
+      var timeEl = document.getElementById('ai-response-time');
+
+      // Safe DOM renderer for AI text - avoids raw innerHTML
+      function renderAiTextSafe(container, text, isError) {
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+        if (isError) {
+          var errSpan = document.createElement('span');
+          errSpan.style.color = 'var(--color-accent)';
+          errSpan.style.fontWeight = '600';
+          errSpan.textContent = text || 'An error occurred while connecting to the assistant.';
+          container.appendChild(errSpan);
+          return;
+        }
+
+        var lines = (text || '').split('\n');
+        lines.forEach(function(line) {
+          var trimmed = line.trim();
+          if (!trimmed) return;
+          var p = document.createElement('p');
+          p.textContent = trimmed;
+          p.style.margin = '0 0 0.55rem 0';
+          p.style.lineHeight = '1.55';
+          p.style.fontSize = '0.92rem';
+          p.style.color = 'var(--color-ink-2)';
+          container.appendChild(p);
+        });
+      }
+
+      // Safe renderer for verified facility cards
+      function renderVerifiedZoneCards(container, zones, locationResolved) {
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+        if (!zones || !zones.length) {
+          container.style.display = 'none';
+          return;
+        }
+
+        var heading = document.createElement('div');
+        heading.style.display = 'flex';
+        heading.style.alignItems = 'center';
+        heading.style.justifyContent = 'space-between';
+        heading.style.margin = '0.75rem 0 0.5rem 0';
+        heading.style.padding = '0.5rem 0 0.25rem 0';
+        heading.style.borderTop = '1px solid var(--color-border)';
+
+        var title = document.createElement('span');
+        title.style.fontSize = '0.85rem';
+        title.style.fontWeight = '700';
+        title.style.color = 'var(--color-ink)';
+        title.textContent = locationResolved ? '📍 Verified Nearby Facilities:' : '🏢 Available Phnom Penh Facilities:';
+        heading.appendChild(title);
+        container.appendChild(heading);
+
+        var grid = document.createElement('div');
+        grid.className = 'sp-ai-cards-grid';
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
+        grid.style.gap = '0.75rem';
+
+        zones.forEach(function(zone) {
+          var card = document.createElement('div');
+          card.className = 'sp-ai-zone-card';
+          card.style.background = 'var(--color-surface)';
+          card.style.border = '1px solid var(--color-border)';
+          card.style.borderRadius = 'var(--radius-md)';
+          card.style.padding = '0.85rem 1rem';
+          card.style.display = 'flex';
+          card.style.flexDirection = 'column';
+          card.style.justifyContent = 'space-between';
+          card.style.gap = '0.5rem';
+
+          // Top row: name + status badge
+          var topRow = document.createElement('div');
+          topRow.style.display = 'flex';
+          topRow.style.justifyContent = 'space-between';
+          topRow.style.alignItems = 'flex-start';
+          topRow.style.gap = '0.5rem';
+
+          var nameWrap = document.createElement('div');
+          var nameEl = document.createElement('h5');
+          nameEl.style.margin = '0';
+          nameEl.style.fontSize = '0.95rem';
+          nameEl.style.color = 'var(--color-ink)';
+          nameEl.textContent = zone.name;
+          nameWrap.appendChild(nameEl);
+
+          if (zone.khmer_name) {
+            var khmerEl = document.createElement('span');
+            khmerEl.style.fontSize = '0.75rem';
+            khmerEl.style.color = 'var(--color-muted)';
+            khmerEl.style.display = 'block';
+            khmerEl.textContent = zone.khmer_name;
+            nameWrap.appendChild(khmerEl);
+          }
+          topRow.appendChild(nameWrap);
+
+          // Vacancy badge
+          var badge = document.createElement('span');
+          badge.style.fontSize = '0.75rem';
+          badge.style.fontWeight = '700';
+          badge.style.padding = '0.2rem 0.5rem';
+          badge.style.borderRadius = '100px';
+          badge.style.whiteSpace = 'nowrap';
+          if (zone.is_full || zone.vacant_slots <= 0) {
+            badge.style.background = 'rgba(239, 68, 68, 0.15)';
+            badge.style.color = '#ef4444';
+            badge.textContent = 'Full (0 free)';
+          } else if (zone.availability_status === 'limited') {
+            badge.style.background = 'rgba(245, 158, 11, 0.15)';
+            badge.style.color = '#f59e0b';
+            badge.textContent = zone.vacant_slots + ' spaces left';
+          } else {
+            badge.style.background = 'rgba(16, 185, 129, 0.15)';
+            badge.style.color = '#10b981';
+            badge.textContent = zone.vacant_slots + ' spaces free';
+          }
+          topRow.appendChild(badge);
+          card.appendChild(topRow);
+
+          // Middle: Distance (if resolved) and address
+          var metaWrap = document.createElement('div');
+          metaWrap.style.fontSize = '0.8rem';
+          metaWrap.style.color = 'var(--color-ink-2)';
+          metaWrap.style.display = 'flex';
+          metaWrap.style.flexDirection = 'column';
+          metaWrap.style.gap = '0.2rem';
+
+          if (zone.distance_km !== null && zone.distance_km !== undefined) {
+            var distEl = document.createElement('span');
+            distEl.style.color = 'var(--color-accent)';
+            distEl.style.fontWeight = '700';
+            distEl.textContent = '📍 ' + zone.distance_km + ' km away (' + (zone.resolved_from || 'target') + ')';
+            metaWrap.appendChild(distEl);
+          }
+
+          var locEl = document.createElement('span');
+          var addressText = zone.address || zone.district || '';
+          if (zone.district && zone.address && !zone.address.includes(zone.district)) {
+            addressText += ' · ' + zone.district;
+          }
+          locEl.textContent = addressText;
+          metaWrap.appendChild(locEl);
+          card.appendChild(metaWrap);
+
+          // Foot row: KHR price + reservation link
+          var footRow = document.createElement('div');
+          footRow.style.display = 'flex';
+          footRow.style.justifyContent = 'space-between';
+          footRow.style.alignItems = 'center';
+          footRow.style.marginTop = '0.35rem';
+          footRow.style.paddingTop = '0.5rem';
+          footRow.style.borderTop = '1px dashed var(--color-border)';
+
+          var priceEl = document.createElement('span');
+          priceEl.style.fontWeight = '800';
+          priceEl.style.color = 'var(--color-ink)';
+          priceEl.style.fontFamily = 'var(--font-outlier)';
+          priceEl.style.fontSize = '0.95rem';
+          priceEl.textContent = zone.price_formatted || (zone.price ? zone.price.toLocaleString() + ' ៛' : '');
+          footRow.appendChild(priceEl);
+
+          if (!zone.is_full && zone.vacant_slots > 0) {
+            var bookLink = document.createElement('a');
+            bookLink.href = zone.book_url || ('/book/?zone=' + zone.slug);
+            bookLink.className = 'sp-btn sp-btn-primary sp-btn-sm';
+            bookLink.style.padding = '0.3rem 0.75rem';
+            bookLink.style.fontSize = '0.78rem';
+            bookLink.textContent = 'Reserve Spot (កក់) →';
+            footRow.appendChild(bookLink);
+          } else {
+            var fullSpan = document.createElement('span');
+            fullSpan.className = 'sp-btn sp-btn-secondary sp-btn-sm';
+            fullSpan.style.opacity = '0.6';
+            fullSpan.style.padding = '0.3rem 0.75rem';
+            fullSpan.style.fontSize = '0.78rem';
+            fullSpan.style.cursor = 'not-allowed';
+            fullSpan.textContent = 'Full (ពេញ)';
+            footRow.appendChild(fullSpan);
+          }
+          card.appendChild(footRow);
+          grid.appendChild(card);
+        });
+
+        container.appendChild(grid);
+        container.style.display = 'block';
+      }
 
       // Quick prompt chip click handler
       var chips = document.querySelectorAll('.sp-chip');
@@ -238,6 +433,29 @@
         });
       });
 
+      // Clear / Reset Conversation Context handler
+      if (btnClear) {
+        btnClear.addEventListener('click', function() {
+          var csrfToken = (form.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+          var formData = new FormData();
+          formData.append('query', 'start new conversation');
+          formData.append('clear_history', 'true');
+          if (csrfToken) formData.append('csrfmiddlewaretoken', csrfToken);
+
+          fetch("{% url 'ai_parking_assistant' %}", {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          }).then(function() {
+            resContainer.style.display = 'none';
+            if (verifiedZonesContainer) verifiedZonesContainer.style.display = 'none';
+            input.value = '';
+            input.focus();
+          });
+        });
+      }
+
+      // Form submit handler
       form.addEventListener('submit', function(e) {
         e.preventDefault();
         var q = input.value.trim();
@@ -263,16 +481,27 @@
         })
         .then(function(result) {
           resContainer.style.display = 'block';
+          if (timeEl) timeEl.textContent = 'Just now';
+
           if (result.ok) {
-            resText.innerHTML = (result.data.recommendation || '').replace(/\n/g, '<br>');
+            renderAiTextSafe(resText, result.data.recommendation, false);
+            if (verifiedZonesContainer) {
+              renderVerifiedZoneCards(verifiedZonesContainer, result.data.zones, result.data.location_resolved);
+            }
           } else {
-            resText.innerHTML = '<span style="color:var(--color-accent);">' + (result.data.message || 'An error occurred.') + '</span>';
+            renderAiTextSafe(resText, result.data.message || 'An error occurred.', true);
+            if (verifiedZonesContainer) {
+              verifiedZonesContainer.style.display = 'none';
+            }
           }
           resContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         })
         .catch(function(err) {
           resContainer.style.display = 'block';
-          resText.innerHTML = '<span style="color:var(--color-accent);">Unable to connect to assistant. Please choose from available zones above.</span>';
+          renderAiTextSafe(resText, 'Unable to connect to assistant. Please choose from available zones above.', true);
+          if (verifiedZonesContainer) {
+            verifiedZonesContainer.style.display = 'none';
+          }
         })
         .finally(function() {
           btn.disabled = false;

@@ -52,6 +52,7 @@ def home(request):
             'availability_status': z.availability_status,
             'lat': coords['lat'],
             'lng': coords['lng'],
+            'operating_hours': getattr(z, 'operating_hours', '24/7 Access') or '24/7 Access',
             'book_url': reverse('book') + f'?zone={z.slug}',
             'detail_url': reverse('zone_detail', kwargs={'slug': z.slug}),
         })
