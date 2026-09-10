@@ -325,4 +325,181 @@ class VirtualGateTests(TestCase):
         self.assertIn('data-just-passed="true"', content)
         self.assertIn('vg-replay-animation', content)
 
+    # =========================================================================
+    # ANPR License Plate Camera Simulator Tests
+    # =========================================================================
+    def test_anpr_plate_normalization_function(self):
+        from .gate_machine import normalize_license_plate
+        self.assertEqual(normalize_license_plate('Phnom Penh 2AZ-1234'), 'PHNOMPENH2AZ1234')
+        self.assertEqual(normalize_license_plate('phnom penh  2az_1234.'), 'PHNOMPENH2AZ1234')
+        self.assertEqual(normalize_license_plate(' 2B-5555 '), '2B5555')
+        self.assertEqual(normalize_license_plate('2b 5555'), '2B5555')
+        self.assertEqual(normalize_license_plate(''), '')
+        self.assertEqual(normalize_license_plate(None), '')
+
+    def test_anpr_plate_match_allows_entry_barrier_to_open(self):
+        response = self.client.post(self.url, self.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['gate_open'])
+        self.assertTrue(response.context['plate_matched'])
+        self.assertEqual(response.context['detected_plate'], 'Phnom Penh 2AZ-1234')
+        self.assertEqual(response.context['expected_plate'], 'Phnom Penh 2AZ-1234')
+        self.assertIsNotNone(response.context['permit'])
+        content = response.content.decode()
+        self.assertIn('PLATE MATCH', content)
+        self.assertIn('Phnom Penh 2AZ-1234', content)
+
+    def test_anpr_plate_normalization_matches_varied_casing_and_hyphens(self):
+        # Detected plate with different spacing, hyphens, and casing
+        data = {
+            **self.data,
+            'detected_plate': 'phnom penh 2az 1234',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['plate_matched'])
+        self.assertTrue(response.context['gate_open'])
+        self.assertIsNotNone(response.context['permit'])
+
+    def test_anpr_plate_mismatch_denies_entry_and_keeps_barrier_closed(self):
+        # Simulate mismatch via developer checkbox and custom mismatch plate
+        data = {
+            **self.data,
+            'simulate_plate_mismatch': 'true',
+            'custom_detected_plate': '2X-9999',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['gate_open'])
+        self.assertFalse(response.context['plate_matched'])
+        self.assertEqual(response.context['detected_plate'], '2X-9999')
+        self.assertEqual(response.context['expected_plate'], 'Phnom Penh 2AZ-1234')
+        self.assertIsNone(response.context.get('permit'))
+
+        content = response.content.decode()
+        self.assertIn('PLATE MISMATCH', content)
+        self.assertIn('2X-9999', content)
+        self.assertIn('ANPR Plate Mismatch', response.context['notice'])
+
+        # Verify gate was not opened and reservation not checked in
+        self.reservation.refresh_from_db()
+        self.assertIsNone(self.reservation.checked_in_at)
+        self.assertEqual(self.zone.occupied_slots, 0)
+
+    def test_anpr_plate_mismatch_denies_exit_settlement(self):
+        self.reservation.status = 'CHECKED_IN'
+        self.reservation.checked_in_at = timezone.now() - timedelta(hours=1)
+        self.reservation.save()
+        self.zone.occupied_slots = 1
+        self.zone.save()
+
+        data = {
+            **self.data,
+            'mode': 'exit',
+            'action': 'settle',
+            'payment_provider': 'CASH',
+            'simulate_plate_mismatch': 'true',
+            'custom_detected_plate': '2X-9999',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['gate_open'])
+        self.assertFalse(response.context['plate_matched'])
+        self.assertEqual(response.context['detected_plate'], '2X-9999')
+        self.assertIn('ANPR Plate Mismatch', response.context['notice'])
+
+        # Reservation must remain checked in and unpaid
+        self.reservation.refresh_from_db()
+        self.assertEqual(self.reservation.status, 'CHECKED_IN')
+        self.assertEqual(self.zone.occupied_slots, 1)
+
+    def test_anpr_plate_result_preserved_during_three_step_exit_flow(self):
+        self.reservation.status = 'CHECKED_IN'
+        self.reservation.checked_in_at = timezone.now() - timedelta(hours=1)
+        self.reservation.save()
+        self.zone.occupied_slots = 1
+        self.zone.save()
+
+        data = {**self.data, 'mode': 'exit'}
+
+        # Step 1: Check ticket in exit mode
+        step1_resp = self.client.post(self.url, data)
+        self.assertEqual(step1_resp.status_code, 200)
+        self.assertTrue(step1_resp.context['plate_matched'])
+        self.assertEqual(step1_resp.context['detected_plate'], 'Phnom Penh 2AZ-1234')
+        self.assertFalse(step1_resp.context['gate_open'])  # Balance due 4000 KHR
+
+        # Step 2: Settle balance with preserved detected_plate
+        settle_data = {
+            **data,
+            'action': 'settle',
+            'payment_provider': 'CASH',
+            'detected_plate': step1_resp.context['detected_plate'],
+        }
+        step2_resp = self.client.post(self.url, settle_data)
+        self.assertEqual(step2_resp.status_code, 200)
+        self.assertTrue(step2_resp.context['plate_matched'])
+        self.assertEqual(step2_resp.context['detected_plate'], 'Phnom Penh 2AZ-1234')
+        self.assertTrue(step2_resp.context['gate_open'])
+        permit = step2_resp.context['permit']
+        self.assertIsNotNone(permit)
+
+        # Step 3: Passage confirmed with permit
+        pass_data = {
+            **data,
+            'action': 'pass',
+            'permit': permit,
+            'detected_plate': step2_resp.context['detected_plate'],
+        }
+        step3_resp = self.client.post(self.url, pass_data)
+        self.assertEqual(step3_resp.status_code, 200)
+        self.assertTrue(step3_resp.context['passed'])
+        self.assertFalse(step3_resp.context['gate_open'])
+
+        self.reservation.refresh_from_db()
+        self.assertEqual(self.reservation.status, 'CHECKED_OUT')
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.occupied_slots, 0)
+
+    def test_ui_anpr_camera_elements_and_direction_placement(self):
+        # 1. Entrance mode GET
+        resp_entry = self.client.get(f"{self.url}?mode=entry")
+        self.assertEqual(resp_entry.status_code, 200)
+        content_entry = resp_entry.content.decode()
+        self.assertIn('vg-anpr-camera-unit', content_entry)
+        self.assertIn('vg-anpr-beam', content_entry)
+        self.assertIn('vg-anpr-hud', content_entry)
+        self.assertIn('ANPR', content_entry)
+        self.assertIn('data-direction="entry"', content_entry)
+        self.assertIn('simulate_plate_mismatch', content_entry)
+        self.assertIn('custom_detected_plate', content_entry)
+        self.assertIn('ANPR SIMULATOR', content_entry)
+
+        # 2. Exit mode GET
+        resp_exit = self.client.get(f"{self.url}?mode=exit")
+        self.assertEqual(resp_exit.status_code, 200)
+        content_exit = resp_exit.content.decode()
+        self.assertIn('data-direction="exit"', content_exit)
+        self.assertIn('vg-anpr-camera-unit', content_exit)
+
+        # 3. CSS stylesheet checks for direction-based camera positioning and rotation
+        import os
+        css_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'css', 'virtual-gate.css')
+        with open(css_path, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+
+        self.assertIn('.vg-scene[data-direction="entry"] .vg-anpr-camera-unit', css_content)
+        self.assertIn('.vg-scene[data-direction="exit"] .vg-anpr-camera-unit', css_content)
+        self.assertIn('left: calc(50% + 115px);', css_content)
+        self.assertIn('.vg-car-plate', css_content)
+
+    def test_ui_virtual_car_displays_license_plate(self):
+        # Load reservation into virtual gate terminal
+        resp = self.client.get(f"{self.url}?zone={self.zone.pk}&code={self.reservation.ticket_code}&mode=entry")
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertIn('vg-car-plate', content)
+        self.assertIn('Phnom Penh 2AZ-1234', content)
+
+
 

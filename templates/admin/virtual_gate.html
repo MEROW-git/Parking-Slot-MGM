@@ -95,6 +95,32 @@
         </div>
         <p id="vg-camera-status" class="vg-camera-status" role="status" aria-live="polite"></p>
 
+        <!-- Developer Diagnostic Controls: ANPR License Plate Camera Simulator -->
+        <details class="vg-anpr-dev-panel" id="vg-anpr-dev-panel" {% if simulate_plate_mismatch or custom_detected_plate %}open{% endif %}>
+          <summary class="vg-anpr-dev-summary">
+            <span class="vg-anpr-dev-badge">ANPR SIMULATOR</span>
+            <span class="vg-anpr-dev-hint">Hardware Camera Simulator Diagnostic Overrides</span>
+          </summary>
+          <div class="vg-anpr-dev-body">
+            <p class="vg-anpr-disclaimer">
+              <strong>Hardware Camera Simulator:</strong> Simulates roadside optical ANPR recognition for barrier authorization testing. Does not connect to physical IP camera RTSP streams or perform server OCR.
+            </p>
+            <div class="vg-anpr-controls-row">
+              <label class="vg-checkbox-label">
+                <input type="checkbox" name="simulate_plate_mismatch" id="simulate-plate-mismatch-cb" value="true" {% if simulate_plate_mismatch %}checked{% endif %}>
+                <span><strong>Simulate plate mismatch</strong> (Enforce ANPR security rejection)</span>
+              </label>
+            </div>
+            <div class="vg-anpr-input-row">
+              <label for="custom-detected-plate-input">Custom camera detected plate (optional override):</label>
+              <input type="text" name="custom_detected_plate" id="custom-detected-plate-input" value="{{ custom_detected_plate|default:'' }}" placeholder="e.g. 2X-9999 or 2B-5555" class="vg-dev-input" autocomplete="off" spellcheck="false">
+              <span class="vg-dev-hint">Default is the reservation's registered plate (or 2X-9999 if mismatch is simulated).</span>
+            </div>
+            <!-- Retain detected plate across the entire 3-step exit payment and departure flow -->
+            <input type="hidden" name="detected_plate" id="vg-detected-plate-input" value="{{ detected_plate|default:'' }}">
+          </div>
+        </details>
+
         <!-- Standard Actions: Scan & Check Ticket (Hidden during active 3-step exit flow or after passage) -->
         <div class="vg-actions" id="vg-standard-actions" {% if form.mode.value == 'exit' and reservation %}style="display: none;"{% endif %}>
           <button type="button" id="vg-camera-toggle" class="vg-btn vg-btn-secondary">
@@ -333,8 +359,73 @@
         <div class="vg-arm" id="vg-barrier-arm">
           <div class="vg-arm-stripe"></div>
         </div>
+
+        <!-- Optical Roadside ANPR Camera Simulator (Repositioned and rotated by direction) -->
+        <div class="vg-anpr-camera-unit" id="vg-anpr-camera-unit" aria-label="Roadside ANPR License Plate Recognition Camera">
+          <div class="vg-anpr-scanning-beam" id="vg-anpr-beam" aria-hidden="true"></div>
+          <svg class="vg-anpr-svg" viewBox="0 0 46 80" width="46" height="80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="anpr-pole-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#334155" />
+                <stop offset="50%" stop-color="#64748b" />
+                <stop offset="100%" stop-color="#1e293b" />
+              </linearGradient>
+              <linearGradient id="anpr-housing-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#f8fafc" />
+                <stop offset="60%" stop-color="#cbd5e1" />
+                <stop offset="100%" stop-color="#94a3b8" />
+              </linearGradient>
+              <radialGradient id="anpr-lens-grad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="60%" stop-color="#0284c7" />
+                <stop offset="100%" stop-color="#0c4a6e" />
+              </radialGradient>
+            </defs>
+            <!-- Mounting Base Flange -->
+            <path d="M 14 74 L 32 74 L 35 78 L 11 78 Z" fill="#1e293b" />
+            <circle cx="16" cy="76" r="1" fill="#94a3b8" />
+            <circle cx="30" cy="76" r="1" fill="#94a3b8" />
+            <!-- Vertical Heavy-Duty Pole -->
+            <rect x="20" y="24" width="6" height="50" rx="1" fill="url(#anpr-pole-grad)" />
+            <!-- Adjustable Swivel Bracket -->
+            <circle cx="23" cy="24" r="4" fill="#475569" stroke="#1e293b" stroke-width="1" />
+            <rect x="18" y="21" width="10" height="4" rx="1" fill="#334155" />
+            <!-- Camera Weather Sunshield -->
+            <path d="M 6 11 L 36 7 L 38 12 L 8 16 Z" fill="#334155" />
+            <!-- Camera Enclosure Housing -->
+            <rect x="8" y="13" width="28" height="15" rx="3" fill="url(#anpr-housing-grad)" stroke="#475569" stroke-width="1" />
+            <!-- High-Contrast Front Glass Bezel -->
+            <rect x="6" y="14" width="6" height="13" rx="2" fill="#0f172a" />
+            <!-- Primary Optical Glass Lens -->
+            <circle cx="9" cy="20.5" r="4" fill="url(#anpr-lens-grad)" stroke="#0284c7" stroke-width="0.8" />
+            <circle cx="8" cy="19.5" r="1.2" fill="#ffffff" opacity="0.8" />
+            <!-- Infrared IR Night LEDs -->
+            <circle cx="7.5" cy="15.5" r="0.7" fill="#ef4444" />
+            <circle cx="10.5" cy="15.5" r="0.7" fill="#ef4444" />
+            <circle cx="7.5" cy="25.5" r="0.7" fill="#ef4444" />
+            <circle cx="10.5" cy="25.5" r="0.7" fill="#ef4444" />
+            <!-- Status LED -->
+            <circle id="vg-anpr-cam-led" cx="32" cy="16" r="1.5" fill="{% if plate_matched is True %}#10b981{% elif plate_matched is False %}#ef4444{% else %}#38bdf8{% endif %}" />
+            <!-- High-Contrast Clean ANPR Text Label -->
+            <text x="16" y="23" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="5.5" fill="#0f172a" letter-spacing="0.5">ANPR</text>
+          </svg>
+          <div class="vg-anpr-hud" id="vg-anpr-hud">
+            <span class="vg-anpr-hud-dot"></span>
+            <span class="vg-anpr-hud-text" id="vg-anpr-hud-text">
+              {% if plate_matched is True %}
+                PLATE MATCH
+              {% elif plate_matched is False %}
+                PLATE MISMATCH
+              {% else %}
+                CAMERA READY
+              {% endif %}
+            </span>
+          </div>
+        </div>
+
         <div class="vg-car-track" id="vg-car-track">
           <div class="vg-car" id="vg-vehicle-object" title="Vehicle on sensor">
+            <div class="vg-car-plate" id="vg-car-plate" aria-label="Vehicle License Plate">{{ detected_plate|default:'' }}</div>
             <div class="vg-car-windshield"></div>
             <div class="vg-car-roof"></div>
           </div>
@@ -375,6 +466,27 @@
           <dl class="vg-details-grid">
             <dt>Ticket Code</dt>
             <dd><span class="vg-code-badge">{{ reservation.ticket_code }}</span></dd>
+
+            <dt>ANPR Camera (Simulator)</dt>
+            <dd>
+              <div class="vg-anpr-telemetry-block">
+                <div class="vg-anpr-telemetry-row">
+                  <span class="vg-telemetry-sublabel">Detected:</span>
+                  <strong class="vg-plate-badge" id="vg-telemetry-detected-plate">{{ detected_plate|default:'—' }}</strong>
+                  <span class="vg-telemetry-sublabel" style="margin-left: 8px;">Expected:</span>
+                  <span class="vg-plate-badge" id="vg-telemetry-expected-plate">{{ expected_plate|default:'—' }}</span>
+                </div>
+                <div style="margin-top: 6px;">
+                  {% if plate_matched is True %}
+                    <span class="vg-badge badge-green" id="vg-telemetry-plate-status">✓ PLATE MATCH ({{ detected_plate }})</span>
+                  {% elif plate_matched is False %}
+                    <span class="vg-badge badge-red" id="vg-telemetry-plate-status">✕ PLATE MISMATCH (Detected: {{ detected_plate }} &ne; Expected: {{ expected_plate }})</span>
+                  {% else %}
+                    <span class="vg-badge badge-blue" id="vg-telemetry-plate-status">ANPR READY</span>
+                  {% endif %}
+                </div>
+              </div>
+            </dd>
 
             <dt>Vehicle Plate</dt>
             <dd><span class="vg-plate-badge">{{ reservation.plate_number }}</span></dd>

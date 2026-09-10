@@ -3,6 +3,7 @@ Admin virtual parking gate simulator.
 Simulates optical QR / physical barrier arm operations for Entrance and Exit.
 Passage confirmation delegates to real atomic parking services.
 """
+import re
 import secrets
 import time
 from django import forms
@@ -18,6 +19,17 @@ from django.views.decorators.http import require_http_methods
 from .models import ParkingZone, Reservation
 from .qr import generate_demo_payment_qr_base64
 from .services import BillingService, GateService, PaymentService
+
+
+def normalize_license_plate(plate: str) -> str:
+    """
+    Normalizes a vehicle license plate by stripping spaces, hyphens, periods,
+    and converting to uppercase for robust string comparison.
+    Example: 'Phnom Penh 2AZ-1234' -> 'PHNOMPENH2AZ1234'
+    """
+    if not plate:
+        return ''
+    return re.sub(r'[\s\-_.]+', '', str(plate)).upper()
 
 
 def _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled):
@@ -90,6 +102,11 @@ def virtual_gate(request):
         'permit_expires_at': None,
         'reservation': None,
         'bill': None,
+        'detected_plate': '',
+        'expected_plate': '',
+        'plate_matched': None,
+        'simulate_plate_mismatch': False,
+        'custom_detected_plate': '',
     }
 
     # If GET has valid code and zone, inspect reservation for preview or telemetry reconciliation
@@ -104,13 +121,25 @@ def virtual_gate(request):
         if reservation:
             if str(reservation.parking_zone_id) == str(zone_id):
                 bill = BillingService.calculate_bill(reservation, as_of=timezone.now()) if mode == 'exit' else None
-                context.update(reservation=reservation, bill=bill)
+                detected_plate = reservation.plate_number
+                expected_plate = reservation.plate_number
+                plate_matched = True
+                context.update(
+                    reservation=reservation,
+                    bill=bill,
+                    detected_plate=detected_plate,
+                    expected_plate=expected_plate,
+                    plate_matched=plate_matched,
+                )
                 _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                 if is_ajax:
                     return JsonResponse({
                         'success': True,
                         'ticket_code': reservation.ticket_code,
                         'plate_number': reservation.plate_number,
+                        'detected_plate': detected_plate,
+                        'expected_plate': expected_plate,
+                        'plate_matched': plate_matched,
                         'status': reservation.status,
                         'status_display': reservation.get_status_display(),
                         'mode': mode,
@@ -154,6 +183,31 @@ def virtual_gate(request):
                 reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
                 ParkingZone.objects.select_for_update().get(pk=zone.pk)
 
+                # ANPR Optical License Plate Simulator Processing
+                simulate_plate_mismatch = request.POST.get('simulate_plate_mismatch') in ('true', 'on', '1', True)
+                custom_detected_plate = (request.POST.get('custom_detected_plate') or '').strip()
+                incoming_detected_plate = (request.POST.get('detected_plate') or '').strip()
+
+                expected_plate = reservation.plate_number
+                if simulate_plate_mismatch:
+                    if custom_detected_plate and normalize_license_plate(custom_detected_plate) != normalize_license_plate(expected_plate):
+                        detected_plate = custom_detected_plate
+                    else:
+                        detected_plate = '2X-9999'
+                else:
+                    detected_plate = incoming_detected_plate or custom_detected_plate or expected_plate
+
+                plate_matched = (normalize_license_plate(detected_plate) == normalize_license_plate(expected_plate))
+
+                context.update(
+                    reservation=reservation,
+                    detected_plate=detected_plate,
+                    expected_plate=expected_plate,
+                    plate_matched=plate_matched,
+                    simulate_plate_mismatch=simulate_plate_mismatch,
+                    custom_detected_plate=custom_detected_plate,
+                )
+
                 # Action: Close barrier without passage
                 if action == 'close':
                     context['gate_open'] = False
@@ -175,6 +229,26 @@ def virtual_gate(request):
 
                 # Action: Settle exit balance
                 if action == 'settle':
+                    if not plate_matched:
+                        err = (
+                            f"ANPR Plate Mismatch: Detected vehicle plate '{detected_plate}' does not match "
+                            f"ticket reservation plate '{expected_plate}'. Payment and departure authorization blocked."
+                        )
+                        messages.error(request, err)
+                        allowed, _, bill, _ = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
+                        context.update(gate_open=False, permit=None, permit_expires_at=None, notice=err, bill=bill)
+                        _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
+                        if is_ajax:
+                            return JsonResponse({
+                                'success': False,
+                                'plate_matched': False,
+                                'detected_plate': detected_plate,
+                                'expected_plate': expected_plate,
+                                'notice': err,
+                                'gate_open': False,
+                            }, status=400)
+                        return render(request, 'admin/virtual_gate.html', context)
+
                     if mode != 'exit':
                         err = 'Payment settlement is only applicable in Exit mode.'
                         if is_ajax:
@@ -234,7 +308,14 @@ def virtual_gate(request):
                                 context.update(reservation=reservation, bill=bill, gate_open=False, permit=None, permit_expires_at=None)
                                 _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                                 if is_ajax:
-                                    return JsonResponse({'success': False, 'notice': notice, 'balance_due': bill['balance_due']}, status=400)
+                                    return JsonResponse({
+                                        'success': False,
+                                        'notice': notice,
+                                        'balance_due': bill['balance_due'],
+                                        'detected_plate': detected_plate,
+                                        'expected_plate': expected_plate,
+                                        'plate_matched': plate_matched,
+                                    }, status=400)
                                 return render(request, 'admin/virtual_gate.html', context)
 
                             elif outcome == 'cancel':
@@ -245,7 +326,14 @@ def virtual_gate(request):
                                 context.update(reservation=reservation, bill=bill, gate_open=False, permit=None, permit_expires_at=None)
                                 _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                                 if is_ajax:
-                                    return JsonResponse({'success': False, 'notice': notice, 'balance_due': bill['balance_due']})
+                                    return JsonResponse({
+                                        'success': False,
+                                        'notice': notice,
+                                        'balance_due': bill['balance_due'],
+                                        'detected_plate': detected_plate,
+                                        'expected_plate': expected_plate,
+                                        'plate_matched': plate_matched,
+                                    })
                                 return render(request, 'admin/virtual_gate.html', context)
 
                             else:  # outcome == 'success'
@@ -308,11 +396,22 @@ def virtual_gate(request):
                             'ticket_code': reservation.ticket_code,
                             'status': reservation.status,
                             'payment_status': reservation.payment_status,
+                            'detected_plate': detected_plate,
+                            'expected_plate': expected_plate,
+                            'plate_matched': plate_matched,
                         })
                     return render(request, 'admin/virtual_gate.html', context)
 
                 # Action: Check ticket & open barrier
-                if mode == 'entry':
+                if not plate_matched:
+                    allowed = False
+                    notice = (
+                        f"ANPR Plate Mismatch: Detected vehicle plate '{detected_plate}' does not match "
+                        f"expected ticket plate '{expected_plate}'. Barrier kept closed."
+                    )
+                    messages.error(request, notice)
+                    bill = BillingService.calculate_bill(reservation, as_of=timezone.now()) if mode == 'exit' else None
+                elif mode == 'entry':
                     allowed, _, notice = GateService.validate_entry(reservation.ticket_code, zone.pk)
                     bill = None
                 else:
@@ -320,7 +419,6 @@ def virtual_gate(request):
 
                 context.update(reservation=reservation, bill=bill, notice=notice)
                 _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
-
 
                 # Action: Confirm vehicle passage & close barrier
                 if action == 'pass':
@@ -349,6 +447,9 @@ def virtual_gate(request):
                                     'mode': mode,
                                     'ticket_code': reservation.ticket_code,
                                     'plate_number': reservation.plate_number,
+                                    'detected_plate': detected_plate,
+                                    'expected_plate': expected_plate,
+                                    'plate_matched': plate_matched,
                                     'status': reservation.status,
                                     'status_display': reservation.get_status_display(),
                                     'notice': context['notice'],
@@ -386,5 +487,23 @@ def virtual_gate(request):
                         context['notice'] = 'Ticket verified. Barrier is OPEN — waiting for vehicle to pass.'
                     else:
                         context['gate_open'] = False
+                        if not plate_matched:
+                            context['notice'] = notice
+
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': allowed,
+                            'gate_open': context.get('gate_open', False),
+                            'permit': context.get('permit'),
+                            'permit_expires_at': context.get('permit_expires_at'),
+                            'notice': context.get('notice'),
+                            'ticket_code': reservation.ticket_code,
+                            'plate_number': reservation.plate_number,
+                            'detected_plate': detected_plate,
+                            'expected_plate': expected_plate,
+                            'plate_matched': plate_matched,
+                            'status': reservation.status,
+                            'balance_due': bill['balance_due'] if bill else 0,
+                        }, status=200 if allowed else 400)
 
     return render(request, 'admin/virtual_gate.html', context)

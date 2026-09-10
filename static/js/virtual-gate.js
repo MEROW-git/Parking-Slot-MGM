@@ -290,9 +290,22 @@
     if (reopenBox) reopenBox.style.display = 'none';
     const resetBox = document.getElementById('vg-reset-box');
     if (resetBox) resetBox.style.display = 'none';
+
+    const anprEl = document.getElementById('vg-anpr-camera-unit');
+    if (anprEl) {
+      anprEl.classList.remove('is-scanning', 'is-matched', 'is-mismatched');
+    }
+    const anprTextEl = document.getElementById('vg-anpr-hud-text');
+    if (anprTextEl) {
+      anprTextEl.textContent = 'CAMERA READY';
+    }
+    const checkBtnEl = document.getElementById('btn-check-open');
+    if (checkBtnEl) {
+      checkBtnEl.dataset.anprProcessed = '';
+    }
   }
 
-  document.querySelectorAll('#id_zone, #id_code').forEach(input => {
+  document.querySelectorAll('#id_zone, #id_code, #simulate-plate-mismatch-cb, #custom-detected-plate-input').forEach(input => {
     input.addEventListener('input', () => {
       invalidateAuthorization('BARRIER CLOSED — INPUT MODIFIED');
     });
@@ -316,6 +329,9 @@
       }
 
       invalidateAuthorization('BARRIER CLOSED — DIRECTION CHANGED');
+      if (checkBtn) checkBtn.dataset.anprProcessed = '';
+      if (anprUnit) anprUnit.classList.remove('is-scanning', 'is-matched', 'is-mismatched');
+      if (anprHudText) anprHudText.textContent = 'CAMERA READY';
     });
   });
 
@@ -333,6 +349,131 @@
         }
       });
     }
+  }
+
+  // =========================================================================
+  // Optical Roadside ANPR License Plate Camera Simulator Controller
+  // CAMERA READY → SCANNING PLATE → PLATE DETECTED → (MATCH / MISMATCH)
+  // =========================================================================
+  const anprUnit = document.getElementById('vg-anpr-camera-unit');
+  const anprHud = document.getElementById('vg-anpr-hud');
+  const anprHudText = document.getElementById('vg-anpr-hud-text');
+  const anprLed = document.getElementById('vg-anpr-cam-led');
+  const carPlateEl = document.getElementById('vg-car-plate');
+  const checkBtn = document.getElementById('btn-check-open');
+  const detectedPlateInput = document.getElementById('vg-detected-plate-input');
+  const customPlateInput = document.getElementById('custom-detected-plate-input');
+  const mismatchCb = document.getElementById('simulate-plate-mismatch-cb');
+
+  function normalizePlate(p) {
+    if (!p) return '';
+    return String(p).replace(/[\s\-_.]+/g, '').toUpperCase();
+  }
+
+  function setAnprState(state, detected, expected) {
+    if (!anprUnit || !anprHudText) return;
+
+    if (state === 'READY') {
+      anprUnit.classList.remove('is-scanning', 'is-matched', 'is-mismatched');
+      anprHudText.textContent = 'CAMERA READY';
+      if (anprLed) anprLed.setAttribute('fill', '#38bdf8');
+    } else if (state === 'SCANNING') {
+      anprUnit.classList.remove('is-matched', 'is-mismatched');
+      anprUnit.classList.add('is-scanning');
+      anprHudText.textContent = 'SCANNING PLATE';
+      if (anprLed) anprLed.setAttribute('fill', '#38bdf8');
+    } else if (state === 'DETECTED') {
+      anprUnit.classList.remove('is-scanning');
+      anprHudText.textContent = 'PLATE DETECTED';
+      if (carPlateEl && detected) {
+        carPlateEl.textContent = detected;
+      }
+    } else if (state === 'MATCH') {
+      anprUnit.classList.remove('is-scanning', 'is-mismatched');
+      anprUnit.classList.add('is-matched');
+      anprHudText.textContent = 'PLATE MATCH';
+      if (anprLed) anprLed.setAttribute('fill', '#10b981');
+      if (carPlateEl && detected) {
+        carPlateEl.textContent = detected;
+      }
+    } else if (state === 'MISMATCH') {
+      anprUnit.classList.remove('is-scanning', 'is-matched');
+      anprUnit.classList.add('is-mismatched');
+      anprHudText.textContent = 'PLATE MISMATCH';
+      if (anprLed) anprLed.setAttribute('fill', '#ef4444');
+      if (carPlateEl && detected) {
+        carPlateEl.textContent = detected;
+      }
+    }
+  }
+
+  // Initialize ANPR state on page load based on rendered server telemetry
+  const plateStatusBadge = document.getElementById('vg-telemetry-plate-status');
+  const detectedTelemetry = document.getElementById('vg-telemetry-detected-plate');
+  const expectedTelemetry = document.getElementById('vg-telemetry-expected-plate');
+
+  if (plateStatusBadge) {
+    const text = plateStatusBadge.textContent || '';
+    const detectedVal = detectedTelemetry?.textContent?.trim() || '';
+    const expectedVal = expectedTelemetry?.textContent?.trim() || '';
+
+    if (text.includes('PLATE MATCH')) {
+      setAnprState('MATCH', detectedVal, expectedVal);
+    } else if (text.includes('PLATE MISMATCH')) {
+      setAnprState('MISMATCH', detectedVal, expectedVal);
+    } else {
+      setAnprState('READY');
+    }
+  }
+
+  // Animate ANPR scan sequence on "Check ticket & open barrier" click
+  if (checkBtn && form) {
+    checkBtn.addEventListener('click', async (e) => {
+      if (checkBtn.dataset.anprProcessed === 'true') {
+        // Already animated, proceed with submit
+        return;
+      }
+
+      e.preventDefault();
+
+      let simulatedDetected = '';
+      const isMismatch = mismatchCb?.checked;
+      const customVal = customPlateInput?.value?.trim();
+      const currentDetected = detectedPlateInput?.value?.trim();
+
+      if (isMismatch) {
+        simulatedDetected = customVal || '2X-9999';
+      } else {
+        simulatedDetected = customVal || currentDetected || '2AZ-1234';
+      }
+
+      // 1. CAMERA READY
+      setAnprState('READY');
+
+      // 2. SCANNING PLATE (pulse beam)
+      await new Promise(r => setTimeout(r, 60));
+      setAnprState('SCANNING');
+
+      // 3. PLATE DETECTED
+      await new Promise(r => setTimeout(r, 450));
+      setAnprState('DETECTED', simulatedDetected);
+
+      // Brief pause to display detected plate on car before submitting
+      await new Promise(r => setTimeout(r, 200));
+
+      checkBtn.dataset.anprProcessed = 'true';
+
+      let actionInput = form.querySelector('input[name="action"]');
+      if (!actionInput) {
+        actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        form.appendChild(actionInput);
+      }
+      actionInput.value = 'open';
+
+      form.submit();
+    });
   }
 
   // =========================================================================
@@ -373,6 +514,10 @@
       const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
       if (csrfInput && !formData.get('csrfmiddlewaretoken')) {
         formData.set('csrfmiddlewaretoken', csrfInput.value);
+      }
+      const detectedPlateHidden = document.getElementById('vg-detected-plate-input');
+      if (detectedPlateHidden && !formData.get('detected_plate')) {
+        formData.set('detected_plate', detectedPlateHidden.value);
       }
 
       // 2. NOW disable conflicting controls to prevent duplicate submissions
