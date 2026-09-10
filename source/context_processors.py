@@ -19,4 +19,6 @@ def sompark_context(request):
         'active_reservation': active_reservation,
         'current_date': timezone.localdate(),
         'ASSET_VERSION': getattr(settings, 'ASSET_VERSION', '1.2.0'),
+        'gemini_ai_enabled': getattr(settings, 'GEMINI_AI_ENABLED', True),
+        'GEMINI_AI_ENABLED': getattr(settings, 'GEMINI_AI_ENABLED', True),
     }

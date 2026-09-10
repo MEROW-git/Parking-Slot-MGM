@@ -67,6 +67,7 @@ def home(request):
         'districts': districts,
         'selected_district': district_filter,
         'search_query': query,
+        'gemini_ai_enabled': getattr(settings, 'GEMINI_AI_ENABLED', True),
         'title': 'SomPark - Phnom Penh Smart Parking (ចំណតឆ្លាតវៃ ភ្នំពេញ)',
     }
     return render(request, 'source/index.html', context)

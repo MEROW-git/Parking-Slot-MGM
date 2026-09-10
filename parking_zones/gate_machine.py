@@ -526,8 +526,8 @@ def virtual_gate(request):
                         context['notice'] = notice
                         messages.info(request, notice)
 
-                    # Re-check exit authorization after payment settlement
-                    allowed, _, bill, prep_notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
+                    # Explicit settlement may renew a zero-balance exit, but never records passage.
+                    allowed, _, bill, prep_notice = GateService.authorize_exit_at_gate(reservation.pk, zone.pk)
                     reservation.refresh_from_db()
 
                     if allowed and bill.get('balance_due', 0) == 0 and reservation.status == 'CHECKED_IN':
@@ -585,6 +585,8 @@ def virtual_gate(request):
                 elif mode == 'entry':
                     allowed, _, notice = GateService.validate_entry(reservation.ticket_code, zone.pk)
                     bill = None
+                elif action == 'open':
+                    allowed, _, bill, notice = GateService.authorize_exit_at_gate(reservation.pk, zone.pk)
                 else:
                     allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
 

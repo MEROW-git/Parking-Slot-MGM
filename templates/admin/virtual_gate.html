@@ -222,14 +222,14 @@
                 </div>
                 <div class="vg-step-details">
                   <div class="vg-step-label">STEP 3</div>
-                  <div class="vg-step-title">Exit barrier opened</div>
+                  <div class="vg-step-title">Exit passage</div>
                   <div class="vg-step-desc" id="vg-step-3-desc">
                     {% if passed %}
                       Vehicle passed &middot; Closed
                     {% elif gate_open %}
                       Barrier OPEN &middot; Waiting
                     {% else %}
-                      Waiting for vehicle
+                      Barrier closed &middot; Open to continue
                     {% endif %}
                   </div>
                 </div>
@@ -242,10 +242,10 @@
         {% if form.mode.value == 'exit' and reservation and bill.balance_due == 0 and not gate_open and not passed and plate_matched != False %}
           <div class="vg-reopen-actions" id="vg-reopen-box" style="margin-top: 1rem;">
             <div class="vg-alert vg-alert-info" style="margin-bottom: 0.75rem;">
-              <strong>Payment Settled:</strong> Remaining balance is 0 KHR. Click below to open the barrier for the departing vehicle.
+              <strong>Payment settled:</strong> Open the barrier to continue. We will recheck the balance and renew an expired exit window if no extra payment is due. Then press Vehicle passed.
             </div>
             <button type="submit" name="action" value="open" class="vg-btn vg-btn-primary" id="btn-reopen-barrier" style="width: 100%; justify-content: center;">
-              &#9654; Open barrier &mdash; waiting for vehicle
+              Open barrier
             </button>
           </div>
         {% endif %}
@@ -260,14 +260,10 @@
             Re-checks ticket status, deadlines, and facility capacity atomically at passage confirmation before recording vehicle movement.
           </p>
           <div class="vg-pass-buttons">
-            <button type="submit" name="action" value="pass" class="vg-btn vg-btn-success vg-btn-pulse" id="vg-pass">
-              <span class="vg-btn-icon" aria-hidden="true">&#128663;</span>
+            <button type="submit" name="action" value="pass" class="vg-btn vg-btn-success vg-btn-pulse" id="vg-pass" {% if not gate_open %}disabled{% endif %}>
               <span id="vg-pass-text">
-                {% if form.mode.value == 'exit' %}
-                  Confirm Vehicle Departure &mdash; Close Barrier (ឡានចេញរួច)
-                {% else %}
-                  Confirm Vehicle Entry &mdash; Close Barrier (ឡានចូលរួច)
-                {% endif %}
+                Vehicle passed &mdash; close barrier
+                {% if form.mode.value == 'exit' %}(ឡានចេញរួច){% else %}(ឡានចូលរួច){% endif %}
               </span>
             </button>
             <button type="submit" name="action" value="close" class="vg-btn vg-btn-secondary" id="vg-close">
@@ -741,5 +737,5 @@
 
 <script id="vg-zones-info-data" type="application/json">{{ zones_info_json|safe }}</script>
 
-<script src="{% static 'js/virtual-gate.js' %}?v=2.2.3" defer></script>
+<script src="{% static 'js/virtual-gate.js' %}?v=2.2.4" defer></script>
 {% endblock %}

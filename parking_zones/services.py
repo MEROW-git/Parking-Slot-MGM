@@ -721,6 +721,29 @@ class GateService:
 
     @staticmethod
     @transaction.atomic
+    def authorize_exit_at_gate(reservation_id: int, zone_id: int):
+        """Explicit gate action: renew a settled exit, without recording passage.
+
+        Keep prepare_exit read-only: an expired permit must never renew itself
+        while confirming passage or merely viewing the ticket.
+        """
+        reservation = Reservation.objects.select_for_update().get(pk=reservation_id)
+        allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code, zone_id)
+        if reservation.parking_zone_id != zone_id or reservation.status != 'CHECKED_IN':
+            return False, reservation, bill, notice
+        now = timezone.now()
+        if bill and bill['balance_due'] == 0 and (
+            not reservation.exit_authorized_until or reservation.exit_authorized_until < now
+        ):
+            reservation.exit_authorized_until = now + timedelta(
+                minutes=getattr(settings, 'EXIT_WINDOW_MINUTES', 5)
+            )
+            reservation.save(update_fields=['exit_authorized_until'])
+            return True, reservation, bill, 'Exit authorization renewed. No additional payment required.'
+        return allowed, reservation, bill, notice
+
+    @staticmethod
+    @transaction.atomic
     def confirm_physical_exit(reservation_id: int, staff_user=None) -> tuple[bool, Reservation, str]:
         reservation = Reservation.objects.select_for_update().select_related('parking_zone').get(id=reservation_id)
         zone = ParkingZone.objects.select_for_update().get(id=reservation.parking_zone_id)
@@ -1059,4 +1082,3 @@ class AntiSpamService:
             return False, msg, meta
 
         return True, "", meta
-

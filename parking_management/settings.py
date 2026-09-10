@@ -13,7 +13,7 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR / '.env', override=True)
 
 SECRET_KEY = os.environ.get('SECRET_KEY', '').strip()
 if not SECRET_KEY:
@@ -26,6 +26,18 @@ if not SECRET_KEY:
 # Keep private provider keys on the server, out of template contexts and responses.
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', '').strip()
+
+# Gemini AI Feature Flag: parse gemini_ai, GEMINI_AI, or GEMINI_AI_ENABLED from .env / environment
+_gemini_ai_raw = (
+    os.environ.get('gemini_ai') or
+    os.environ.get('GEMINI_AI') or
+    os.environ.get('GEMINI_AI_ENABLED')
+)
+if _gemini_ai_raw is not None:
+    _gemini_ai_clean = str(_gemini_ai_raw).strip().lower()
+    GEMINI_AI_ENABLED = _gemini_ai_clean in ('true', '1', 't', 'yes', 'on')
+else:
+    GEMINI_AI_ENABLED = True
 
 # Robust debug parsing: defaults to False for safe production deployment
 _debug_env = os.environ.get('DEBUG', 'False').strip().lower()

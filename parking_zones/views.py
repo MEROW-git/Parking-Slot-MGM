@@ -1044,6 +1044,13 @@ def ai_parking_assistant(request):
     - Ranks parking by verified proximity or prompts for landmarks if location is unresolved.
     - Returns AI recommendations with live zone availability, KHR rates, and direct booking links.
     """
+    if not getattr(settings, 'GEMINI_AI_ENABLED', True):
+        return JsonResponse({
+            'status': 'error',
+            'code': 'AI_ASSISTANT_DISABLED',
+            'message': 'Smart Parking Assistant is currently disabled in system settings.'
+        }, status=403)
+
     # 1. Rate limiting check (max 5 requests per minute per user)
     if not check_ai_rate_limit(request.user.id, max_requests=5, window_seconds=60):
         return JsonResponse({

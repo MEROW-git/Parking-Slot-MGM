@@ -280,6 +280,8 @@ class GeminiService:
 
     @classmethod
     def is_configured(cls) -> bool:
+        if not getattr(settings, 'GEMINI_AI_ENABLED', True):
+            return False
         return bool(cls.get_api_key())
 
     @classmethod

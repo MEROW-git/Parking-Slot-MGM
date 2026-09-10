@@ -35,11 +35,10 @@
       sceneEl.dataset.direction = selectedMode;
     }
     if (passText) {
-      if (selectedMode === 'exit') {
-        passText.innerHTML = 'Confirm Vehicle Departure &mdash; Close Barrier (ឡានចេញរួច)';
-      } else {
-        passText.innerHTML = 'Confirm Vehicle Entry &mdash; Close Barrier (ឡានចូលរួច)';
-      }
+      passText.textContent = selectedMode === 'exit'
+        ? 'Vehicle passed — close barrier (ឡានចេញរួច)'
+        : 'Vehicle passed — close barrier (ឡានចូលរួច)';
+      passText.title = selectedMode === 'exit' ? 'Confirm vehicle departure' : 'Confirm vehicle entry';
     }
   }
 
@@ -51,6 +50,8 @@
   let permitExpiresAt = null;
   let isCrossing = false;
   let isPassageInFlight = false;
+  let authorizationRevision = 0;
+  let isSettlementInFlight = false;
 
   // Stop camera tracks cleanly
   function stopCamera() {
@@ -224,10 +225,25 @@
       permitTimerBanner.style.background = '#fef2f2';
       permitTimerBanner.style.borderColor = '#f87171';
       permitTimerBanner.style.color = '#991b1b';
-      permitTimerBanner.innerHTML = '<strong>Gate authorization expired.</strong> Barrier auto-closed. Re-check ticket.';
+      // Preserve the countdown span so a renewed permit can reuse it.
+      if (permitSecondsEl) permitSecondsEl.textContent = '0';
     }
     if (passBtn) passBtn.disabled = true;
     if (sceneEl) sceneEl.classList.remove('is-open');
+    const passBox = document.getElementById('vg-pass-actions-box');
+    if (passBox) passBox.style.display = 'none';
+    const reopenBox = document.getElementById('vg-reopen-box');
+    const standardActions = document.getElementById('vg-standard-actions');
+    if (reopenBox) reopenBox.style.display = 'block';
+    else if (standardActions) standardActions.style.display = '';
+    if (checkBtn) checkBtn.disabled = false;
+    const step3 = document.getElementById('vg-step-3');
+    if (step3) {
+      step3.classList.remove('is-active', 'is-completed');
+      step3.classList.add('is-pending');
+    }
+    const step3Desc = document.getElementById('vg-step-3-desc');
+    if (step3Desc) step3Desc.textContent = 'Authorization expired - reopen to continue';
     if (statusBanner && statusText) {
       statusBanner.className = 'vg-status-indicator status-closed';
       statusText.textContent = 'BARRIER CLOSED — AUTHORIZATION EXPIRED';
@@ -276,6 +292,7 @@
 
   // Invalidate authorization and clear obsolete timers upon input edits
   function invalidateAuthorization(reason) {
+    authorizationRevision += 1;
     stopPermitCountdown();
     if (passBtn) {
       passBtn.disabled = true;
@@ -359,7 +376,7 @@
   });
 
   // Initialize countdown if gate is open on page load
-  if (permitSecondsEl && permitTimerBanner && passBtn && !passBtn.disabled) {
+  if (permitSecondsEl && permitTimerBanner && passBtn && sceneEl?.dataset.gateOpen === 'true') {
     startPermitCountdown();
     if (sceneEl?.classList.contains('is-open')) {
       passBtn.disabled = true;
@@ -371,6 +388,69 @@
           if (statusText) statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
         }
       });
+    }
+  }
+
+  // Shared paid/reopened gate transition. Never move the car here: only an
+  // explicit passage confirmation may start its animation or update occupancy.
+  async function showAuthorizedOpen(data) {
+    if (!data.gate_open || !data.permit || !Number.isFinite(Number(data.permit_expires_at)) ||
+        Number(data.permit_expires_at) <= Date.now() / 1000) {
+      throw new Error('The server has not supplied a valid open-barrier permit.');
+    }
+    updateGateDirection();
+    if (passBtn) {
+      passBtn.disabled = true;
+      passBtn.title = 'Wait for the barrier to finish opening.';
+    }
+    if (closeBtn) closeBtn.disabled = true;
+    const permitInput = document.getElementById('vg-permit-input');
+    if (permitInput) permitInput.value = data.permit;
+    if (permitTimerBanner) {
+      permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
+      permitTimerBanner.style.cssText = '';
+    }
+    startPermitCountdown();
+    const passBox = document.getElementById('vg-pass-actions-box');
+    if (passBox) passBox.style.display = 'block';
+    const reopenBox = document.getElementById('vg-reopen-box');
+    if (reopenBox) reopenBox.style.display = 'none';
+    const step3 = document.getElementById('vg-step-3');
+    if (step3) {
+      step3.classList.remove('is-pending', 'is-completed');
+      step3.classList.add('is-active');
+    }
+    const connector = document.getElementById('vg-connector-2-3');
+    if (connector) connector.classList.add('is-active');
+    const step3Desc = document.getElementById('vg-step-3-desc');
+    if (step3Desc) step3Desc.textContent = 'Barrier opening - please wait';
+    if (sceneEl) {
+      sceneEl.classList.remove('is-passed', 'is-moving');
+      sceneEl.classList.add('is-open');
+    }
+    if (statusBanner) statusBanner.className = 'vg-status-indicator status-open';
+    if (statusText) statusText.textContent = 'BARRIER OPENING - PLEASE WAIT';
+    await waitForArmOpening();
+    if (!sceneEl?.classList.contains('is-open') || Date.now() / 1000 >= permitExpiresAt) return;
+    if (passBtn) {
+      passBtn.disabled = false;
+      passBtn.title = '';
+    }
+    if (closeBtn) closeBtn.disabled = false;
+    if (statusText) statusText.textContent = 'BARRIER OPEN - WAITING FOR VEHICLE';
+    if (step3Desc) step3Desc.textContent = 'Barrier OPEN - press Vehicle passed';
+    showGateNotice(data.notice || 'Barrier open. Press Vehicle passed to simulate crossing.', true);
+  }
+
+  function showGateNotice(message, success = false) {
+    let noticeBox = document.querySelector('.vg-notice');
+    if (!noticeBox && statusBanner?.parentNode) {
+      noticeBox = document.createElement('div');
+      statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
+    }
+    if (noticeBox) {
+      noticeBox.className = success ? 'vg-notice is-success' : 'vg-notice vg-alert-error';
+      noticeBox.textContent = message;
     }
   }
 
@@ -524,7 +604,7 @@
     passBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       // Immediate guard against re-entry while in-flight or animating
-      if (isCrossing || isPassageInFlight) return;
+      if (passBtn.disabled || isCrossing || isPassageInFlight) return;
       isPassageInFlight = true;
 
       // 1. CRITICAL: Snapshot FormData BEFORE disabling any form controls!
@@ -672,6 +752,16 @@
       }
 
       // 3. Server confirmed passage: execute visible crossing animation
+      if (!result?.success || !result?.passed) {
+        isPassageInFlight = false;
+        expirePermit();
+        if (closeBtn) closeBtn.disabled = false;
+        if (codeInput) codeInput.disabled = false;
+        if (zoneSelect) zoneSelect.disabled = false;
+        modeRadios.forEach(r => r.disabled = false);
+        showGateNotice(result?.notice || 'Passage was not confirmed. Check the ticket again.');
+        return;
+      }
       isCrossing = true;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -1016,25 +1106,7 @@
           // Set form ticket code
           if (codeInput) codeInput.value = data.ticket_code;
 
-          // Open simulated barrier arm immediately
-          if (sceneEl) {
-            sceneEl.classList.add('is-open');
-            sceneEl.classList.remove('is-passed');
-          }
-          if (statusBanner && statusText) {
-            statusBanner.className = 'vg-status-indicator status-open';
-            statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
-          }
-
-          // Permit countdown & passage actions
-          const permitInput = document.getElementById('vg-permit-input');
-          if (permitInput) permitInput.value = data.permit;
-          if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
-          startPermitCountdown();
-
-          updateGateDirection();
-          const passBox = document.getElementById('vg-pass-actions-box');
-          if (passBox) passBox.style.display = 'block';
+          await showAuthorizedOpen(data);
 
           // Hide walk-in card while ticket is in active passage hold
           if (walkinCard) walkinCard.style.display = 'none';
@@ -1087,6 +1159,9 @@
   const demoCancelBtn = document.getElementById('btn-demo-qr-cancel');
 
   async function handleExitSettlement(provider, outcome) {
+    if (isSettlementInFlight) return;
+    isSettlementInFlight = true;
+    const requestRevision = authorizationRevision;
     const csrfToken = form?.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
     const zoneId = zoneSelect?.value;
     const codeVal = codeInput?.value?.trim();
@@ -1122,7 +1197,8 @@
       });
 
       const data = await resp.json();
-      if (resp.ok && data.success && data.settled) {
+      if (requestRevision !== authorizationRevision) return;
+      if (resp.ok && data.success && data.settled && data.gate_open && data.permit) {
         // Step 2 Completed
         const step2 = document.getElementById('vg-step-2');
         if (step2) {
@@ -1140,46 +1216,7 @@
         const settleBox = document.getElementById('vg-settlement-box');
         if (settleBox) settleBox.style.display = 'none';
 
-        // Step 3 Active: Barrier opened
-        const step3 = document.getElementById('vg-step-3');
-        if (step3) {
-          step3.classList.remove('is-pending');
-          step3.classList.add('is-active');
-        }
-        const step3Desc = document.getElementById('vg-step-3-desc');
-        if (step3Desc) step3Desc.textContent = 'Barrier OPEN · Waiting';
-
-        // Open barrier arm immediately
-        if (sceneEl) {
-          sceneEl.classList.add('is-open');
-          sceneEl.classList.remove('is-passed');
-        }
-        if (statusBanner && statusText) {
-          statusBanner.className = 'vg-status-indicator status-open';
-          statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
-        }
-
-        // Set permit and start countdown
-        const permitInput = document.getElementById('vg-permit-input');
-        if (permitInput) permitInput.value = data.permit;
-        if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
-        startPermitCountdown();
-
-        // Show passage actions with correct direction label
-        updateGateDirection();
-        const passBox = document.getElementById('vg-pass-actions-box');
-        if (passBox) passBox.style.display = 'block';
-
-        // Update notice
-        let noticeBox = document.querySelector('.vg-notice');
-        if (!noticeBox && statusBanner && statusBanner.parentNode) {
-          noticeBox = document.createElement('div');
-          statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
-        }
-        if (noticeBox) {
-          noticeBox.className = 'vg-notice is-success';
-          noticeBox.textContent = data.notice;
-        }
+        await showAuthorizedOpen(data);
 
         // Update balance due display in telemetry
         const balEl = document.querySelector('.vg-balance-amount');
@@ -1201,6 +1238,8 @@
       }
     } catch (err) {
       alert('Network error during exit payment settlement.');
+    } finally {
+      isSettlementInFlight = false;
     }
   }
 
@@ -1234,6 +1273,7 @@
     reopenBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       reopenBtn.disabled = true;
+      const requestRevision = authorizationRevision;
 
       const formData = new FormData(form);
       formData.set('action', 'open');
@@ -1250,52 +1290,19 @@
         });
 
         const data = await resp.json();
+        if (requestRevision !== authorizationRevision) return;
         if (resp.ok && data.success && data.gate_open) {
-          if (sceneEl) {
-            sceneEl.classList.add('is-open');
-            sceneEl.classList.remove('is-passed');
-          }
-          if (statusBanner && statusText) {
-            statusBanner.className = 'vg-status-indicator status-open';
-            statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
-          }
-          const reopenBox = document.getElementById('vg-reopen-box');
-          if (reopenBox) reopenBox.style.display = 'none';
-
-          const permitInput = document.getElementById('vg-permit-input');
-          if (permitInput) permitInput.value = data.permit;
-          if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
-          startPermitCountdown();
-
-          updateGateDirection();
-          const passBox = document.getElementById('vg-pass-actions-box');
-          if (passBox) passBox.style.display = 'block';
-
-          let noticeBox = document.querySelector('.vg-notice');
-          if (!noticeBox && statusBanner && statusBanner.parentNode) {
-            noticeBox = document.createElement('div');
-            statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
-          }
-          if (noticeBox) {
-            noticeBox.className = 'vg-notice is-success';
-            noticeBox.textContent = data.notice || 'Barrier is OPEN — waiting for vehicle to pass.';
-          }
+          await showAuthorizedOpen(data);
         } else {
-          // If server rejects or non-JSON, submit standard form
-          const actionInput = document.createElement('input');
-          actionInput.type = 'hidden';
-          actionInput.name = 'action';
-          actionInput.value = 'open';
-          form.appendChild(actionInput);
-          form.submit();
+          showGateNotice(data.notice || 'Barrier remains closed. Check the ticket again.');
+          const standardActions = document.getElementById('vg-standard-actions');
+          if (standardActions) standardActions.style.display = '';
+          const reopenBox = document.getElementById('vg-reopen-box');
+          if (reopenBox && data.balance_due > 0) reopenBox.style.display = 'none';
         }
       } catch (err) {
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'open';
-        form.appendChild(actionInput);
-        form.submit();
+        // Do not silently repeat a state-changing request after an uncertain response.
+        showGateNotice('Could not confirm barrier authorization. Please check the ticket again.');
       } finally {
         reopenBtn.disabled = false;
       }

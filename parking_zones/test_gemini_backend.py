@@ -12,6 +12,7 @@ from parking_zones.ai import (
 )
 
 
+@override_settings(GEMINI_AI_ENABLED=True)
 class GeminiBackendSecurityAndAssistantTest(TestCase):
     """
     Test suite for backend-only Gemini AI Assistant:

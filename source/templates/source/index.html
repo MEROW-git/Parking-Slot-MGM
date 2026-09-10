@@ -110,6 +110,7 @@
   </div>
 </section>
 
+{% if gemini_ai_enabled %}
 <!-- AI Smart Parking Assistant Card -->
 <section class="sp-ai-assistant-section" id="ai-assistant-section" aria-labelledby="ai-heading">
   <div class="sp-ai-card" data-reveal="up">
@@ -169,6 +170,7 @@
     {% endif %}
   </div>
 </section>
+{% endif %}
 
 <section class="sp-zone-directory" id="parking-zones" aria-labelledby="zones-heading">
   <div class="sp-directory-head" data-reveal="up">
@@ -220,6 +222,7 @@
     </script>
   {% endif %}
 
+  {% if gemini_ai_enabled %}
   <!-- AI Assistant Client Script -->
   <script>
     (function() {
@@ -511,5 +514,6 @@
       });
     })();
   </script>
+  {% endif %}
 {% endblock %}
 
