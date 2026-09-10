@@ -35,13 +35,6 @@
           <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">
             Print ticket (បោះពុម្ព)
           </button>
-          <form action="{% url 'checkout' %}" method="post" class="sp-ticket-action-form" id="form-ticket-checkout" style="display:inline;">
-            {% csrf_token %}
-            <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
-            <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-checkout-ticket">
-              Proceed to exit (ចេញពីចំណត)
-            </button>
-          </form>
         {% elif bill.balance_due > 0 %}
           <a href="{% url 'pay_exit' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-pay-exit" title="Pay outstanding balance and prepare for exit">
             Pay & prepare to leave (ទូទាត់ និងត្រៀមចេញ)

@@ -3,6 +3,7 @@ from datetime import timedelta
 from functools import wraps
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
 from django.contrib.auth.models import User
@@ -648,8 +649,9 @@ def staff_gate_action(request):
 def checkout(request):
     """
     Customer checkout action.
-    Validates ticket ownership, enforces settlement, and authorizes exit.
-    Only allows check out for reservations that are currently CHECKED_IN.
+    Validates ticket ownership, enforces settlement, and directs to payment or exit QR.
+    Customer endpoints must never mark physical departure or release capacity.
+    Physical exit is strictly recorded by gate passage confirmation.
     """
     ticket_code = request.POST.get('ticket_code', '').strip()
     if ticket_code and Reservation.objects.filter(ticket_code=ticket_code).exclude(customer=request.user).exists() and not request.user.is_staff:
@@ -670,16 +672,21 @@ def checkout(request):
         )
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
-    bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
     now = timezone.now()
-    if bill['balance_due'] > 0 and not (reservation.exit_authorized_until and now <= reservation.exit_authorized_until):
+    bill = BillingService.calculate_bill(reservation, as_of=now)
+    is_exit_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
+    is_exit_window_expired = bool(reservation.exit_authorized_until and now > reservation.exit_authorized_until)
+
+    # 1. Outstanding balance: direct to exit payment
+    if bill['balance_due'] > 0 and not is_exit_authorized:
         messages.info(
             request,
             f'Outstanding balance of {bill["balance_due"]:,} KHR must be settled before checkout.'
         )
         return redirect('pay_exit', ticket_code=reservation.ticket_code)
 
-    if reservation.exit_authorized_until and now > reservation.exit_authorized_until:
+    # 2. Expired authorization: direct to existing payment or renewal flow
+    if is_exit_window_expired:
         if bill['balance_due'] > 0:
             messages.warning(request, 'Your 5-minute exit window has expired. Please settle your remaining balance.')
             return redirect('pay_exit', ticket_code=reservation.ticket_code)
@@ -687,12 +694,16 @@ def checkout(request):
             messages.warning(request, 'Your 5-minute exit window has expired. Please renew your exit pass.')
             return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
-    success, reservation, msg = GateService.confirm_physical_exit(reservation.pk, staff_user=request.user if request.user.is_staff else None)
-    if success:
-        messages.success(request, msg)
-    else:
-        messages.error(request, msg)
-    return redirect('dashboard')
+    # 3. Valid exit authorization: direct to the exit QR pass
+    if is_exit_authorized:
+        messages.info(
+            request,
+            'Your exit pass is active. Please present your exit QR at the gate barrier to depart.'
+        )
+        return redirect(f"{reverse('ticket_gate_mode', kwargs={'ticket_code': reservation.ticket_code})}?mode=exit")
+
+    # 4. Zero balance due but not yet authorized: direct to ticket to activate departure
+    return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
 
 @staff_required

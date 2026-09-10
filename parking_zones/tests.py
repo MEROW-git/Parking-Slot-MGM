@@ -259,13 +259,24 @@ class BookingAndCheckoutWorkflowTests(TestCase):
         res_get = self.client.get(reverse('checkout'))
         self.assertEqual(res_get.status_code, 405)
 
-        # Owner Dara checks out
+        # Owner Dara requests checkout - customer endpoint cannot mark departure or release space
         self.client.login(username='dara', password='secretpassword')
         res_ok = self.client.post(reverse('checkout'), {'ticket_code': reservation.ticket_code}, follow=True)
         self.assertEqual(res_ok.status_code, 200)
 
         reservation.refresh_from_db()
+        self.assertFalse(reservation.checked_out)
+        self.assertEqual(reservation.status, 'CHECKED_IN')
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.occupied_slots, 1)
+        self.assertEqual(self.zone.vacant_slots, 4)
+
+        # Only physical gate confirmation records exit and releases capacity
+        success, reservation, msg = GateService.confirm_physical_exit(reservation.pk)
+        self.assertTrue(success)
+        reservation.refresh_from_db()
         self.assertTrue(reservation.checked_out)
+        self.assertEqual(reservation.status, 'CHECKED_OUT')
         self.zone.refresh_from_db()
         self.assertEqual(self.zone.occupied_slots, 0)
         self.assertEqual(self.zone.vacant_slots, 5)
