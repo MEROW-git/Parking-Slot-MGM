@@ -305,8 +305,9 @@ class VirtualGateTests(TestCase):
         resp = self.client.get(self.url)
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode()
-        self.assertIn('virtual-gate.css?v=2.1.0', content)
-        self.assertIn('virtual-gate.js?v=2.1.0', content)
+        self.assertIn('/static/css/tokens.css', content)
+        self.assertIn('virtual-gate.css?v=2.2.0', content)
+        self.assertIn('virtual-gate.js?v=2.2.0', content)
         self.assertIn('vg-car-track', content)
         self.assertIn('data-direction="entry"', content)
         self.assertIn('data-just-passed="false"', content)
@@ -467,8 +468,11 @@ class VirtualGateTests(TestCase):
         self.assertEqual(resp_entry.status_code, 200)
         content_entry = resp_entry.content.decode()
         self.assertIn('vg-anpr-camera-unit', content_entry)
+        self.assertIn('vg-anpr-camera-head', content_entry)
+        self.assertIn('vg-anpr-camera-post', content_entry)
         self.assertIn('vg-anpr-beam', content_entry)
         self.assertIn('vg-anpr-hud', content_entry)
+        self.assertIn('data-state="ready"', content_entry)
         self.assertIn('ANPR', content_entry)
         self.assertIn('data-direction="entry"', content_entry)
         self.assertIn('simulate_plate_mismatch', content_entry)
@@ -500,6 +504,4 @@ class VirtualGateTests(TestCase):
         content = resp.content.decode()
         self.assertIn('vg-car-plate', content)
         self.assertIn('Phnom Penh 2AZ-1234', content)
-
-
 

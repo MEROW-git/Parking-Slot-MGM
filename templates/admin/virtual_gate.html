@@ -5,7 +5,8 @@
 
 {% block extrastyle %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'css/virtual-gate.css' %}?v=2.1.0">
+<link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'css/virtual-gate.css' %}?v=2.2.0">
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -360,62 +361,33 @@
           <div class="vg-arm-stripe"></div>
         </div>
 
-        <!-- Optical Roadside ANPR Camera Simulator (Repositioned and rotated by direction) -->
-        <div class="vg-anpr-camera-unit" id="vg-anpr-camera-unit" aria-label="Roadside ANPR License Plate Recognition Camera">
+        <!-- Roadside ANPR camera: the mast stays upright while the head faces the approaching vehicle. -->
+        <div
+          class="vg-anpr-camera-unit{% if plate_matched is True %} is-matched{% elif plate_matched is False %} is-mismatched{% endif %}"
+          id="vg-anpr-camera-unit"
+          data-state="{% if plate_matched is True %}match{% elif plate_matched is False %}mismatch{% else %}ready{% endif %}"
+          role="img"
+          aria-label="Roadside ANPR license plate camera"
+        >
           <div class="vg-anpr-scanning-beam" id="vg-anpr-beam" aria-hidden="true"></div>
-          <svg class="vg-anpr-svg" viewBox="0 0 46 80" width="46" height="80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-              <linearGradient id="anpr-pole-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#334155" />
-                <stop offset="50%" stop-color="#64748b" />
-                <stop offset="100%" stop-color="#1e293b" />
-              </linearGradient>
-              <linearGradient id="anpr-housing-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#f8fafc" />
-                <stop offset="60%" stop-color="#cbd5e1" />
-                <stop offset="100%" stop-color="#94a3b8" />
-              </linearGradient>
-              <radialGradient id="anpr-lens-grad" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#38bdf8" />
-                <stop offset="60%" stop-color="#0284c7" />
-                <stop offset="100%" stop-color="#0c4a6e" />
-              </radialGradient>
-            </defs>
-            <!-- Mounting Base Flange -->
-            <path d="M 14 74 L 32 74 L 35 78 L 11 78 Z" fill="#1e293b" />
-            <circle cx="16" cy="76" r="1" fill="#94a3b8" />
-            <circle cx="30" cy="76" r="1" fill="#94a3b8" />
-            <!-- Vertical Heavy-Duty Pole -->
-            <rect x="20" y="24" width="6" height="50" rx="1" fill="url(#anpr-pole-grad)" />
-            <!-- Adjustable Swivel Bracket -->
-            <circle cx="23" cy="24" r="4" fill="#475569" stroke="#1e293b" stroke-width="1" />
-            <rect x="18" y="21" width="10" height="4" rx="1" fill="#334155" />
-            <!-- Camera Weather Sunshield -->
-            <path d="M 6 11 L 36 7 L 38 12 L 8 16 Z" fill="#334155" />
-            <!-- Camera Enclosure Housing -->
-            <rect x="8" y="13" width="28" height="15" rx="3" fill="url(#anpr-housing-grad)" stroke="#475569" stroke-width="1" />
-            <!-- High-Contrast Front Glass Bezel -->
-            <rect x="6" y="14" width="6" height="13" rx="2" fill="#0f172a" />
-            <!-- Primary Optical Glass Lens -->
-            <circle cx="9" cy="20.5" r="4" fill="url(#anpr-lens-grad)" stroke="#0284c7" stroke-width="0.8" />
-            <circle cx="8" cy="19.5" r="1.2" fill="#ffffff" opacity="0.8" />
-            <!-- Infrared IR Night LEDs -->
-            <circle cx="7.5" cy="15.5" r="0.7" fill="#ef4444" />
-            <circle cx="10.5" cy="15.5" r="0.7" fill="#ef4444" />
-            <circle cx="7.5" cy="25.5" r="0.7" fill="#ef4444" />
-            <circle cx="10.5" cy="25.5" r="0.7" fill="#ef4444" />
-            <!-- Status LED -->
-            <circle id="vg-anpr-cam-led" cx="32" cy="16" r="1.5" fill="{% if plate_matched is True %}#10b981{% elif plate_matched is False %}#ef4444{% else %}#38bdf8{% endif %}" />
-            <!-- High-Contrast Clean ANPR Text Label -->
-            <text x="16" y="23" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="5.5" fill="#0f172a" letter-spacing="0.5">ANPR</text>
-          </svg>
+          <div class="vg-anpr-hardware" aria-hidden="true">
+            <span class="vg-anpr-camera-base"></span>
+            <span class="vg-anpr-camera-post"></span>
+            <span class="vg-anpr-camera-joint"></span>
+            <span class="vg-anpr-camera-head">
+              <span class="vg-anpr-camera-hood"></span>
+              <span class="vg-anpr-camera-lens"></span>
+              <span class="vg-anpr-camera-wordmark">ANPR</span>
+              <span class="vg-anpr-camera-led" id="vg-anpr-cam-led"></span>
+            </span>
+          </div>
           <div class="vg-anpr-hud" id="vg-anpr-hud">
             <span class="vg-anpr-hud-dot"></span>
             <span class="vg-anpr-hud-text" id="vg-anpr-hud-text">
               {% if plate_matched is True %}
-                PLATE MATCH
+                MATCHED
               {% elif plate_matched is False %}
-                PLATE MISMATCH
+                MISMATCH
               {% else %}
                 CAMERA READY
               {% endif %}
@@ -608,5 +580,5 @@
   </div>
 </div>
 
-<script src="{% static 'js/virtual-gate.js' %}?v=2.1.0" defer></script>
+<script src="{% static 'js/virtual-gate.js' %}?v=2.2.0" defer></script>
 {% endblock %}

@@ -293,7 +293,8 @@
 
     const anprEl = document.getElementById('vg-anpr-camera-unit');
     if (anprEl) {
-      anprEl.classList.remove('is-scanning', 'is-matched', 'is-mismatched');
+      anprEl.classList.remove('is-scanning', 'is-detected', 'is-matched', 'is-mismatched');
+      anprEl.dataset.state = 'ready';
     }
     const anprTextEl = document.getElementById('vg-anpr-hud-text');
     if (anprTextEl) {
@@ -330,7 +331,10 @@
 
       invalidateAuthorization('BARRIER CLOSED — DIRECTION CHANGED');
       if (checkBtn) checkBtn.dataset.anprProcessed = '';
-      if (anprUnit) anprUnit.classList.remove('is-scanning', 'is-matched', 'is-mismatched');
+      if (anprUnit) {
+        anprUnit.classList.remove('is-scanning', 'is-detected', 'is-matched', 'is-mismatched');
+        anprUnit.dataset.state = 'ready';
+      }
       if (anprHudText) anprHudText.textContent = 'CAMERA READY';
     });
   });
@@ -356,9 +360,7 @@
   // CAMERA READY → SCANNING PLATE → PLATE DETECTED → (MATCH / MISMATCH)
   // =========================================================================
   const anprUnit = document.getElementById('vg-anpr-camera-unit');
-  const anprHud = document.getElementById('vg-anpr-hud');
   const anprHudText = document.getElementById('vg-anpr-hud-text');
-  const anprLed = document.getElementById('vg-anpr-cam-led');
   const carPlateEl = document.getElementById('vg-car-plate');
   const checkBtn = document.getElementById('btn-check-open');
   const detectedPlateInput = document.getElementById('vg-detected-plate-input');
@@ -373,34 +375,29 @@
   function setAnprState(state, detected, expected) {
     if (!anprUnit || !anprHudText) return;
 
+    anprUnit.classList.remove('is-scanning', 'is-detected', 'is-matched', 'is-mismatched');
+    anprUnit.dataset.state = state.toLowerCase();
+
     if (state === 'READY') {
-      anprUnit.classList.remove('is-scanning', 'is-matched', 'is-mismatched');
       anprHudText.textContent = 'CAMERA READY';
-      if (anprLed) anprLed.setAttribute('fill', '#38bdf8');
     } else if (state === 'SCANNING') {
-      anprUnit.classList.remove('is-matched', 'is-mismatched');
       anprUnit.classList.add('is-scanning');
-      anprHudText.textContent = 'SCANNING PLATE';
-      if (anprLed) anprLed.setAttribute('fill', '#38bdf8');
+      anprHudText.textContent = 'SCANNING';
     } else if (state === 'DETECTED') {
-      anprUnit.classList.remove('is-scanning');
-      anprHudText.textContent = 'PLATE DETECTED';
+      anprUnit.classList.add('is-detected');
+      anprHudText.textContent = 'PLATE FOUND';
       if (carPlateEl && detected) {
         carPlateEl.textContent = detected;
       }
     } else if (state === 'MATCH') {
-      anprUnit.classList.remove('is-scanning', 'is-mismatched');
       anprUnit.classList.add('is-matched');
-      anprHudText.textContent = 'PLATE MATCH';
-      if (anprLed) anprLed.setAttribute('fill', '#10b981');
+      anprHudText.textContent = 'MATCHED';
       if (carPlateEl && detected) {
         carPlateEl.textContent = detected;
       }
     } else if (state === 'MISMATCH') {
-      anprUnit.classList.remove('is-scanning', 'is-matched');
       anprUnit.classList.add('is-mismatched');
-      anprHudText.textContent = 'PLATE MISMATCH';
-      if (anprLed) anprLed.setAttribute('fill', '#ef4444');
+      anprHudText.textContent = 'MISMATCH';
       if (carPlateEl && detected) {
         carPlateEl.textContent = detected;
       }

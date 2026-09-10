@@ -1,3 +1,7 @@
+/* Hallmark · component: gate camera · genre: modern-minimal · theme: SomPark locked system
+ * states: ready · scanning · detected · matched · mismatched
+ * contrast: pass · pre-emit critique: P4 H4 E4 S5 R5 V4
+ */
 /* ==========================================================================
    SomPark Virtual Parking Gate Terminal — Stylesheet
    Matches Django Admin light/dark themes with high-contrast terminal graphics.
@@ -630,141 +634,208 @@
   transform: translateX(-50%) rotate(180deg);
 }
 
-/* ==========================================================================
-   Optical Roadside ANPR Camera Simulator
-   Realistic pole, bracket, head, optical lens, IR LEDs, ANPR label, and beam
-   ========================================================================== */
+/* Roadside ANPR camera simulator. */
 .vg-anpr-camera-unit {
+  --vg-anpr-state-color: var(--color-info);
   position: absolute;
   left: calc(50% + 115px);
-  width: 46px;
-  height: 80px;
+  width: 92px;
+  height: 116px;
   z-index: 6;
   pointer-events: none;
-  transform-origin: 23px 40px;
-  transition: top 650ms cubic-bezier(0.4, 0, 0.2, 1), transform 650ms cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--vg-anpr-state-color);
 }
 
-/* Entrance placement: lower incoming side (incoming cars move bottom -> top) */
+/* Entry traffic approaches from the bottom; exit traffic approaches from the top. */
 .vg-scene[data-direction="entry"] .vg-anpr-camera-unit {
-  top: 280px;
-  transform: rotate(18deg);
+  top: calc(50% + var(--space-2xl));
 }
-
-/* Exit placement: upper incoming side (incoming cars move top -> bottom) */
 .vg-scene[data-direction="exit"] .vg-anpr-camera-unit {
-  top: 60px;
-  transform: rotate(42deg);
+  top: var(--space-xl);
 }
 
 @media (max-width: 600px) {
   .vg-anpr-camera-unit {
-    left: calc(50% + 95px);
-  }
-  .vg-scene[data-direction="entry"] .vg-anpr-camera-unit {
-    top: 235px;
-  }
-  .vg-scene[data-direction="exit"] .vg-anpr-camera-unit {
-    top: 45px;
+    left: calc(50% + 55px);
+    transform: scale(0.72);
+    transform-origin: top left;
   }
 }
 
-.vg-anpr-svg {
+.vg-anpr-hardware {
+  position: absolute;
+  inset: 0;
+}
+.vg-anpr-camera-base,
+.vg-anpr-camera-post,
+.vg-anpr-camera-joint,
+.vg-anpr-camera-head,
+.vg-anpr-camera-hood,
+.vg-anpr-camera-lens,
+.vg-anpr-camera-wordmark,
+.vg-anpr-camera-led {
+  position: absolute;
   display: block;
-  overflow: visible;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  box-sizing: border-box;
+}
+.vg-anpr-camera-base {
+  left: 49px;
+  top: 84px;
+  width: 26px;
+  height: 5px;
+  border: var(--rule-hair) solid var(--color-rule-2);
+  border-radius: var(--radius-input);
+  background: var(--color-paper-3);
+}
+.vg-anpr-camera-post {
+  left: 60px;
+  top: 31px;
+  width: 5px;
+  height: 55px;
+  border-inline: var(--rule-hair) solid var(--color-rule-2);
+  background: var(--color-paper-3);
+}
+.vg-anpr-camera-joint {
+  left: 56px;
+  top: 27px;
+  width: 13px;
+  height: 13px;
+  border: var(--rule-hair) solid var(--color-rule-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-2);
+}
+.vg-anpr-camera-head {
+  left: 8px;
+  top: 10px;
+  width: 56px;
+  height: 27px;
+  border: var(--rule-hair) solid var(--color-rule-2);
+  border-radius: var(--radius-input);
+  background: var(--color-paper-3);
+  transform-origin: right center;
+}
+.vg-scene[data-direction="entry"] .vg-anpr-camera-head {
+  transform: rotate(6deg);
+}
+.vg-scene[data-direction="exit"] .vg-anpr-camera-head {
+  transform: rotate(-6deg);
+}
+.vg-anpr-camera-hood {
+  inset: -4px -3px auto -3px;
+  height: 6px;
+  border-radius: var(--radius-input) var(--radius-input) 0 0;
+  background: var(--color-rule-2);
+}
+.vg-anpr-camera-lens {
+  left: 5px;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  border: var(--rule-fine) solid currentColor;
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+}
+.vg-anpr-camera-lens::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0.72;
+}
+.vg-anpr-camera-wordmark {
+  left: 24px;
+  top: 8px;
+  color: var(--color-ink);
+  font-family: var(--font-outlier);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+.vg-anpr-camera-led {
+  right: 5px;
+  top: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
 }
 
-/* Optical Scanning Beam */
 .vg-anpr-scanning-beam {
   position: absolute;
   top: 10px;
-  right: 32px;
-  width: 140px;
-  height: 52px;
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.4) 0%, rgba(56, 189, 248, 0.08) 75%, transparent 100%);
-  clip-path: polygon(100% 38%, 100% 62%, 0% 100%, 0% 0%);
+  left: -82px;
+  width: 98px;
+  height: 38px;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, currentColor 34%, transparent));
+  clip-path: polygon(0 18%, 100% 44%, 100% 56%, 0 82%);
   transform-origin: right center;
-  transform: rotate(165deg);
-  opacity: 0.25;
+  opacity: 0.12;
   pointer-events: none;
-  transition: opacity 0.3s ease, filter 0.3s ease, background 0.3s ease;
+  transition: transform var(--dur-short) var(--ease-in-out), opacity var(--dur-short) var(--ease-in-out);
 }
 
-/* Scanning Beam Active States */
 .vg-anpr-camera-unit.is-scanning .vg-anpr-scanning-beam {
-  opacity: 0.95;
-  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.95));
-  animation: vg-anpr-sweep 1.1s infinite alternate ease-in-out;
+  opacity: 0.42;
+  animation: vg-anpr-sweep 900ms var(--ease-in-out) infinite alternate;
 }
+.vg-anpr-camera-unit.is-detected .vg-anpr-scanning-beam,
 .vg-anpr-camera-unit.is-matched .vg-anpr-scanning-beam {
-  opacity: 0.85;
-  background: linear-gradient(90deg, rgba(34, 197, 94, 0.55) 0%, rgba(34, 197, 94, 0.12) 75%, transparent 100%);
-  filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.9));
+  opacity: 0.18;
 }
 .vg-anpr-camera-unit.is-mismatched .vg-anpr-scanning-beam {
-  opacity: 0.9;
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.55) 0%, rgba(239, 68, 68, 0.12) 75%, transparent 100%);
-  filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.9));
+  opacity: 0.22;
+}
+.vg-anpr-camera-unit.is-matched {
+  --vg-anpr-state-color: var(--color-success);
+}
+.vg-anpr-camera-unit.is-mismatched {
+  --vg-anpr-state-color: var(--color-danger);
 }
 
 @keyframes vg-anpr-sweep {
-  0% {
-    transform: rotate(156deg) scaleY(0.85);
-    opacity: 0.7;
-  }
-  100% {
-    transform: rotate(174deg) scaleY(1.15);
-    opacity: 1;
-  }
+  from { transform: rotate(-3deg); opacity: 0.22; }
+  to { transform: rotate(3deg); opacity: 0.42; }
 }
 
-/* Camera In-Scene HUD Badge */
 .vg-anpr-hud {
   position: absolute;
-  top: -24px;
-  right: -24px;
+  left: 0;
+  top: 94px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid #38bdf8;
-  color: #38bdf8;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 9px;
-  font-weight: 800;
+  gap: var(--space-3xs);
+  min-height: 20px;
+  max-width: 92px;
+  padding-inline: var(--space-2xs);
+  border: var(--rule-hair) solid currentColor;
+  border-radius: var(--radius-input);
+  background: var(--color-paper);
+  color: currentColor;
+  font-family: var(--font-outlier);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
   letter-spacing: 0.06em;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
   pointer-events: none;
-  transition: all 0.25s ease;
 }
 .vg-anpr-hud-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
   background: currentColor;
-  box-shadow: 0 0 6px currentColor;
 }
-.vg-anpr-camera-unit.is-scanning .vg-anpr-hud {
-  border-color: #38bdf8;
-  color: #38bdf8;
-  animation: vg-hud-pulse 1s infinite alternate ease-in-out;
-}
-.vg-anpr-camera-unit.is-matched .vg-anpr-hud {
-  border-color: #10b981;
-  color: #10b981;
-}
-.vg-anpr-camera-unit.is-mismatched .vg-anpr-hud {
-  border-color: #ef4444;
-  color: #ef4444;
+.vg-anpr-camera-unit.is-scanning .vg-anpr-camera-led,
+.vg-anpr-camera-unit.is-scanning .vg-anpr-hud-dot {
+  animation: vg-anpr-indicator 900ms var(--ease-in-out) infinite alternate;
 }
 
-@keyframes vg-hud-pulse {
-  0% { transform: scale(0.98); opacity: 0.85; }
-  100% { transform: scale(1.04); opacity: 1; }
+@keyframes vg-anpr-indicator {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
 }
 
 /* ==========================================================================
@@ -1112,7 +1183,10 @@
   .vg-car-track,
   .vg-car,
   .vg-reticle-laser,
-  .vg-live-dot {
+  .vg-live-dot,
+  .vg-anpr-scanning-beam,
+  .vg-anpr-camera-led,
+  .vg-anpr-hud-dot {
     transition: none !important;
     animation: none !important;
   }
@@ -1467,4 +1541,3 @@
 [data-theme="dark"] .vg-checkbox-label {
   color: #f1f5f9;
 }
-
