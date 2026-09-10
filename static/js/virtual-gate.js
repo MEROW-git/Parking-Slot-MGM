@@ -15,6 +15,8 @@
   const statusEl = document.getElementById('vg-camera-status');
   const codeInput = document.getElementById('id_code');
   const form = document.getElementById('gate-machine-form');
+  const zoneSelect = document.getElementById('id_zone') || document.querySelector('select[name="zone"]');
+  const modeRadios = document.querySelectorAll('input[name="mode"]');
 
   const permitSecondsEl = document.getElementById('vg-timer-seconds');
   const permitTimerBanner = document.getElementById('vg-permit-timer');
@@ -485,8 +487,6 @@
       isPassageInFlight = true;
 
       const checkBtn = document.getElementById('btn-check-open');
-      const zoneSelect = document.getElementById('id_zone');
-      const modeRadios = document.querySelectorAll('input[name="mode"]');
 
       // 1. CRITICAL: Snapshot FormData BEFORE disabling any form controls!
       // In HTML standard, disabled form elements are omitted from FormData.
