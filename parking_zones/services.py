@@ -32,14 +32,19 @@ class BillingService:
         has_verified_entry = bool(reservation.checked_in_at)
         reserved_days = reservation.effective_reserved_days
 
+        is_walk_in = getattr(reservation, 'is_walk_in', False)
+        rate_label = 'Walk-in rate' if is_walk_in else 'Daily rate'
+
         # BEFORE CHECK-IN (or unentered states: CONFIRMED, PAYMENT_PENDING, CANCELLED, EXPIRED without actual entry)
         if not reservation.checked_in_at:
             return {
                 'daily_rate': daily_rate,
                 'daily_rate_formatted': f"{daily_rate:,} ៛",
-                'overstay_multiplier': float(overstay_multiplier),
-                'overstay_rate': overstay_rate,
-                'overstay_rate_formatted': f"{overstay_rate:,} ៛",
+                'rate_label': rate_label,
+                'is_walk_in': is_walk_in,
+                'overstay_multiplier': 1.0 if is_walk_in else float(overstay_multiplier),
+                'overstay_rate': daily_rate if is_walk_in else overstay_rate,
+                'overstay_rate_formatted': f"{daily_rate:,} ៛" if is_walk_in else f"{overstay_rate:,} ៛",
                 'entry_time': None,
                 'exit_time': None,
                 'booked_end': reservation.effective_finish_time,
@@ -79,7 +84,6 @@ class BillingService:
 
         # AFTER CHECK-IN:
         # A parking day means a full 24-hour period starting at actual check-in.
-        # parking_deadline = checked_in_at + N × 24 hours
         entry_time = reservation.checked_in_at
         parking_deadline = entry_time + timedelta(days=reserved_days)
         exit_time = reservation.checked_out_at or now
@@ -89,7 +93,20 @@ class BillingService:
 
         total_parked_seconds = max(0.0, (exit_time - entry_time).total_seconds())
 
-        if exit_time <= parking_deadline:
+        if is_walk_in:
+            # Walk-in: 24-hour block billing from actual entry, minimum 1 day.
+            # No reserved-duration overstay penalty.
+            if total_parked_seconds == 0:
+                normal_days = 1
+            else:
+                normal_days = max(1, math.ceil(total_parked_seconds / 86400.0))
+            normal_seconds = total_parked_seconds
+            normal_charge = normal_days * daily_rate
+            overstay_seconds = 0.0
+            overstay_days = 0
+            overstay_charge = 0
+            parking_deadline = entry_time + timedelta(days=normal_days)
+        elif exit_time <= parking_deadline:
             # Within reserved duration
             overstay_seconds = 0.0
             overstay_days = 0
@@ -139,9 +156,11 @@ class BillingService:
         return {
             'daily_rate': daily_rate,
             'daily_rate_formatted': f"{daily_rate:,} ៛",
-            'overstay_multiplier': float(overstay_multiplier),
-            'overstay_rate': overstay_rate,
-            'overstay_rate_formatted': f"{overstay_rate:,} ៛",
+            'rate_label': rate_label,
+            'is_walk_in': is_walk_in,
+            'overstay_multiplier': 1.0 if is_walk_in else float(overstay_multiplier),
+            'overstay_rate': daily_rate if is_walk_in else overstay_rate,
+            'overstay_rate_formatted': f"{daily_rate:,} ៛" if is_walk_in else f"{overstay_rate:,} ៛",
             'entry_time': entry_time,
             'exit_time': exit_time,
             'booked_end': reservation.effective_finish_time,
@@ -205,8 +224,11 @@ class CapacityService:
 
     @staticmethod
     def check_immediate_availability(zone_id: int) -> bool:
-        """Verifies if spaces are available right now, locking the zone row."""
-        zone = ParkingZone.objects.select_for_update().get(id=zone_id)
+        """Verifies if spaces are available right now, locking the zone row if inside a transaction."""
+        if transaction.get_connection().in_atomic_block:
+            zone = ParkingZone.objects.select_for_update().get(id=zone_id)
+        else:
+            zone = ParkingZone.objects.get(id=zone_id)
         now = timezone.now()
 
         # Count active arrival holds
@@ -226,6 +248,32 @@ class CapacityService:
         occupied = zone.occupied_slots
         available = zone.num_of_slots - (occupied + active_holds + pending_deposits)
         return available > 0
+
+    @staticmethod
+    def get_unreserved_capacity(zone_id: int) -> int:
+        """
+        Returns number of unreserved spaces remaining for immediate walk-in allocation.
+        Accounts for physical occupancy, active arrival holds, and pending deposits.
+        Locks zone row if inside an atomic transaction block.
+        """
+        if transaction.get_connection().in_atomic_block:
+            zone = ParkingZone.objects.select_for_update().get(id=zone_id)
+        else:
+            zone = ParkingZone.objects.get(id=zone_id)
+        now = timezone.now()
+        active_holds = Reservation.objects.filter(
+            parking_zone=zone,
+            status='CONFIRMED',
+            arrival_deadline__gt=now,
+            checked_in_at__isnull=True
+        ).count()
+        pending_deposits = Reservation.objects.filter(
+            parking_zone=zone,
+            status='PAYMENT_PENDING',
+            payment_deadline__gt=now
+        ).count()
+        used = zone.occupied_slots + active_holds + pending_deposits
+        return max(0, zone.num_of_slots - used)
 
     @staticmethod
     def check_date_range_availability(
@@ -562,8 +610,13 @@ class GateService:
             deadline = reservation.arrival_deadline or reservation.effective_finish_time
             if deadline and now >= deadline:
                 reservation.status = 'EXPIRED'
-                reservation.staff_notes = (reservation.staff_notes + f"\n[No-Show] 3-hour arrival window expired at {now.isoformat()}.").strip()
+                if reservation.is_walk_in:
+                    reservation.staff_notes = (reservation.staff_notes + f"\n[Walk-In No-Show] Walk-in arrival window expired at {now.isoformat()}.").strip()
+                else:
+                    reservation.staff_notes = (reservation.staff_notes + f"\n[No-Show] 3-hour arrival window expired at {now.isoformat()}.").strip()
                 reservation.save(update_fields=['status', 'staff_notes'])
+                if reservation.is_walk_in:
+                    return False, reservation, 'The walk-in ticket arrival window has expired.'
                 return False, reservation, 'The 3-hour arrival window for this unpaid booking has expired.'
         else:
             # For DEPOSIT:
@@ -739,7 +792,10 @@ class ExpiryService:
         )
         for res in stale_unpaid:
             res.status = 'EXPIRED'
-            res.staff_notes = (res.staff_notes + f"\n[Auto-Expire] 3-hour arrival deadline passed at {now.isoformat()}").strip()
+            if getattr(res, 'is_walk_in', False):
+                res.staff_notes = (res.staff_notes + f"\n[Auto-Expire] Walk-in ticket hold expired at {now.isoformat()}").strip()
+            else:
+                res.staff_notes = (res.staff_notes + f"\n[Auto-Expire] 3-hour arrival deadline passed at {now.isoformat()}").strip()
             res.save(update_fields=['status', 'staff_notes'])
             results['unpaid_holds'] += 1
 

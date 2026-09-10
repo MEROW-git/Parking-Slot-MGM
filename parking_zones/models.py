@@ -2,6 +2,7 @@ import math
 import secrets
 import string
 from datetime import time, datetime, timedelta
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -33,6 +34,7 @@ class ParkingZone(models.Model):
     address = models.CharField(max_length=255)
     district = models.CharField(max_length=100, default='Phnom Penh')
     price = models.PositiveIntegerField(default=3000, help_text='Price in KHR (Riel) per session/day')
+    walk_in_price = models.PositiveIntegerField(default=7000, help_text='Walk-in rate in KHR per day')
     description = models.TextField(blank=True)
     operating_hours = models.CharField(max_length=100, default='06:00 - 22:00')
     latitude = models.FloatField(default=11.5564, blank=True, null=True, help_text='Latitude for map coordinates')
@@ -60,6 +62,10 @@ class ParkingZone(models.Model):
     @property
     def price_khr_formatted(self):
         return f"{self.price:,} ៛"
+
+    @property
+    def walk_in_price_khr_formatted(self):
+        return f"{self.walk_in_price:,} ៛"
 
     @property
     def overstay_price(self):
@@ -174,10 +180,11 @@ class Reservation(models.Model):
     ]
 
     ticket_code = models.CharField(max_length=20, default=generate_ticket_code, unique=True)
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reservations')
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='reservations')
     parking_zone = models.ForeignKey(ParkingZone, on_delete=models.CASCADE, related_name='reservations')
-    plate_number = models.CharField(max_length=40, help_text='Cambodian vehicle plate e.g. 2AZ-1234')
-    phone_number = models.CharField(max_length=30, help_text='Contact phone e.g. +855 12 345 678')
+    plate_number = models.CharField(max_length=40, blank=True, help_text='Cambodian vehicle plate e.g. 2AZ-1234')
+    phone_number = models.CharField(max_length=30, blank=True, help_text='Contact phone e.g. +855 12 345 678')
+    is_walk_in = models.BooleanField(default=False, help_text='True for walk-in tickets issued at gate')
 
     # Date fields (legacy and query compatibility)
     start_date = models.DateField()
@@ -229,7 +236,8 @@ class Reservation(models.Model):
         verbose_name_plural = 'Reservations'
 
     def __str__(self):
-        return f"Ticket {self.ticket_code} - {self.customer.username} ({self.parking_zone.name}) [{self.status}]"
+        cust_name = self.customer.username if self.customer else (self.plate_number or "Walk-in")
+        return f"Ticket {self.ticket_code} - {cust_name} ({self.parking_zone.name}) [{self.status}]"
 
     def save(self, *args, **kwargs):
         # Synchronize checked_out boolean with lifecycle status bidirectionally
@@ -243,22 +251,35 @@ class Reservation(models.Model):
             self.checked_out = False
 
         # Ensure daily rate is snapshotted from parking zone if not set
-        if not self.daily_rate and self.parking_zone_id:
+        if self.is_walk_in:
+            if not self.daily_rate and self.parking_zone_id:
+                self.daily_rate = getattr(self.parking_zone, 'walk_in_price', 7000)
+            self.overstay_multiplier = Decimal('1.0')
+            self.payment_method = 'PAY_AT_EXIT'
+        elif not self.daily_rate and self.parking_zone_id:
             self.daily_rate = self.parking_zone.price
 
         # Populate start_time, finish_time, and arrival_deadline based on payment method
         if self.payment_method == 'PAY_AT_EXIT':
             from django.conf import settings
-            hold_hours = getattr(settings, 'ARRIVAL_HOLD_HOURS', 3)
             booking_time = self.start_time or self.created_on or timezone.now()
             self.start_time = booking_time
             if not self.arrival_deadline:
-                self.arrival_deadline = booking_time + timedelta(hours=hold_hours)
-            self.finish_time = self.arrival_deadline
+                if self.is_walk_in:
+                    timeout_min = getattr(settings, 'WALK_IN_ARRIVAL_TIMEOUT_MINUTES', 5)
+                    self.arrival_deadline = booking_time + timedelta(minutes=timeout_min)
+                else:
+                    hold_hours = getattr(settings, 'ARRIVAL_HOLD_HOURS', 3)
+                    self.arrival_deadline = booking_time + timedelta(hours=hold_hours)
+            if self.is_walk_in:
+                if not self.finish_time:
+                    self.finish_time = booking_time + timedelta(days=self.reserved_days or 1)
+            else:
+                self.finish_time = self.arrival_deadline
             if not self.start_date:
                 self.start_date = timezone.localdate(self.start_time)
             if not self.finish_date:
-                self.finish_date = timezone.localdate(self.arrival_deadline)
+                self.finish_date = timezone.localdate(self.finish_time)
         else:
             # DEPOSIT mode
             booking_time = self.start_time or self.created_on or timezone.now()

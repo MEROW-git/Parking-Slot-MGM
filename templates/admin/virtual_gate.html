@@ -133,6 +133,38 @@
           </button>
         </div>
 
+        <!-- Walk-In Customer Ticket Dispenser (Entrance Mode Only) -->
+        <div class="vg-walkin-card" id="vg-walkin-card" {% if form.mode.value == 'exit' or reservation %}style="display: none;"{% endif %}>
+          <div class="vg-walkin-header">
+            <span class="vg-walkin-badge">TICKET DISPENSER</span>
+            <span class="vg-walkin-title">Walk-In Parking (គ្មានការកក់ទុក)</span>
+          </div>
+          <p class="vg-walkin-subtext">
+            Issue on-demand parking ticket for arriving vehicles without online reservations.
+          </p>
+
+          <div class="vg-walkin-info-grid">
+            <div class="vg-walkin-info-item">
+              <span class="vg-walkin-label">Walk-in rate:</span>
+              <strong class="vg-walkin-val" id="vg-walkin-rate-val">7,000 ៛ / day</strong>
+            </div>
+            <div class="vg-walkin-info-item">
+              <span class="vg-walkin-label">Unreserved capacity:</span>
+              <strong class="vg-walkin-val" id="vg-walkin-cap-val">—</strong>
+            </div>
+          </div>
+
+          <div class="vg-walkin-plate-row">
+            <label for="vg-walkin-plate-input">Simulated vehicle plate capture (optional):</label>
+            <input type="text" name="walk_in_plate" id="vg-walkin-plate-input" class="vg-dev-input" placeholder="e.g. 2AZ-1234 (optional)" autocomplete="off">
+          </div>
+
+          <button type="button" class="vg-btn vg-btn-walkin" id="btn-show-walkin-confirm">
+            <span class="vg-btn-icon" aria-hidden="true">&#127915;</span>
+            Get walk-in ticket
+          </button>
+        </div>
+
         <!-- Three-Step Exit Flow Indicator (Active during Exit mode with verified reservation) -->
         {% if form.mode.value == 'exit' and reservation %}
           <div class="vg-exit-flow" id="vg-exit-flow">
@@ -531,7 +563,7 @@
             <div class="vg-bill-box">
               <h4 class="vg-bill-title">Itemized Exit Billing Breakdown (KHR / ៛)</h4>
               <div class="vg-bill-row">
-                <span>Normal Parking Duration ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }} @ {{ bill.daily_rate|floatformat:"0" }} KHR):</span>
+                <span>{{ bill.rate_label|default:'Normal Parking Duration' }} ({{ bill.normal_days }} day{{ bill.normal_days|pluralize }} @ {{ bill.daily_rate|floatformat:"0" }} KHR):</span>
                 <strong>{{ bill.normal_charge|floatformat:"0" }} KHR</strong>
               </div>
 
@@ -579,6 +611,106 @@
     </section>
   </div>
 </div>
+
+<!-- Walk-In Ticket Rate Confirmation Modal -->
+<div class="vg-modal-backdrop" id="vg-walkin-confirm-modal" hidden>
+  <div class="vg-modal-card" role="dialog" aria-labelledby="vg-confirm-title" aria-modal="true">
+    <div class="vg-modal-header">
+      <h3 id="vg-confirm-title">Confirm Walk-In Ticket Issuance</h3>
+      <button type="button" class="vg-modal-close" id="btn-close-walkin-confirm" aria-label="Close">&times;</button>
+    </div>
+    <div class="vg-modal-body">
+      <div class="vg-confirm-details">
+        <div class="vg-confirm-row">
+          <span>Parking Facility:</span>
+          <strong id="vg-confirm-facility-name">—</strong>
+        </div>
+        <div class="vg-confirm-row">
+          <span>Walk-in rate:</span>
+          <strong id="vg-confirm-rate" style="color: #0284c7; font-size: 1.1rem;">7,000 ៛ / day</strong>
+        </div>
+        <div class="vg-confirm-row">
+          <span>Vehicle License Plate:</span>
+          <strong id="vg-confirm-plate">Not captured (Optional)</strong>
+        </div>
+        <div class="vg-confirm-row">
+          <span>Arrival Hold:</span>
+          <strong>5 minutes unreserved space hold</strong>
+        </div>
+      </div>
+      <div class="vg-alert vg-alert-info" style="margin-top: 1rem; font-size: 0.82rem; line-height: 1.45;">
+        <strong>Billing Policy:</strong> Walk-in rate is 7,000 KHR per started 24-hour block from actual entry (1-day minimum). No overstay penalty.
+        <br>
+        <strong>Note:</strong> Printing and opening the barrier does not increment physical occupancy. Billing and physical occupancy begin only upon confirmed vehicle passage.
+      </div>
+    </div>
+    <div class="vg-modal-footer">
+      <button type="button" class="vg-btn vg-btn-secondary" id="btn-cancel-walkin-confirm">Cancel</button>
+      <button type="button" class="vg-btn vg-btn-success" id="btn-issue-walkin-ticket">
+        ✓ Confirm &amp; Issue Ticket
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Printable QR Ticket Receipt Modal -->
+<div class="vg-modal-backdrop {% if ticket_qr_base64 and reservation.is_walk_in and not passed %}is-open{% endif %}" id="vg-ticket-print-modal" {% if not ticket_qr_base64 or not reservation.is_walk_in or passed %}hidden{% endif %}>
+  <div class="vg-modal-card vg-ticket-modal-card" role="dialog" aria-labelledby="vg-ticket-title" aria-modal="true">
+    <div class="vg-modal-header no-print">
+      <h3 id="vg-ticket-title">Walk-In Parking Ticket</h3>
+      <button type="button" class="vg-modal-close" id="btn-close-ticket-modal" aria-label="Close">&times;</button>
+    </div>
+    <div class="vg-modal-body">
+      <!-- Printable Ticket Area (Thermal receipt / printable format) -->
+      <div class="vg-printable-ticket" id="vg-printable-ticket-area">
+        <div class="vg-ticket-header">
+          <div class="vg-ticket-logo">SOMPARK</div>
+          <div class="vg-ticket-sub">ENTRY TICKET / ប័ណ្ណចតរថយន្ត</div>
+        </div>
+        <div class="vg-ticket-facility" id="vg-ticket-facility-name">{{ reservation.parking_zone.name|default:'SomPark Facility' }}</div>
+        
+        <div class="vg-ticket-qr-wrap">
+          <img src="{{ ticket_qr_base64|default:'' }}" alt="Access QR Code" id="vg-ticket-qr-img" class="vg-ticket-qr">
+        </div>
+        
+        <div class="vg-ticket-code" id="vg-ticket-code-display">{{ reservation.ticket_code|default:'SPK-XXXXXXX' }}</div>
+        
+        <div class="vg-ticket-meta-grid">
+          <div class="vg-ticket-row">
+            <span>Walk-in rate:</span>
+            <strong id="vg-ticket-rate-display">{{ reservation.daily_rate|default:7000|floatformat:"0" }} KHR / day</strong>
+          </div>
+          <div class="vg-ticket-row">
+            <span>Vehicle Plate:</span>
+            <strong id="vg-ticket-plate-display">{{ reservation.plate_number|default:'—' }}</strong>
+          </div>
+          <div class="vg-ticket-row">
+            <span>Issued:</span>
+            <span id="vg-ticket-issued-display">{{ now|date:"d M Y, H:i" }}</span>
+          </div>
+          <div class="vg-ticket-row">
+            <span>Arrival Window:</span>
+            <span id="vg-ticket-timeout-display">5 min hold timeout</span>
+          </div>
+        </div>
+        
+        <div class="vg-ticket-footer">
+          <p><strong>Please keep this ticket with you.</strong></p>
+          <p>Scan this QR at the exit gate to pay and depart.</p>
+          <p style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">24-hour block billing from actual entry. No overstay penalty.</p>
+        </div>
+      </div>
+    </div>
+    <div class="vg-modal-footer no-print">
+      <button type="button" class="vg-btn vg-btn-secondary" id="btn-dismiss-ticket">Close</button>
+      <button type="button" class="vg-btn vg-btn-primary" id="btn-print-ticket">
+        <span class="vg-btn-icon" aria-hidden="true">&#128424;</span> Print Ticket
+      </button>
+    </div>
+  </div>
+</div>
+
+<script id="vg-zones-info-data" type="application/json">{{ zones_info_json|safe }}</script>
 
 <script src="{% static 'js/virtual-gate.js' %}?v=2.2.0" defer></script>
 {% endblock %}

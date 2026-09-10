@@ -1541,3 +1541,374 @@
 [data-theme="dark"] .vg-checkbox-label {
   color: #f1f5f9;
 }
+
+/* ==========================================================================
+   Walk-in Parking Ticket Dispenser & Modal Styles
+   ========================================================================== */
+
+.vg-walkin-card {
+  margin-top: 20px;
+  padding: 18px;
+  background: var(--darkened-bg, #f8fafc);
+  border: 1px solid var(--hairline-color, #e2e8f0);
+  border-left: 4px solid var(--primary, #eb891e);
+  border-radius: 8px;
+}
+
+.vg-walkin-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.vg-walkin-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: var(--primary, #eb891e);
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.vg-walkin-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--body-fg, #1e293b);
+}
+
+.vg-walkin-subtext {
+  font-size: 12.5px;
+  color: var(--body-quiet-color, #64748b);
+  margin: 0 0 14px;
+  line-height: 1.4;
+}
+
+.vg-walkin-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.vg-walkin-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vg-walkin-label {
+  font-size: 11px;
+  color: var(--body-quiet-color, #64748b);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.vg-walkin-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--body-fg, #0f172a);
+}
+
+.vg-walkin-plate-row {
+  margin-bottom: 14px;
+}
+
+.vg-walkin-plate-row label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--body-quiet-color, #475569);
+}
+
+.vg-btn-walkin {
+  width: 100%;
+  justify-content: center;
+  background: #0ea5e9;
+  color: #ffffff;
+  border: 1px solid #0284c7;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.vg-btn-walkin:hover {
+  background: #0284c7;
+}
+
+.vg-btn-walkin:active {
+  transform: translateY(1px);
+}
+
+/* Modals */
+.vg-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.vg-modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.vg-modal-card {
+  background: var(--body-bg, #ffffff);
+  border: 1px solid var(--hairline-color, #cbd5e1);
+  border-radius: 12px;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: vgModalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vgModalPop {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.vg-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--hairline-color, #e2e8f0);
+}
+
+.vg-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--body-fg, #0f172a);
+}
+
+.vg-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--body-quiet-color, #94a3b8);
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.vg-modal-close:hover {
+  color: var(--body-fg, #0f172a);
+}
+
+.vg-modal-body {
+  padding: 20px;
+}
+
+.vg-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--hairline-color, #e2e8f0);
+  background: var(--darkened-bg, #f8fafc);
+}
+
+/* Confirmation modal details */
+.vg-confirm-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vg-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13.5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline-color, #f1f5f9);
+}
+
+/* Printable Ticket Receipt */
+.vg-ticket-modal-card {
+  max-width: 400px;
+}
+
+.vg-printable-ticket {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.vg-ticket-header {
+  margin-bottom: 10px;
+}
+
+.vg-ticket-logo {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #0f172a;
+}
+
+.vg-ticket-sub {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.vg-ticket-facility {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.vg-ticket-qr-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.vg-ticket-qr {
+  display: block;
+  width: 160px;
+  height: 160px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px;
+  background: #ffffff;
+}
+
+.vg-ticket-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #0f172a;
+  margin-bottom: 14px;
+}
+
+.vg-ticket-meta-grid {
+  text-align: left;
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.vg-ticket-row {
+  display: flex;
+  justify-content: space-between;
+  color: #334155;
+}
+
+.vg-ticket-footer {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+
+.vg-ticket-footer p {
+  margin: 2px 0;
+}
+
+/* Dark mode overrides for Walk-in elements */
+[data-theme="dark"] .vg-walkin-card {
+  background: #1e293b;
+  border-color: #334155;
+  border-left-color: var(--primary, #eb891e);
+}
+[data-theme="dark"] .vg-walkin-title {
+  color: #f8fafc;
+}
+[data-theme="dark"] .vg-walkin-subtext {
+  color: #94a3b8;
+}
+[data-theme="dark"] .vg-walkin-info-grid {
+  background: #0f172a;
+}
+[data-theme="dark"] .vg-walkin-label {
+  color: #94a3b8;
+}
+[data-theme="dark"] .vg-walkin-val {
+  color: #f8fafc;
+}
+[data-theme="dark"] .vg-modal-card {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+[data-theme="dark"] .vg-modal-header {
+  border-bottom-color: #334155;
+}
+[data-theme="dark"] .vg-modal-header h3 {
+  color: #f8fafc;
+}
+[data-theme="dark"] .vg-modal-footer {
+  background: #0f172a;
+  border-top-color: #334155;
+}
+[data-theme="dark"] .vg-confirm-row {
+  border-bottom-color: #334155;
+}
+
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .vg-modal-backdrop,
+  .vg-ticket-modal-card,
+  #vg-printable-ticket-area,
+  #vg-printable-ticket-area * {
+    visibility: visible;
+  }
+  .vg-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+  }
+  .vg-ticket-modal-card {
+    box-shadow: none;
+    border: none;
+    max-width: 100%;
+    margin: 0;
+  }
+  .vg-printable-ticket {
+    border: 1px solid #000;
+    padding: 15px;
+    width: 320px;
+    margin: 0 auto;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+

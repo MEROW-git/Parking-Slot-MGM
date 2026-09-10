@@ -3,9 +3,12 @@ Admin virtual parking gate simulator.
 Simulates optical QR / physical barrier arm operations for Entrance and Exit.
 Passage confirmation delegates to real atomic parking services.
 """
+import json
 import re
 import secrets
 import time
+from datetime import timedelta
+from decimal import Decimal
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
@@ -16,9 +19,9 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from .models import ParkingZone, Reservation
-from .qr import generate_demo_payment_qr_base64
-from .services import BillingService, GateService, PaymentService
+from .models import ParkingZone, Reservation, generate_ticket_code, generate_access_token
+from .qr import generate_demo_payment_qr_base64, generate_access_qr_base64
+from .services import BillingService, GateService, PaymentService, CapacityService
 
 
 def normalize_license_plate(plate: str) -> str:
@@ -58,6 +61,7 @@ class GateMachineForm(forms.Form):
     code = forms.CharField(
         max_length=128,
         label='Ticket code or access QR token',
+        required=False,
         widget=forms.TextInput(
             attrs={
                 'placeholder': 'SPK-XXXXXXX or 48-char hex token',
@@ -67,6 +71,14 @@ class GateMachineForm(forms.Form):
             }
         )
     )
+
+    def clean(self):
+        cleaned = super().clean()
+        action = self.data.get('action', 'open')
+        if action != 'walk_in_issue' and not cleaned.get('code'):
+            self.add_error('code', 'Ticket code or access QR token is required.')
+        return cleaned
+
 
 
 @require_http_methods(['GET', 'POST'])
@@ -90,6 +102,19 @@ def virtual_gate(request):
     form = GateMachineForm(request.POST or None, initial=initial)
     demo_enabled = getattr(settings, 'DEMO_PAYMENT_ENABLED', True)
 
+    zones_info = {}
+    for z in ParkingZone.objects.all():
+        unreserved = CapacityService.get_unreserved_capacity(z.pk)
+        zones_info[str(z.pk)] = {
+            'id': z.pk,
+            'name': z.name,
+            'walk_in_price': z.walk_in_price,
+            'walk_in_price_formatted': z.walk_in_price_khr_formatted,
+            'unreserved_capacity': unreserved,
+            'num_of_slots': z.num_of_slots,
+            'occupied_slots': z.occupied_slots,
+        }
+
     context = {
         **admin.site.each_context(request),
         'title': 'Virtual Parking Gate Terminal',
@@ -107,12 +132,15 @@ def virtual_gate(request):
         'plate_matched': None,
         'simulate_plate_mismatch': False,
         'custom_detected_plate': '',
+        'zones_info_json': json.dumps(zones_info),
+        'ticket_qr_base64': None,
     }
 
     # If GET has valid code and zone, inspect reservation for preview or telemetry reconciliation
     if request.method == 'GET' and initial.get('zone') and initial.get('code'):
         zone_id = initial.get('zone')
-        code = initial.get('code').strip()
+        raw_code = initial.get('code').strip()
+        code = raw_code.replace('sompark:pass:', '').strip() if raw_code.startswith('sompark:pass:') else raw_code
         mode = initial.get('mode', 'entry')
         reservation = (
             Reservation.objects.filter(ticket_code=code).first() or
@@ -153,8 +181,130 @@ def virtual_gate(request):
     if request.method == 'POST' and form.is_valid():
         zone = form.cleaned_data['zone']
         mode = form.cleaned_data['mode']
-        code = form.cleaned_data['code'].strip()
+        raw_code = (form.cleaned_data.get('code') or '').strip()
+        code = raw_code.replace('sompark:pass:', '').strip() if raw_code.startswith('sompark:pass:') else raw_code
         action = request.POST.get('action', 'open')
+
+        # Action: Issue Walk-In Ticket at Entrance
+        if action == 'walk_in_issue':
+            if mode != 'entry':
+                err = 'Walk-in tickets can only be issued at the Entrance gate.'
+                if is_ajax:
+                    return JsonResponse({'success': False, 'notice': err}, status=400)
+                form.add_error(None, err)
+                return render(request, 'admin/virtual_gate.html', context)
+
+            with transaction.atomic():
+                zone = ParkingZone.objects.select_for_update().get(pk=zone.pk)
+
+                # Check capacity server-side, including active reservation holds
+                unreserved = CapacityService.get_unreserved_capacity(zone.pk)
+                if unreserved <= 0:
+                    err = (
+                        f"Cannot issue walk-in ticket: Facility '{zone.name}' has no available unreserved spaces. "
+                        f"All slots are occupied or held by active reservations."
+                    )
+                    messages.error(request, err)
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'notice': err, 'unreserved': 0}, status=400)
+                    form.add_error(None, err)
+                    context.update(notice=err)
+                    return render(request, 'admin/virtual_gate.html', context)
+
+                # Duplicate / retry prevention
+                idempotency_key = (request.POST.get('idempotency_key') or '').strip()
+                existing_res = None
+                if idempotency_key:
+                    recent_cutoff = timezone.now() - timedelta(minutes=5)
+                    existing_res = Reservation.objects.filter(
+                        parking_zone=zone,
+                        is_walk_in=True,
+                        staff_notes__contains=f"[IDEMP:{idempotency_key}]",
+                        created_on__gte=recent_cutoff
+                    ).first()
+
+                now = timezone.now()
+                if existing_res:
+                    reservation = existing_res
+                else:
+                    # Optional simulated plate capture
+                    detected_plate = (
+                        request.POST.get('custom_detected_plate') or
+                        request.POST.get('detected_plate') or
+                        request.POST.get('walk_in_plate') or
+                        request.POST.get('plate_number') or
+                        ''
+                    ).strip()
+
+                    idemp_tag = f"[IDEMP:{idempotency_key}]" if idempotency_key else ""
+                    arrival_timeout_minutes = getattr(settings, 'WALK_IN_ARRIVAL_TIMEOUT_MINUTES', 5)
+
+                    reservation = Reservation.objects.create(
+                        customer=None,
+                        parking_zone=zone,
+                        plate_number=detected_plate,
+                        phone_number='',
+                        is_walk_in=True,
+                        start_date=now.date(),
+                        finish_date=now.date(),
+                        start_time=now,
+                        finish_time=now + timedelta(days=1),
+                        daily_rate=zone.walk_in_price,
+                        overstay_multiplier=Decimal('1.0'),
+                        payment_method='PAY_AT_EXIT',
+                        payment_status='UNPAID',
+                        status='CONFIRMED',
+                        arrival_deadline=now + timedelta(minutes=arrival_timeout_minutes),
+                        access_token=generate_access_token(),
+                        staff_notes=f"Walk-in ticket issued at entrance. Rate: {zone.walk_in_price} KHR/day. {idemp_tag}".strip(),
+                    )
+
+                # Generate printable QR ticket image (Data URI)
+                ticket_qr = generate_access_qr_base64(reservation.ticket_code)
+
+                # Cryptographic permit for barrier opening
+                permit = signing.dumps([request.user.pk, reservation.pk, zone.pk, 'entry'], salt='virtual-gate')
+                permit_expires_at = int(time.time()) + 120
+
+                notice = (
+                    f"Walk-in ticket #{reservation.ticket_code} issued at {zone.walk_in_price:,} KHR/day. "
+                    f"Barrier is OPEN — waiting for vehicle to pass."
+                )
+                messages.success(request, notice)
+
+                context.update(
+                    reservation=reservation,
+                    ticket_qr_base64=ticket_qr,
+                    gate_open=True,
+                    permit=permit,
+                    permit_expires_at=permit_expires_at,
+                    notice=notice,
+                    detected_plate=reservation.plate_number,
+                    expected_plate=reservation.plate_number,
+                    plate_matched=True,
+                )
+
+                if is_ajax:
+                    return JsonResponse({
+                        'success': True,
+                        'walk_in_issued': True,
+                        'ticket_code': reservation.ticket_code,
+                        'access_token': reservation.access_token,
+                        'ticket_qr_base64': ticket_qr,
+                        'daily_rate': reservation.daily_rate,
+                        'daily_rate_formatted': f"{reservation.daily_rate:,} ៛",
+                        'rate_label': 'Walk-in rate',
+                        'plate_number': reservation.plate_number,
+                        'arrival_deadline': reservation.arrival_deadline.isoformat() if reservation.arrival_deadline else None,
+                        'gate_open': True,
+                        'permit': permit,
+                        'permit_expires_at': permit_expires_at,
+                        'notice': notice,
+                        'status': reservation.status,
+                        'status_display': reservation.get_status_display(),
+                        'unreserved_capacity': CapacityService.get_unreserved_capacity(zone.pk),
+                    })
+                return render(request, 'admin/virtual_gate.html', context)
 
         reservation = Reservation.objects.filter(ticket_code=code).first()
         if reservation is None:
@@ -197,7 +347,10 @@ def virtual_gate(request):
                 else:
                     detected_plate = incoming_detected_plate or custom_detected_plate or expected_plate
 
-                plate_matched = (normalize_license_plate(detected_plate) == normalize_license_plate(expected_plate))
+                if not expected_plate:
+                    plate_matched = True
+                else:
+                    plate_matched = (normalize_license_plate(detected_plate) == normalize_license_plate(expected_plate))
 
                 context.update(
                     reservation=reservation,
@@ -211,7 +364,17 @@ def virtual_gate(request):
                 # Action: Close barrier without passage
                 if action == 'close':
                     context['gate_open'] = False
-                    context['notice'] = 'Barrier closed without passage. Reservation status and parking capacity remain unchanged.'
+                    if reservation.is_walk_in and not reservation.checked_in_at:
+                        reservation.status = 'CANCELLED'
+                        reservation.staff_notes = (
+                            reservation.staff_notes +
+                            f"\n[Abandoned] Unused walk-in ticket cancelled without passage at {timezone.now().isoformat()}."
+                        ).strip()
+                        reservation.save(update_fields=['status', 'staff_notes'])
+                        context['notice'] = f'Barrier closed without passage. Unused walk-in ticket #{reservation.ticket_code} hold released.'
+                    else:
+                        context['notice'] = 'Barrier closed without passage. Reservation status and parking capacity remain unchanged.'
+
                     if mode == 'exit':
                         bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
                         context.update(reservation=reservation, bill=bill)

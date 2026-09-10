@@ -818,6 +818,374 @@
     });
   }
 
+  // =========================================================================
+  // Walk-in Parking & Exit Payment Controller
+  // =========================================================================
+  const zonesScript = document.getElementById('vg-zones-info-data');
+  let zonesInfo = {};
+  if (zonesScript) {
+    try {
+      zonesInfo = JSON.parse(zonesScript.textContent || '{}');
+    } catch (_) {}
+  }
+
+  const walkinCard = document.getElementById('vg-walkin-card');
+  const walkinRateVal = document.getElementById('vg-walkin-rate-val');
+  const walkinCapVal = document.getElementById('vg-walkin-cap-val');
+  const showWalkinBtn = document.getElementById('btn-show-walkin-confirm');
+  const walkinConfirmModal = document.getElementById('vg-walkin-confirm-modal');
+  const closeWalkinConfirmBtn = document.getElementById('btn-close-walkin-confirm');
+  const cancelWalkinConfirmBtn = document.getElementById('btn-cancel-walkin-confirm');
+  const issueWalkinTicketBtn = document.getElementById('btn-issue-walkin-ticket');
+  const walkinPlateInput = document.getElementById('vg-walkin-plate-input');
+
+  const confirmFacilityName = document.getElementById('vg-confirm-facility-name');
+  const confirmRate = document.getElementById('vg-confirm-rate');
+  const confirmPlate = document.getElementById('vg-confirm-plate');
+
+  const ticketPrintModal = document.getElementById('vg-ticket-print-modal');
+  const closeTicketModalBtn = document.getElementById('btn-close-ticket-modal');
+  const dismissTicketBtn = document.getElementById('btn-dismiss-ticket');
+  const printTicketBtn = document.getElementById('btn-print-ticket');
+
+  function updateWalkinFacilityDisplay() {
+    if (!zoneSelect) return;
+    const zoneId = zoneSelect.value;
+    const info = zonesInfo[zoneId];
+    if (info) {
+      if (walkinRateVal) walkinRateVal.textContent = `${info.walk_in_price_formatted} / day`;
+      if (walkinCapVal) {
+        if (info.unreserved_capacity > 0) {
+          walkinCapVal.textContent = `${info.unreserved_capacity} space${info.unreserved_capacity > 1 ? 's' : ''} available`;
+          walkinCapVal.style.color = '#10b981';
+          if (showWalkinBtn) showWalkinBtn.disabled = false;
+        } else {
+          walkinCapVal.textContent = `0 spaces (Full / Reserved)`;
+          walkinCapVal.style.color = '#ef4444';
+          if (showWalkinBtn) showWalkinBtn.disabled = true;
+        }
+      }
+    } else {
+      if (walkinRateVal) walkinRateVal.textContent = '7,000 ៛ / day';
+      if (walkinCapVal) {
+        walkinCapVal.textContent = '—';
+        walkinCapVal.style.color = '';
+      }
+    }
+  }
+
+  if (zoneSelect) {
+    zoneSelect.addEventListener('change', updateWalkinFacilityDisplay);
+    updateWalkinFacilityDisplay();
+  }
+
+  // Update card visibility on gate direction change (Entrance / Exit)
+  modeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (walkinCard) {
+        if (radio.value === 'entry' && (!codeInput || !codeInput.value.trim())) {
+          walkinCard.style.display = 'block';
+          updateWalkinFacilityDisplay();
+        } else {
+          walkinCard.style.display = 'none';
+        }
+      }
+    });
+  });
+
+  // Open Walk-in Confirmation Modal
+  if (showWalkinBtn) {
+    showWalkinBtn.addEventListener('click', () => {
+      const zoneId = zoneSelect?.value;
+      if (!zoneId) {
+        alert('Please select a parking facility first.');
+        zoneSelect?.focus();
+        return;
+      }
+      const info = zonesInfo[zoneId];
+      if (info && info.unreserved_capacity <= 0) {
+        alert(`Cannot issue walk-in ticket: Facility '${info.name}' has no available unreserved spaces. All slots are occupied or held by active reservations.`);
+        return;
+      }
+
+      if (confirmFacilityName) confirmFacilityName.textContent = info ? info.name : 'Selected Facility';
+      if (confirmRate) confirmRate.textContent = info ? `${info.walk_in_price_formatted} / day` : '7,000 ៛ / day';
+      const plate = walkinPlateInput?.value?.trim() || '';
+      if (confirmPlate) confirmPlate.textContent = plate ? plate.toUpperCase() : 'Not captured (Optional)';
+
+      if (walkinConfirmModal) walkinConfirmModal.hidden = false;
+    });
+  }
+
+  function hideWalkinConfirm() {
+    if (walkinConfirmModal) walkinConfirmModal.hidden = true;
+  }
+  if (closeWalkinConfirmBtn) closeWalkinConfirmBtn.addEventListener('click', hideWalkinConfirm);
+  if (cancelWalkinConfirmBtn) cancelWalkinConfirmBtn.addEventListener('click', hideWalkinConfirm);
+
+  // Issue Walk-in Ticket via Server Request
+  let walkInInFlight = false;
+  if (issueWalkinTicketBtn) {
+    issueWalkinTicketBtn.addEventListener('click', async () => {
+      if (walkInInFlight) return;
+      walkInInFlight = true;
+      issueWalkinTicketBtn.disabled = true;
+
+      const zoneId = zoneSelect?.value;
+      const plate = walkinPlateInput?.value?.trim() || '';
+      const csrfToken = form?.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
+      const idempotencyKey = 'walkin_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
+      const formData = new FormData();
+      formData.set('csrfmiddlewaretoken', csrfToken);
+      formData.set('zone', zoneId);
+      formData.set('mode', 'entry');
+      formData.set('action', 'walk_in_issue');
+      formData.set('walk_in_plate', plate);
+      formData.set('idempotency_key', idempotencyKey);
+
+      try {
+        const postUrl = form?.getAttribute('action') || window.location.pathname || window.location.href;
+        const resp = await fetch(postUrl, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+          body: formData
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+          hideWalkinConfirm();
+
+          // Populate printable ticket modal
+          const ticketFacility = document.getElementById('vg-ticket-facility-name');
+          const ticketCodeDisplay = document.getElementById('vg-ticket-code-display');
+          const ticketQrImg = document.getElementById('vg-ticket-qr-img');
+          const ticketRateDisplay = document.getElementById('vg-ticket-rate-display');
+          const ticketPlateDisplay = document.getElementById('vg-ticket-plate-display');
+
+          if (ticketFacility) ticketFacility.textContent = zonesInfo[zoneId]?.name || 'SomPark Facility';
+          if (ticketCodeDisplay) ticketCodeDisplay.textContent = data.ticket_code;
+          if (ticketQrImg) ticketQrImg.src = data.ticket_qr_base64;
+          if (ticketRateDisplay) ticketRateDisplay.textContent = `${data.daily_rate_formatted} / day (Walk-in rate)`;
+          if (ticketPlateDisplay) ticketPlateDisplay.textContent = data.plate_number || '—';
+
+          // Show printable ticket modal
+          if (ticketPrintModal) ticketPrintModal.hidden = false;
+
+          // Set form ticket code
+          if (codeInput) codeInput.value = data.ticket_code;
+
+          // Open simulated barrier arm immediately
+          if (sceneEl) {
+            sceneEl.classList.add('is-open');
+            sceneEl.classList.remove('is-passed');
+          }
+          if (statusBanner && statusText) {
+            statusBanner.className = 'vg-status-indicator status-open';
+            statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
+          }
+
+          // Permit countdown & passage actions
+          const permitInput = document.getElementById('vg-permit-input');
+          if (permitInput) permitInput.value = data.permit;
+          if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
+          startPermitCountdown();
+
+          const passBox = document.getElementById('vg-pass-actions-box');
+          if (passBox) passBox.style.display = 'block';
+
+          // Hide walk-in card while ticket is in active passage hold
+          if (walkinCard) walkinCard.style.display = 'none';
+
+          // Update notice
+          let noticeBox = document.querySelector('.vg-notice');
+          if (!noticeBox && statusBanner && statusBanner.parentNode) {
+            noticeBox = document.createElement('div');
+            statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
+          }
+          if (noticeBox) {
+            noticeBox.className = 'vg-notice is-success';
+            noticeBox.textContent = data.notice;
+          }
+
+          // Update cached unreserved capacity
+          if (zonesInfo[zoneId] && typeof data.unreserved_capacity === 'number') {
+            zonesInfo[zoneId].unreserved_capacity = data.unreserved_capacity;
+            updateWalkinFacilityDisplay();
+          }
+        } else {
+          alert(data.notice || 'Failed to issue walk-in ticket. Please try again.');
+          hideWalkinConfirm();
+        }
+      } catch (err) {
+        alert('Network connection error while issuing walk-in ticket.');
+      } finally {
+        walkInInFlight = false;
+        issueWalkinTicketBtn.disabled = false;
+      }
+    });
+  }
+
+  // Close ticket printable modal
+  function hideTicketModal() {
+    if (ticketPrintModal) ticketPrintModal.hidden = true;
+  }
+  if (closeTicketModalBtn) closeTicketModalBtn.addEventListener('click', hideTicketModal);
+  if (dismissTicketBtn) dismissTicketBtn.addEventListener('click', hideTicketModal);
+  if (printTicketBtn) {
+    printTicketBtn.addEventListener('click', () => {
+      window.print();
+    });
+  }
+
+  // Direct exit payment settlement (Requirement 9: continue directly to barrier opening & passage without re-scanning)
+  const cashBtn = document.getElementById('btn-confirm-cash');
+  const demoSuccessBtn = document.getElementById('btn-demo-qr-success');
+  const demoFailureBtn = document.getElementById('btn-demo-qr-failure');
+  const demoCancelBtn = document.getElementById('btn-demo-qr-cancel');
+
+  async function handleExitSettlement(provider, outcome) {
+    const csrfToken = form?.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
+    const zoneId = zoneSelect?.value;
+    const codeVal = codeInput?.value?.trim();
+
+    const formData = new FormData();
+    formData.set('csrfmiddlewaretoken', csrfToken);
+    formData.set('zone', zoneId);
+    formData.set('mode', 'exit');
+    formData.set('code', codeVal);
+    formData.set('action', 'settle');
+    formData.set('payment_provider', provider);
+    formData.set('outcome', outcome);
+
+    const detectedPlateHidden = document.getElementById('vg-detected-plate-input');
+    if (detectedPlateHidden && detectedPlateHidden.value) {
+      formData.set('detected_plate', detectedPlateHidden.value);
+    }
+    const customDetectedPlate = document.getElementById('custom-detected-plate-input');
+    if (customDetectedPlate && customDetectedPlate.value) {
+      formData.set('custom_detected_plate', customDetectedPlate.value);
+    }
+    const mismatchCb = document.getElementById('simulate-plate-mismatch-cb');
+    if (mismatchCb && mismatchCb.checked) {
+      formData.set('simulate_plate_mismatch', 'true');
+    }
+
+    try {
+      const postUrl = form?.getAttribute('action') || window.location.pathname || window.location.href;
+      const resp = await fetch(postUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        body: formData
+      });
+
+      const data = await resp.json();
+      if (resp.ok && data.success && data.settled) {
+        // Step 2 Completed
+        const step2 = document.getElementById('vg-step-2');
+        if (step2) {
+          step2.classList.remove('is-active', 'is-pending');
+          step2.classList.add('is-completed');
+        }
+        const conn12 = document.getElementById('vg-connector-1-2');
+        if (conn12) conn12.classList.add('is-completed');
+        const conn23 = document.getElementById('vg-connector-2-3');
+        if (conn23) conn23.classList.add('is-active');
+        const step2Desc = document.getElementById('vg-step-2-desc');
+        if (step2Desc) step2Desc.textContent = '0 KHR due · Settled';
+
+        // Hide settlement box
+        const settleBox = document.getElementById('vg-settlement-box');
+        if (settleBox) settleBox.style.display = 'none';
+
+        // Step 3 Active: Barrier opened
+        const step3 = document.getElementById('vg-step-3');
+        if (step3) {
+          step3.classList.remove('is-pending');
+          step3.classList.add('is-active');
+        }
+        const step3Desc = document.getElementById('vg-step-3-desc');
+        if (step3Desc) step3Desc.textContent = 'Barrier OPEN · Waiting';
+
+        // Open barrier arm immediately
+        if (sceneEl) {
+          sceneEl.classList.add('is-open');
+          sceneEl.classList.remove('is-passed');
+        }
+        if (statusBanner && statusText) {
+          statusBanner.className = 'vg-status-indicator status-open';
+          statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
+        }
+
+        // Set permit and start countdown
+        const permitInput = document.getElementById('vg-permit-input');
+        if (permitInput) permitInput.value = data.permit;
+        if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
+        startPermitCountdown();
+
+        // Show passage actions
+        const passBox = document.getElementById('vg-pass-actions-box');
+        if (passBox) passBox.style.display = 'block';
+
+        // Update notice
+        let noticeBox = document.querySelector('.vg-notice');
+        if (!noticeBox && statusBanner && statusBanner.parentNode) {
+          noticeBox = document.createElement('div');
+          statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
+        }
+        if (noticeBox) {
+          noticeBox.className = 'vg-notice is-success';
+          noticeBox.textContent = data.notice;
+        }
+
+        // Update balance due display in telemetry
+        const balEl = document.querySelector('.vg-balance-amount');
+        if (balEl) {
+          balEl.textContent = '0 KHR';
+          balEl.classList.add('is-zero');
+        }
+      } else {
+        // Payment failed, cancelled, or plate mismatch
+        let noticeBox = document.querySelector('.vg-notice');
+        if (!noticeBox && statusBanner && statusBanner.parentNode) {
+          noticeBox = document.createElement('div');
+          statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
+        }
+        if (noticeBox) {
+          noticeBox.className = 'vg-notice vg-alert-error';
+          noticeBox.textContent = data.notice || 'Payment processing failed.';
+        }
+      }
+    } catch (err) {
+      alert('Network error during exit payment settlement.');
+    }
+  }
+
+  if (cashBtn) {
+    cashBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleExitSettlement('CASH', 'success');
+    });
+  }
+  if (demoSuccessBtn) {
+    demoSuccessBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleExitSettlement('DEMO', 'success');
+    });
+  }
+  if (demoFailureBtn) {
+    demoFailureBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleExitSettlement('DEMO', 'failure');
+    });
+  }
+  if (demoCancelBtn) {
+    demoCancelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleExitSettlement('DEMO', 'cancel');
+    });
+  }
+
   // Cleanup on page hide or navigate away
   window.addEventListener('pagehide', stopCamera);
   window.addEventListener('beforeunload', stopCamera);
