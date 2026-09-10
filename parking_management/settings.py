@@ -339,5 +339,4 @@ BOOKING_RATE_LIMIT_PER_MINUTE = int(os.environ.get('BOOKING_RATE_LIMIT_PER_MINUT
 BOOKING_IP_RATE_LIMIT_PER_MINUTE = int(os.environ.get('BOOKING_IP_RATE_LIMIT_PER_MINUTE', '30'))
 
 # Asset versioning for cache busting
-ASSET_VERSION = os.environ.get('ASSET_VERSION', '1.2.0')
-
+ASSET_VERSION = os.environ.get('ASSET_VERSION', '1.3.0')

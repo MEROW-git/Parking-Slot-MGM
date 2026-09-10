@@ -29,11 +29,6 @@
   --sp-transition: var(--dur-short) var(--ease-out);
 }
 
-html,
-body {
-  overflow-x: clip;
-}
-
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 6rem;
@@ -2485,7 +2480,7 @@ code {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
   gap: var(--space-xl);
-  align-items: start;
+  align-items: stretch;
   min-width: 0;
 }
 
@@ -2508,14 +2503,31 @@ code {
   margin-bottom: var(--space-xl);
 }
 
-.sp-zone-sidebar-card {
-  position: sticky;
-  top: 6.5rem;
+/* Sticky Booking Card Column: follows scroll below 5rem navbar with 1.25rem gap, stops before footer */
+.sp-zone-detail-sidebar {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  position: static;
 }
 
-@media (max-width: 56rem), (max-height: 40rem) {
+.sp-zone-sidebar-card {
+  position: -webkit-sticky;
+  position: sticky;
+  top: calc(5rem + 1.25rem);
+  margin-bottom: 0;
+  z-index: 20;
+}
+
+@media (max-width: 56rem), (max-height: 35rem) {
+  .sp-zone-detail-sidebar {
+    height: auto;
+  }
+
   .sp-zone-sidebar-card {
-    position: static;
+    position: static !important;
+    top: auto !important;
+    margin-bottom: var(--space-xl) !important;
   }
 }
 

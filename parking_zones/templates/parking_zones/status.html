@@ -2,6 +2,41 @@
 
 {% block title %}{{ parking_zone.name }} | SomPark Phnom Penh{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Sticky Booking Card: Follows scroll below 5rem navbar with 1.25rem gap, stops before footer */
+  html, body {
+    overflow-x: visible !important;
+  }
+  .sp-zone-detail-grid {
+    align-items: stretch !important;
+  }
+  .sp-zone-detail-sidebar {
+    display: block !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    position: static !important;
+  }
+  .sp-zone-sidebar-card {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: calc(5rem + 1.25rem) !important;
+    margin-bottom: 0 !important;
+    z-index: 20 !important;
+  }
+  @media (max-width: 56rem), (max-height: 35rem) {
+    .sp-zone-detail-sidebar {
+      height: auto !important;
+    }
+    .sp-zone-sidebar-card {
+      position: static !important;
+      top: auto !important;
+      margin-bottom: var(--space-xl) !important;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 {% include "components/page_header.html" with title=parking_zone.name subtitle=parking_zone.address khmer_tag=parking_zone.khmer_name %}
 
@@ -95,8 +130,8 @@
   </div>
 
   <!-- Right Column: Booking Card -->
-  <div class="sp-zone-detail-sidebar">
-    <div class="sp-zone-sidebar-card" data-reveal="up" data-reveal-delay="120">
+  <div class="sp-zone-detail-sidebar" style="height:100%; min-width:0; position:static;">
+    <div class="sp-zone-sidebar-card" id="sticky-booking-card">
       <div style="border-bottom:var(--rule-fine) solid var(--color-rule); padding-bottom:1.25rem; margin-bottom:1.25rem;">
         <div style="font-size:0.85rem; font-weight:700; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.04em;">Daily Rate</div>
         <div style="font-size:2.25rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-ink); line-height:1.15; margin-block:0.25rem;">
