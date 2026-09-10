@@ -398,11 +398,14 @@
       if (isCustomPlate()) {
         codeEl.placeholder = 'e.g. MEOW or MY CAR';
         if (codeLabelEl) codeLabelEl.textContent = 'Custom Plate Text (អក្សរផ្លាកផ្ទាល់ខ្លួន)';
-        if (codeHelpEl) codeHelpEl.textContent = 'Enter your personalized plate text. Numbers are optional and spaces remain spaces.';
+        if (codeHelpEl) codeHelpEl.hidden = true;
       } else {
         codeEl.placeholder = 'e.g. 2AZ 1234';
         if (codeLabelEl) codeLabelEl.textContent = 'Standard Plate Number (លេខផ្លាក)';
-        if (codeHelpEl) codeHelpEl.textContent = 'Type a space or hyphen between both parts; it will be saved as 2AZ-1234.';
+        if (codeHelpEl) {
+          codeHelpEl.hidden = false;
+          codeHelpEl.textContent = 'Type a space or hyphen between both parts; it will be saved as 2AZ-1234.';
+        }
       }
     }
 
