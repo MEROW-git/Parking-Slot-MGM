@@ -15,7 +15,7 @@
 
   <!-- 2. State-Driven Action Buttons (Centered) -->
   <div class="no-print sp-ticket-actions-bar" id="ticket-actions-bar" data-reveal="up">
-    <div class="sp-ticket-actions-group">
+    <div class="sp-ticket-actions-group" id="ticket-actions-group">
       {% if reservation.status == 'CONFIRMED' %}
         <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-show-gate-mode" title="Fullscreen high-contrast QR for gate scanner">
           Show at Gate (បង្ហាញនៅរបាំង)
@@ -156,31 +156,31 @@
       </div>
       <div style="text-align:right;">
         {% if reservation.checked_out or reservation.status == 'CHECKED_OUT' %}
-          <span class="sp-avail-badge" style="background:#e5e7eb; color:#4b5563; border:1px solid #9ca3af;">
+          <span class="sp-avail-badge" id="ticket-status-badge" style="background:#e5e7eb; color:#4b5563; border:1px solid #9ca3af;">
             CHECKED OUT (បានចេញ)
           </span>
         {% elif reservation.status == 'CHECKED_IN' %}
-          <span class="sp-avail-badge available" style="background:rgba(34,197,94,0.2); color:#15803d; border:1px solid #16a34a;">
+          <span class="sp-avail-badge available" id="ticket-status-badge" style="background:rgba(34,197,94,0.2); color:#15803d; border:1px solid #16a34a;">
             PARKED / CHECKED IN (កំពុងចត)
           </span>
         {% elif reservation.status == 'CONFIRMED' %}
-          <span class="sp-avail-badge" style="background:rgba(59,130,246,0.15); color:#1d4ed8; border:1px solid #3b82f6;">
+          <span class="sp-avail-badge" id="ticket-status-badge" style="background:rgba(59,130,246,0.15); color:#1d4ed8; border:1px solid #3b82f6;">
             CONFIRMED HOLD (បានកក់)
           </span>
         {% elif reservation.status == 'PAYMENT_PENDING' %}
-          <span class="sp-avail-badge" style="background:rgba(245,158,11,0.15); color:#b45309; border:1px solid #f59e0b;">
+          <span class="sp-avail-badge" id="ticket-status-badge" style="background:rgba(245,158,11,0.15); color:#b45309; border:1px solid #f59e0b;">
             PAYMENT PENDING (រង់ចាំការបង់ប្រាក់)
           </span>
         {% elif reservation.status == 'EXPIRED' %}
-          <span class="sp-avail-badge" style="background:rgba(239,68,68,0.15); color:#b91c1c; border:1px solid #ef4444;">
+          <span class="sp-avail-badge" id="ticket-status-badge" style="background:rgba(239,68,68,0.15); color:#b91c1c; border:1px solid #ef4444;">
             EXPIRED (ផុតកំណត់)
           </span>
         {% elif reservation.status == 'CANCELLED' %}
-          <span class="sp-avail-badge" style="background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db;">
+          <span class="sp-avail-badge" id="ticket-status-badge" style="background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db;">
             CANCELLED (បានបោះបង់)
           </span>
         {% else %}
-          <span class="sp-avail-badge">{{ reservation.get_status_display }}</span>
+          <span class="sp-avail-badge" id="ticket-status-badge">{{ reservation.get_status_display }}</span>
         {% endif %}
         <div style="font-size:0.75rem; color:var(--color-print-muted); margin-top:0.35rem;">
           Issued: {{ reservation.created_on|date:"d M Y, H:i" }}
@@ -195,7 +195,7 @@
       </div>
 
       <!-- Scannable QR Code Image -->
-      <div style="background:white; padding:12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border:1px solid #e2e8f0; line-height:0; position:relative;">
+      <div id="ticket-qr-container" style="background:white; padding:12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border:1px solid #e2e8f0; line-height:0; position:relative;">
         {% if reservation.status == 'PAYMENT_PENDING' %}
           <div style="position:relative; display:inline-block;">
             {% if qr_data_uri %}
@@ -338,8 +338,8 @@
           {% endif %}
 
           <div style="display:flex; justify-content:space-between; border-top:2px solid #0f172a; padding-top:0.4rem; margin-top:0.4rem; font-size:1.15rem; font-weight:800;">
-            <span>{% if reservation.checked_out or reservation.status == 'CHECKED_OUT' %}Total Paid (បានទូទាត់):{% else %}Estimated Balance Due (សមតុល្យត្រូវបង់):{% endif %}</span>
-            <span style="font-family:var(--font-outlier); color:#0f172a;">{{ bill.balance_due_formatted }}</span>
+            <span id="ticket-balance-due-label">{% if reservation.checked_out or reservation.status == 'CHECKED_OUT' %}Total Paid (បានទូទាត់):{% else %}Estimated Balance Due (សមតុល្យត្រូវបង់):{% endif %}</span>
+            <span id="ticket-balance-due-val" style="font-family:var(--font-outlier); color:#0f172a;">{{ bill.balance_due_formatted }}</span>
           </div>
         {% endif %}
       </div>
@@ -348,13 +348,13 @@
     <!-- Checked In / Checked Out Timestamps -->
     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.5rem; margin-top:1rem; font-size:0.8rem; color:var(--color-print-muted); background:#f8fafc; padding:0.75rem; border-radius:6px;">
       <div>
-        Checked In: <strong>{{ reservation.checked_in_at|date:"d M Y, H:i"|default:"Pending arrival" }}</strong>
+        Checked In: <strong id="ticket-checked-in-at">{{ reservation.checked_in_at|date:"d M Y, H:i"|default:"Pending arrival" }}</strong>
       </div>
       <div>
-        Parking Deadline: <strong>{% if reservation.checked_in_at %}{{ reservation.parking_deadline|date:"d M Y, H:i" }}{% else %}Set when you enter{% endif %}</strong>
+        Parking Deadline: <strong id="ticket-parking-deadline">{% if reservation.checked_in_at %}{{ reservation.parking_deadline|date:"d M Y, H:i" }}{% else %}Set when you enter{% endif %}</strong>
       </div>
       <div>
-        Checked Out: <strong>{% if reservation.checked_out_at %}{{ reservation.checked_out_at|date:"d M Y, H:i" }}{% elif reservation.checked_in_at %}In session{% else %}Not entered yet{% endif %}</strong>
+        Checked Out: <strong id="ticket-checked-out-at">{% if reservation.checked_out_at %}{{ reservation.checked_out_at|date:"d M Y, H:i" }}{% elif reservation.checked_in_at %}In session{% else %}Not entered yet{% endif %}</strong>
       </div>
     </div>
 
@@ -393,4 +393,155 @@
 
 {% block extra_scripts %}
 <script src="{% static 'js/sompark-countdown.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const ticketCode = '{{ reservation.ticket_code }}';
+    if (!window.SomParkSync || !ticketCode) return;
+
+    function formatIsoDate(isoStr) {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' +
+             d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
+    SomParkSync.observeTicket(ticketCode, (data) => {
+      // 1. Update Status Badge
+      const badgeEl = document.getElementById('ticket-status-badge');
+      if (badgeEl && data.status) {
+        if (data.status === 'CHECKED_OUT') {
+          badgeEl.className = 'sp-avail-badge';
+          badgeEl.style = 'background:#e5e7eb; color:#4b5563; border:1px solid #9ca3af;';
+          badgeEl.textContent = 'CHECKED OUT (បានចេញ)';
+        } else if (data.status === 'CHECKED_IN') {
+          badgeEl.className = 'sp-avail-badge available';
+          badgeEl.style = 'background:rgba(34,197,94,0.2); color:#15803d; border:1px solid #16a34a;';
+          badgeEl.textContent = 'PARKED / CHECKED IN (កំពុងចត)';
+        } else if (data.status === 'CONFIRMED') {
+          badgeEl.className = 'sp-avail-badge';
+          badgeEl.style = 'background:rgba(59,130,246,0.15); color:#1d4ed8; border:1px solid #3b82f6;';
+          badgeEl.textContent = 'CONFIRMED HOLD (បានកក់)';
+        } else if (data.status === 'PAYMENT_PENDING') {
+          badgeEl.className = 'sp-avail-badge';
+          badgeEl.style = 'background:rgba(245,158,11,0.15); color:#b45309; border:1px solid #f59e0b;';
+          badgeEl.textContent = 'PAYMENT PENDING (រង់ចាំការបង់ប្រាក់)';
+        } else if (data.status === 'EXPIRED') {
+          badgeEl.className = 'sp-avail-badge';
+          badgeEl.style = 'background:rgba(239,68,68,0.15); color:#b91c1c; border:1px solid #ef4444;';
+          badgeEl.textContent = 'EXPIRED (ផុតកំណត់)';
+        } else if (data.status === 'CANCELLED') {
+          badgeEl.className = 'sp-avail-badge';
+          badgeEl.style = 'background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db;';
+          badgeEl.textContent = 'CANCELLED (បានបោះបង់)';
+        }
+      }
+
+      // 2. Update Action Buttons Group
+      const actionsGroup = document.getElementById('ticket-actions-group');
+      if (actionsGroup && data.status) {
+        const csrfToken = getCookie('csrftoken') || '';
+        let html = '';
+        if (data.status === 'CHECKED_OUT') {
+          html = '<button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-receipt">View / Print receipt (បោះពុម្ពបង្កាន់ដៃ)</button>';
+        } else if (data.status === 'CHECKED_IN') {
+          if (data.is_exit_authorized) {
+            html = `<a href="/ticket/${ticketCode}/gate-mode/?mode=exit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-show-exit-qr">Show exit QR (បង្ហាញ QR ចេញ)</a>
+                    <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">Print ticket (បោះពុម្ព)</button>`;
+          } else if (data.balance_due > 0) {
+            html = `<a href="/ticket/${ticketCode}/pay-exit/" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-pay-exit">Pay & prepare to leave (ទូទាត់ និងត្រៀមចេញ)</a>
+                    <a href="/ticket/${ticketCode}/gate-mode/" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-show-gate-mode">Show at Gate (បង្ហាញនៅរបាំង)</a>
+                    <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">Print ticket (បោះពុម្ព)</button>`;
+          } else {
+            html = `<form action="/ticket/${ticketCode}/renew-exit/" method="post" style="display:inline;">
+                      <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                      <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-prepare-exit">Prepare to leave (ត្រៀមចាកចេញ)</button>
+                    </form>
+                    <a href="/ticket/${ticketCode}/gate-mode/" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-show-gate-mode">Show at Gate (បង្ហាញនៅរបាំង)</a>
+                    <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">Print ticket (បោះពុម្ព)</button>`;
+          }
+        } else if (data.status === 'CONFIRMED') {
+          html = `<a href="/ticket/${ticketCode}/gate-mode/" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-show-gate-mode">Show at Gate (បង្ហាញនៅរបាំង)</a>
+                  <button onclick="window.print()" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-print-ticket">Print ticket (បោះពុម្ព)</button>
+                  <button type="button" class="sp-btn sp-btn-secondary sp-btn-destructive sp-btn-sm" id="btn-open-cancel-dialog" onclick="document.getElementById('cancel-reservation-dialog').showModal()">Cancel reservation (បោះបង់)</button>`;
+        } else if (data.status === 'EXPIRED' || data.status === 'CANCELLED') {
+          html = `<a href="/book/?zone=${data.zone_slug}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-reserve-again">Reserve again (កក់ម្តងទៀត) &rarr;</a>`;
+        }
+        actionsGroup.innerHTML = html;
+      }
+
+      // 3. Update QR Stage (mask if terminal)
+      const qrContainer = document.getElementById('ticket-qr-container');
+      if (qrContainer) {
+        if (data.is_terminal) {
+          const qrImg = qrContainer.querySelector('img');
+          if (qrImg) {
+            qrImg.style.opacity = '0.15';
+            qrImg.style.filter = 'grayscale(100%)';
+          }
+          if (!document.getElementById('ticket-qr-void-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'ticket-qr-void-overlay';
+            overlay.style = 'position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0.5rem; text-align:center; background:rgba(255,255,255,0.88); border-radius:6px;';
+            overlay.innerHTML = `<span style="font-size:0.78rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Pass Inactive</span>
+                                 <span style="font-size:0.72rem; font-weight:600; color:#64748b; margin-top:0.35rem;">${data.status_display}</span>`;
+            qrContainer.appendChild(overlay);
+          }
+        }
+      }
+
+      // 4. Update Countdown Banners
+      const arrivalCard = document.getElementById('arrival-countdown-card');
+      if (arrivalCard && (data.status !== 'CONFIRMED' || data.checked_in_at)) {
+        arrivalCard.style.display = 'none';
+      }
+      const exitCard = document.getElementById('exit-countdown-card');
+      if (exitCard) {
+        if (data.status === 'CHECKED_OUT' || !data.is_exit_authorized) {
+          exitCard.style.display = 'none';
+        } else if (data.is_exit_authorized) {
+          exitCard.style.display = 'flex';
+        }
+      }
+
+      // 5. Update Timestamps
+      const checkedInEl = document.getElementById('ticket-checked-in-at');
+      if (checkedInEl && data.checked_in_at) {
+        checkedInEl.textContent = formatIsoDate(data.checked_in_at);
+      }
+      const checkedOutEl = document.getElementById('ticket-checked-out-at');
+      if (checkedOutEl) {
+        checkedOutEl.textContent = data.checked_out_at ? formatIsoDate(data.checked_out_at) : (data.checked_in_at ? 'In session' : 'Not entered yet');
+      }
+      const deadlineEl = document.getElementById('ticket-parking-deadline');
+      if (deadlineEl && data.parking_deadline) {
+        deadlineEl.textContent = formatIsoDate(data.parking_deadline);
+      }
+
+      // 6. Update Balance Due
+      const balanceEl = document.getElementById('ticket-balance-due-val');
+      if (balanceEl && data.balance_due_formatted) {
+        balanceEl.textContent = data.balance_due_formatted;
+      }
+      const balanceLabel = document.getElementById('ticket-balance-due-label');
+      if (balanceLabel && data.status === 'CHECKED_OUT') {
+        balanceLabel.textContent = 'Total Paid (បានទូទាត់):';
+      }
+    });
+  });
+</script>
 {% endblock %}

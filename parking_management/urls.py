@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path
 from source import views as source_views
 from parking_zones import views as pz_views
+from parking_zones import status_api
 from users import views as user_views
 from parking_zones.gate_machine import virtual_gate
 
@@ -32,6 +33,11 @@ urlpatterns = [
     path('ticket/<str:ticket_code>/gate-mode/', pz_views.ticket_gate_mode, name='ticket_gate_mode'),
     path('all_tickets/', pz_views.all_tickets, name='all_tickets'),
     path('api/ai-assistant/', pz_views.ai_parking_assistant, name='ai_parking_assistant'),
+
+    # Real-Time Status Synchronization APIs
+    path('api/ticket/<str:ticket_code>/status/', status_api.ticket_status_api, name='ticket_status_api'),
+    path('api/tickets/status/', status_api.batch_tickets_status_api, name='batch_tickets_status_api'),
+    path('api/zones/status/', status_api.zones_status_api, name='zones_status_api'),
 
     # Staff Operations Workbench & Gate Scanner
     path('staff/dashboard/', pz_views.admin_dashboard, name='admin_dashboard'),

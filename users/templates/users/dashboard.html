@@ -89,20 +89,20 @@
   {% if active_reservation %}
     <section class="sp-dashboard-active-box" id="dashboard-active-reservation" aria-labelledby="active-res-heading" data-reveal="up">
       <div class="sp-dashboard-active-header">
-        <div>
+        <div id="active-res-badges-box">
           <span class="sp-avail-badge available" style="margin-bottom:0.35rem; display:inline-flex;">
             <span class="sp-dot"></span> CURRENT ACTIVE SESSION
           </span>
           {% if active_reservation.status == 'CHECKED_IN' %}
-            <span class="sp-avail-badge available" style="margin-bottom:0.35rem; display:inline-flex; background:rgba(34,197,94,0.2); color:#4ade80;">
+            <span class="sp-avail-badge available" id="active-res-status-badge" style="margin-bottom:0.35rem; display:inline-flex; background:rgba(34,197,94,0.2); color:#4ade80;">
               <span class="sp-dot"></span> PARKED IN SESSION (កំពុងចត)
             </span>
           {% elif active_reservation.status == 'CONFIRMED' %}
-            <span class="sp-avail-badge" style="margin-bottom:0.35rem; display:inline-flex; background:rgba(59,130,246,0.2); color:#60a5fa;">
+            <span class="sp-avail-badge" id="active-res-status-badge" style="margin-bottom:0.35rem; display:inline-flex; background:rgba(59,130,246,0.2); color:#60a5fa;">
               <span class="sp-dot"></span> HOLD CONFIRMED (បានកក់)
             </span>
           {% else %}
-            <span class="sp-avail-badge" style="margin-bottom:0.35rem; display:inline-flex;">
+            <span class="sp-avail-badge" id="active-res-status-badge" style="margin-bottom:0.35rem; display:inline-flex;">
               {{ active_reservation.get_status_display }}
             </span>
           {% endif %}
@@ -113,7 +113,7 @@
             {{ active_reservation.parking_zone.address }} · {{ active_reservation.parking_zone.district }}
           </p>
         </div>
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <div id="active-res-actions" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
           <a href="{% url 'ticket_gate_mode' active_reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-active-gate-pass" title="Open Fullscreen Gate QR">
             Show Gate Pass
           </a>
@@ -277,4 +277,75 @@
 
 {% block extra_scripts %}
 <script src="{% static 'js/sompark-countdown.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!window.SomParkSync) return;
+
+    // 1. Sync Active Reservation if present
+    {% if active_reservation %}
+    const activeCode = '{{ active_reservation.ticket_code }}';
+    if (activeCode) {
+      SomParkSync.observeTicket(activeCode, (data) => {
+        const badgeEl = document.getElementById('active-res-status-badge');
+        const actionsEl = document.getElementById('active-res-actions');
+        const countdownBox = document.querySelector('.sp-countdown-box');
+
+        if (data.status === 'CHECKED_OUT') {
+          if (badgeEl) {
+            badgeEl.className = 'sp-avail-badge';
+            badgeEl.style = 'margin-bottom:0.35rem; display:inline-flex; background:#e5e7eb; color:#4b5563; border:1px solid #9ca3af;';
+            badgeEl.textContent = 'CHECKED OUT (បានចេញ)';
+          }
+          if (actionsEl) {
+            actionsEl.innerHTML = `<a href="/ticket/${activeCode}/" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-active-view-ticket">View Receipt & Summary</a>`;
+          }
+          if (countdownBox) countdownBox.style.display = 'none';
+
+          // Update table row if present
+          const row = document.getElementById(`row-recent-${activeCode}`);
+          if (row) {
+            const statusCell = row.querySelector('.col-status');
+            if (statusCell) {
+              statusCell.innerHTML = '<span class="sp-avail-badge" style="background:var(--color-paper-3); color:var(--color-muted);">COMPLETED</span>';
+            }
+          }
+        }
+      });
+    }
+    {% endif %}
+
+    // 2. Batch Sync Recent Table Rows
+    const tableRows = document.querySelectorAll('tr[id^="row-recent-"]');
+    if (tableRows && tableRows.length) {
+      const recentCodes = [];
+      tableRows.forEach(tr => {
+        const code = tr.id.replace('row-recent-', '').trim();
+        if (code) recentCodes.push(code);
+      });
+
+      if (recentCodes.length) {
+        SomParkSync.observeBatchTickets(recentCodes, (ticketsMap) => {
+          Object.keys(ticketsMap).forEach(code => {
+            const t = ticketsMap[code];
+            const row = document.getElementById(`row-recent-${code}`);
+            if (row && t) {
+              const statusCell = row.querySelector('.col-status');
+              if (statusCell) {
+                if (t.status === 'CHECKED_OUT') {
+                  statusCell.innerHTML = '<span class="sp-avail-badge" style="background:var(--color-paper-3); color:var(--color-muted);">COMPLETED</span>';
+                } else if (t.status === 'CHECKED_IN') {
+                  statusCell.innerHTML = '<span class="sp-avail-badge available" style="background:rgba(34,197,94,0.2); color:#4ade80;"><span class="sp-dot"></span> PARKED</span>';
+                } else if (t.status === 'EXPIRED') {
+                  statusCell.innerHTML = '<span class="sp-avail-badge" style="background:rgba(239,68,68,0.2); color:#f87171;">EXPIRED</span>';
+                } else if (t.status === 'CANCELLED') {
+                  statusCell.innerHTML = '<span class="sp-avail-badge" style="background:rgba(239,68,68,0.2); color:#f87171;">CANCELLED</span>';
+                }
+              }
+            }
+          });
+        });
+      }
+    }
+  });
+</script>
 {% endblock %}

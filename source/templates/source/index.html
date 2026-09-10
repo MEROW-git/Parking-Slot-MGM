@@ -515,5 +515,30 @@
     })();
   </script>
   {% endif %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.SomParkSync) return;
+
+      SomParkSync.observeZones([], (zones) => {
+        Object.keys(zones).forEach(slug => {
+          const z = zones[slug];
+          const badge = document.getElementById(`avail-badge-${slug}`);
+          if (badge && z) {
+            badge.className = `sp-avail-badge ${z.availability_status}`;
+            const span = badge.querySelector('span:not(.sp-dot)');
+            if (span) {
+              if (z.availability_status === 'full') {
+                span.textContent = 'FULL (ពេញ)';
+              } else if (z.availability_status === 'limited') {
+                span.textContent = `${z.vacant_slots} SPOTS LEFT (ជិតពេញ)`;
+              } else {
+                span.textContent = `${z.vacant_slots} / ${z.num_of_slots} AVAILABLE (ទំនេរ)`;
+              }
+            }
+          }
+        });
+      });
+    });
+  </script>
 {% endblock %}
 

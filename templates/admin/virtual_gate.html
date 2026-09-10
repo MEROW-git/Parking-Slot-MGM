@@ -737,5 +737,32 @@
 
 <script id="vg-zones-info-data" type="application/json">{{ zones_info_json|safe }}</script>
 
+<script src="{% static 'js/sompark-sync.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
 <script src="{% static 'js/virtual-gate.js' %}?v=2.2.4" defer></script>
+{% if reservation %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!window.SomParkSync) return;
+    const ticketCode = '{{ reservation.ticket_code }}';
+    if (!ticketCode) return;
+
+    SomParkSync.observeTicket(ticketCode, (data) => {
+      // If customer settled payment in customer portal while at exit gate:
+      if (data.status === 'CHECKED_IN' && data.balance_due === 0) {
+        const settlementBox = document.getElementById('vg-settlement-box');
+        if (settlementBox) {
+          settlementBox.innerHTML = `
+            <div class="vg-alert vg-alert-success" style="margin-bottom: 1rem; background: rgba(34, 197, 94, 0.15); border: 1px solid #16a34a; color: #4ade80; padding: 0.75rem; border-radius: 6px;">
+              <strong>✓ Customer Mobile Payment Verified:</strong> Balance settled via online payment. Barrier is authorized to open.
+            </div>
+            <button type="submit" name="action" value="open" class="vg-btn vg-btn-primary" id="btn-recheck-open" style="width: 100%; justify-content: center;">
+              Open Barrier for Vehicle Departure (បើករបាំងចេញ) &rarr;
+            </button>
+          `;
+        }
+      }
+    });
+  });
+</script>
+{% endif %}
 {% endblock %}

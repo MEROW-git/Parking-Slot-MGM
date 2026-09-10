@@ -50,3 +50,17 @@ Usage:
     {% endif %}
   </div>
 </div>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!window.SomParkSync) return;
+    const banner = document.getElementById('active-res-banner');
+    if (!banner) return;
+    SomParkSync.observeTicket('{{ reservation.ticket_code }}', (data) => {
+      if (data.status === 'CHECKED_OUT' || data.is_terminal) {
+        banner.style.transition = 'opacity 0.3s ease, max-height 0.3s ease';
+        banner.style.opacity = '0';
+        setTimeout(() => { if (banner) banner.remove(); }, 300);
+      }
+    });
+  });
+</script>

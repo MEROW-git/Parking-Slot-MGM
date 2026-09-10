@@ -51,7 +51,7 @@
         <div>
           <span style="font-size:0.85rem; font-weight:700; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.05em;">Current Occupancy</span>
           <h2 style="font-size:clamp(1.75rem, 3.5vw, 2.25rem); margin-top:0.25rem; line-height:1.2;">
-            {{ parking_zone.vacant_slots }} <span style="font-size:1.1rem; font-weight:600; color:var(--color-ink-2);">/ {{ parking_zone.num_of_slots }} Vacant</span>
+            <span id="zone-vacant-headline">{{ parking_zone.vacant_slots }}</span> <span style="font-size:1.1rem; font-weight:600; color:var(--color-ink-2);">/ {{ parking_zone.num_of_slots }} Vacant</span>
           </h2>
         </div>
         {% include "components/availability_indicator.html" with status=parking_zone.availability_status vacant=parking_zone.vacant_slots total=parking_zone.num_of_slots id=parking_zone.slug %}
@@ -76,11 +76,11 @@
         </div>
         <div>
           <div style="font-size:0.8rem; font-weight:700; color:var(--color-muted); letter-spacing:0.04em;">OCCUPIED</div>
-          <div style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-accent);">{{ parking_zone.occupied_slots }}</div>
+          <div id="zone-occupied-metric" style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-accent);">{{ parking_zone.occupied_slots }}</div>
         </div>
         <div>
           <div style="font-size:0.8rem; font-weight:700; color:var(--color-muted); letter-spacing:0.04em;">AVAILABLE</div>
-          <div style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-success);">{{ parking_zone.vacant_slots }}</div>
+          <div id="zone-vacant-metric" style="font-size:1.5rem; font-weight:800; font-family:var(--font-outlier); color:var(--color-success);">{{ parking_zone.vacant_slots }}</div>
         </div>
       </div>
     </div>
@@ -196,4 +196,43 @@
       });
     </script>
   {% endif %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.SomParkSync) return;
+      const slug = '{{ parking_zone.slug }}';
+      if (!slug) return;
+
+      SomParkSync.observeZones([slug], (zones) => {
+        const z = zones[slug];
+        if (!z) return;
+
+        const vacantHeadline = document.getElementById('zone-vacant-headline');
+        if (vacantHeadline) vacantHeadline.textContent = z.vacant_slots;
+
+        const occMetric = document.getElementById('zone-occupied-metric');
+        if (occMetric) occMetric.textContent = z.occupied_slots;
+
+        const vacMetric = document.getElementById('zone-vacant-metric');
+        if (vacMetric) vacMetric.textContent = z.vacant_slots;
+
+        const barFill = document.getElementById('zone-occupancy-bar-fill');
+        if (barFill) barFill.style.width = z.occupancy_percentage + '%';
+
+        const badge = document.getElementById(`avail-badge-${slug}`);
+        if (badge) {
+          badge.className = `sp-avail-badge ${z.availability_status}`;
+          const span = badge.querySelector('span:not(.sp-dot)');
+          if (span) {
+            if (z.availability_status === 'full') {
+              span.textContent = 'FULL (ពេញ)';
+            } else if (z.availability_status === 'limited') {
+              span.textContent = `${z.vacant_slots} SPOTS LEFT (ជិតពេញ)`;
+            } else {
+              span.textContent = `${z.vacant_slots} / ${z.num_of_slots} AVAILABLE (ទំនេរ)`;
+            }
+          }
+        }
+      });
+    });
+  </script>
 {% endblock %}

@@ -189,4 +189,49 @@
 
 {% block extra_scripts %}
 <script src="{% static 'js/sompark-countdown.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const ticketCode = '{{ reservation.ticket_code }}';
+    if (!window.SomParkSync || !ticketCode) return;
+
+    SomParkSync.observeTicket(ticketCode, (data) => {
+      const card = document.querySelector('.sp-booking-card');
+      const timerCard = document.getElementById('payment-countdown-card');
+
+      if (data.status === 'EXPIRED' || data.status === 'CANCELLED') {
+        if (timerCard) timerCard.style.display = 'none';
+        if (card) {
+          card.innerHTML = `
+            <div style="text-align: center; padding: 2rem 1rem;">
+              <div style="font-size: 2.5rem; margin-bottom: 0.5rem; color: #ef4444;">✕</div>
+              <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #ef4444;">Hold Expired or Cancelled</h2>
+              <p style="color: var(--color-ink-2); margin-bottom: 1.5rem;">
+                The hold on this parking space has expired or was cancelled.
+                <br><small>(ការកក់ទុកកន្លែងចតនេះបានផុតកំណត់ ឬត្រូវបានបោះបង់។)</small>
+              </p>
+              <a href="/book/?zone=${data.zone_slug || ''}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-pay-deposit-rebook">
+                Reserve Again (កក់ម្តងទៀត) &rarr;
+              </a>
+            </div>
+          `;
+        }
+      } else if (data.status === 'CONFIRMED') {
+        if (card) {
+          card.innerHTML = `
+            <div style="text-align: center; padding: 2rem 1rem;">
+              <div style="font-size: 2.5rem; margin-bottom: 0.5rem; color: #16a34a;">✓</div>
+              <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #16a34a;">Deposit Verified</h2>
+              <p style="color: var(--color-ink-2); margin-bottom: 1.5rem;">
+                Your deposit has been verified and your parking space is guaranteed.
+              </p>
+              <a href="/ticket/${ticketCode}/" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-pay-deposit-view-ticket">
+                View Gate Pass & Ticket (មើលសំបុត្រ) &rarr;
+              </a>
+            </div>
+          `;
+        }
+      }
+    });
+  });
+</script>
 {% endblock %}

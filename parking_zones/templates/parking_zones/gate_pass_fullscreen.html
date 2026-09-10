@@ -134,37 +134,37 @@
     <div style="font-size: 0.85rem; color: #475569;">{{ reservation.parking_zone.address }}</div>
   </div>
 
-  <div>
+  <div id="gate-status-pill-container">
     {% if reservation.checked_out %}
-      <span class="gate-status-pill status-completed">COMPLETED / CHECKED OUT</span>
+      <span class="gate-status-pill status-completed" id="gate-status-pill">COMPLETED / CHECKED OUT</span>
     {% elif reservation.status == 'CHECKED_IN' %}
       {% if is_exit_authorized and reservation.exit_authorized_until %}
-        <span class="gate-status-pill status-parked" style="background:#dcfce7; color:#166534; border:1px solid #86efac;">
+        <span class="gate-status-pill status-parked" id="gate-status-pill" style="background:#dcfce7; color:#166534; border:1px solid #86efac;">
           EXIT AUTHORIZED &middot; 5-MIN WINDOW (បានអនុញ្ញាតឱ្យចេញ)
         </span>
-        <div style="font-size: 0.85rem; font-weight: 700; color: #166534; margin-top: 0.25rem;">
+        <div id="gate-exit-window-hint" style="font-size: 0.85rem; font-weight: 700; color: #166534; margin-top: 0.25rem;">
           Exit barrier before {{ reservation.exit_authorized_until|date:"g:i:s A" }}
         </div>
       {% elif mode == 'exit' or bill.balance_due > 0 %}
-        <span class="gate-status-pill" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;">
+        <span class="gate-status-pill" id="gate-status-pill" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;">
           PAYMENT REQUIRED BEFORE EXIT
         </span>
       {% else %}
-        <span class="gate-status-pill status-parked">PARKED &middot; READY FOR EXIT SCAN</span>
+        <span class="gate-status-pill status-parked" id="gate-status-pill">PARKED &middot; READY FOR EXIT SCAN</span>
       {% endif %}
     {% elif reservation.status == 'CONFIRMED' %}
-      <span class="gate-status-pill status-confirmed">RESERVED &middot; READY FOR ENTRY SCAN</span>
+      <span class="gate-status-pill status-confirmed" id="gate-status-pill">RESERVED &middot; READY FOR ENTRY SCAN</span>
     {% else %}
-      <span class="gate-status-pill">{{ reservation.get_status_display }}</span>
+      <span class="gate-status-pill" id="gate-status-pill">{{ reservation.get_status_display }}</span>
     {% endif %}
   </div>
 
   <!-- High-contrast QR Stage with White Background and Quiet Zone -->
-  <div class="gate-qr-stage" id="gate-qr-stage">
+  <div class="gate-qr-stage" id="gate-qr-stage" style="position: relative;">
     {% if qr_data_uri %}
       <img src="{{ qr_data_uri }}" alt="Access QR Code" class="gate-qr-img" id="gate-qr-image">
     {% else %}
-      <img src="{% url 'ticket_qr_image' reservation.ticket_code %}" alt="Access QR Code" class="gate-qr-img">
+      <img src="{% url 'ticket_qr_image' reservation.ticket_code %}" alt="Access QR Code" class="gate-qr-img" id="gate-qr-image">
     {% endif %}
 
     <div class="gate-plate-badge" id="gate-plate-number">
@@ -176,9 +176,54 @@
     </div>
   </div>
 
-  <div class="gate-footer-hint">
+  <div class="gate-footer-hint" id="gate-footer-hint">
     <strong>Turn phone brightness to MAX for quickest barrier scanning.</strong><br>
     សូមបង្កើនពន្លឺអេក្រង់ទូរស័ព្ទឱ្យខ្ពស់ ដើម្បីស្កេនបានលឿននៅរបាំងស្វ័យប្រវត្តិ។
   </div>
+
+  <script src="{% static 'js/sompark-sync.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const ticketCode = '{{ reservation.ticket_code }}';
+      if (!window.SomParkSync || !ticketCode) return;
+
+      SomParkSync.observeTicket(ticketCode, (data) => {
+        const pillContainer = document.getElementById('gate-status-pill-container');
+        const qrImg = document.getElementById('gate-qr-image');
+        const stage = document.getElementById('gate-qr-stage');
+        const footerHint = document.getElementById('gate-footer-hint');
+
+        if (data.status === 'CHECKED_OUT') {
+          if (pillContainer) {
+            pillContainer.innerHTML = '<span class="gate-status-pill status-completed">COMPLETED / CHECKED OUT (បានចេញ)</span>';
+          }
+          if (qrImg) {
+            qrImg.style.opacity = '0.15';
+            qrImg.style.filter = 'grayscale(100%)';
+          }
+          if (stage && !document.getElementById('gate-void-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'gate-void-overlay';
+            overlay.style = 'position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1rem; text-align:center; background:rgba(255,255,255,0.92); border-radius:14px;';
+            overlay.innerHTML = '<strong style="font-size:1.1rem; color:#475569; text-transform:uppercase; letter-spacing:0.05em;">Session Completed</strong><span style="font-size:0.85rem; color:#64748b; margin-top:0.35rem;">Vehicle has exited the facility.<br>ការចតត្រូវបានបញ្ចប់។</span>';
+            stage.appendChild(overlay);
+          }
+          if (footerHint) {
+            footerHint.innerHTML = '<strong>Vehicle passage confirmed. Have a safe drive!</strong><br>យានយន្តបានចេញរួចរាល់។ សូមធ្វើដំណើរប្រកបដោយសុវត្ថិភាព!';
+          }
+        } else if (data.status === 'CHECKED_IN') {
+          if (pillContainer) {
+            if (data.is_exit_authorized) {
+              pillContainer.innerHTML = '<span class="gate-status-pill status-parked" style="background:#dcfce7; color:#166534; border:1px solid #86efac;">EXIT AUTHORIZED &middot; 5-MIN WINDOW (បានអនុញ្ញាតឱ្យចេញ)</span>';
+            } else if (data.balance_due > 0) {
+              pillContainer.innerHTML = '<span class="gate-status-pill" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;">PAYMENT REQUIRED BEFORE EXIT</span>';
+            } else {
+              pillContainer.innerHTML = '<span class="gate-status-pill status-parked">PARKED &middot; READY FOR EXIT SCAN</span>';
+            }
+          }
+        }
+      });
+    });
+  </script>
 </body>
 </html>

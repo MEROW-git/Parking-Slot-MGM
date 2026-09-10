@@ -244,3 +244,39 @@
 
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const ticketCode = '{{ reservation.ticket_code }}';
+    if (!window.SomParkSync || !ticketCode) return;
+
+    SomParkSync.observeTicket(ticketCode, (data) => {
+      const card = document.querySelector('.sp-pay-exit-card');
+      const heroAmount = document.getElementById('pay-exit-hero-amount');
+      const balanceDue = document.getElementById('pay-exit-balance-due');
+
+      if (data.status === 'CHECKED_OUT') {
+        if (card) {
+          card.innerHTML = `
+            <div style="text-align: center; padding: 2rem 1rem;">
+              <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">✓</div>
+              <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #16a34a;">Vehicle Checked Out</h2>
+              <p style="color: var(--color-ink-2); margin-bottom: 1.5rem;">
+                This parking session was checked out and settled at the gate. No further payment is required.
+                <br><small>(ការចតនេះត្រូវបានទូទាត់ និងចេញរួចរាល់នៅច្រកទ្វារ។ មិនត្រូវការទូទាត់បន្ថែមឡើយ។)</small>
+              </p>
+              <a href="/ticket/${ticketCode}/" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-pay-exit-view-receipt">
+                View Official Receipt (មើលបង្កាន់ដៃ) &rarr;
+              </a>
+            </div>
+          `;
+        }
+      } else if (data.status === 'CHECKED_IN' && data.balance_due === 0) {
+        if (heroAmount) heroAmount.textContent = '0 ៛';
+        if (balanceDue) balanceDue.textContent = '0 ៛';
+      }
+    });
+  });
+</script>
+{% endblock %}
