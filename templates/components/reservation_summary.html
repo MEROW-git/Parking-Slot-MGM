@@ -18,8 +18,8 @@ Usage:
     <p class="sp-res-copy">
       Plate: <strong>{{ reservation.plate_number }}</strong> ·
       Dates: <strong>{{ reservation.start_date|date:"d M Y" }}</strong> to <strong>{{ reservation.finish_date|date:"d M Y" }}</strong>
-      {% if reservation.arrival_deadline and reservation.status == 'CONFIRMED' and reservation.payment_method == 'PAY_AT_EXIT' %}
-        · Arrive by: <strong style="color:#facc15;">{{ reservation.arrival_deadline|date:"H:i" }}</strong>
+      {% if reservation.arrival_deadline and reservation.status == 'CONFIRMED' and not reservation.checked_in_at %}
+        · Arrive by: <strong style="color:#facc15;">{{ reservation.arrival_deadline|date:"H:i (d M)" }}</strong>
       {% endif %}
     </p>
   </div>

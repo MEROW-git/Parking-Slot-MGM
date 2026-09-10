@@ -99,16 +99,18 @@ class ParkingZone(models.Model):
     def active_holds_count(self):
         """Count of active arrival holds and pending deposits holding capacity."""
         now = timezone.now()
-        unpaid_holds = self.reservations.filter(
-            payment_method='PAY_AT_EXIT',
+        # Active confirmed holds (both 3-hour pay-at-exit holds and 5-hour deposit holds) before entry
+        active_holds = self.reservations.filter(
             status='CONFIRMED',
-            arrival_deadline__gt=now
+            arrival_deadline__gt=now,
+            checked_in_at__isnull=True
         ).count()
+        # Pending deposits within payment timeout window
         pending_deposits = self.reservations.filter(
             status='PAYMENT_PENDING',
             payment_deadline__gt=now
         ).count()
-        return unpaid_holds + pending_deposits
+        return active_holds + pending_deposits
 
     @property
     def available_capacity_now(self):
@@ -183,10 +185,12 @@ class Reservation(models.Model):
 
     # Deadlines and actual gate execution timestamps
     payment_deadline = models.DateTimeField(null=True, blank=True, help_text='Checkout timeout for deposit payment')
-    arrival_deadline = models.DateTimeField(null=True, blank=True, help_text='Arrival deadline for unpaid same-day holds (3 hours)')
+    arrival_deadline = models.DateTimeField(null=True, blank=True, help_text='Arrival deadline (3 hours for pay-at-exit; 5 hours after verified deposit)')
     checked_in_at = models.DateTimeField(null=True, blank=True, help_text='Actual gate entry timestamp')
     checked_out_at = models.DateTimeField(null=True, blank=True, help_text='Actual gate exit timestamp')
     exit_authorized_until = models.DateTimeField(null=True, blank=True, help_text='5-minute gate departure authorization window')
+    cancelled_at = models.DateTimeField(null=True, blank=True, help_text='Cancellation timestamp for cooldown tracking')
+    deposit_forfeited = models.BooleanField(default=False, help_text='True if first-day payment was retained due to customer no-show')
 
     # Cryptographic access token for scannable QR (opaque, unguessable)
     access_token = models.CharField(max_length=64, unique=True, null=True, blank=True, help_text='Opaque token for scannable access QR')
@@ -235,13 +239,24 @@ class Reservation(models.Model):
             if not self.finish_date:
                 self.finish_date = timezone.localdate(self.arrival_deadline)
         else:
-            # Populate start_time and finish_time from dates if unset (DEPOSIT mode)
-            if not self.start_time and self.start_date:
-                tz = timezone.get_current_timezone()
-                self.start_time = timezone.make_aware(datetime.combine(self.start_date, time(6, 0)), tz)
-            if not self.finish_time and self.finish_date:
-                tz = timezone.get_current_timezone()
-                self.finish_time = timezone.make_aware(datetime.combine(self.finish_date, time(22, 0)), tz)
+            # DEPOSIT mode
+            booking_time = self.start_time or self.created_on or timezone.now()
+            if not self.start_time:
+                self.start_time = booking_time
+            if not self.start_date:
+                self.start_date = timezone.localdate(self.start_time)
+
+            if self.arrival_deadline:
+                if not self.finish_time:
+                    self.finish_time = self.arrival_deadline
+                if not self.finish_date:
+                    self.finish_date = timezone.localdate(self.finish_time)
+            else:
+                days = self.reserved_days if self.reserved_days else 1
+                if not self.finish_time:
+                    self.finish_time = self.start_time + timedelta(days=days)
+                if not self.finish_date:
+                    self.finish_date = timezone.localdate(self.finish_time)
 
         # Infer reserved_days when omitted or defaulted to 1 and times/dates span multiple days
         if not getattr(self, '_reserved_days_explicit', False):
@@ -311,7 +326,7 @@ class Reservation(models.Model):
 
     @property
     def effective_finish_time(self):
-        if self.payment_method == 'PAY_AT_EXIT' and self.arrival_deadline:
+        if not self.checked_in_at and self.arrival_deadline:
             return self.arrival_deadline
         if self.finish_time:
             return self.finish_time

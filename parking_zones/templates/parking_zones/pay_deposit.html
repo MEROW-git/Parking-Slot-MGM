@@ -52,8 +52,8 @@
         <strong>{{ reservation.customer.username }}</strong> ({{ reservation.phone_number }})
       </div>
       <div>
-        <span style="color:var(--color-ink-2); display:block; font-size:0.75rem; text-transform:uppercase;">Arrival Window</span>
-        <strong>{{ reservation.start_datetime|date:"d M Y, H:i" }}</strong>
+        <span style="color:var(--color-ink-2); display:block; font-size:0.75rem; text-transform:uppercase;">Arrival Window (ពេលមកដល់)</span>
+        <strong>5 hours after payment verification</strong>
       </div>
       <div>
         <span style="color:var(--color-ink-2); display:block; font-size:0.75rem; text-transform:uppercase;">Reserved Duration</span>
@@ -63,11 +63,11 @@
 
     <!-- Deposit Policy Disclosure -->
     <div class="sp-form-note" style="border-left-color:var(--color-primary); background:rgba(30, 41, 59, 0.6); margin-bottom:1.5rem;">
-      <strong>📌 How your deposit works (លក្ខខណ្ឌប្រាក់កក់):</strong>
+      <strong>📌 Arrival Window &amp; Deposit Forfeiture Terms (លក្ខខណ្ឌប្រាក់កក់):</strong>
       <ul style="margin:0.35rem 0 0; padding-left:1.2rem; font-size:0.82rem; line-height:1.45; color:var(--color-ink-2);">
-        <li>This deposit equals 1 day's standard parking rate and guarantees your spot without a 3-hour arrival expiry.</li>
-        <li>It is deducted in full from your bill at the exit barrier when settling actual parking time.</li>
-        <li>Disclosed demo policy: Deposits are non-refundable in the event of customer cancellation or no-show.</li>
+        <li><strong>5-Hour Arrival Window:</strong> After verified payment, you have exactly 5 hours to arrive and enter through the barrier gate.</li>
+        <li><strong>No-Show Retention Disclosure:</strong> If you do not enter before the 5-hour deadline, the reservation expires, your spot is released, and the first-day payment is retained for customer no-show. (Forfeiture does <em>not</em> apply to payment errors or operator cancellations).</li>
+        <li><strong>Full Credit at Exit:</strong> Your deposit is credited 100% toward your final bill at departure. Parking duration starts only upon confirmed physical entry.</li>
       </ul>
     </div>
 

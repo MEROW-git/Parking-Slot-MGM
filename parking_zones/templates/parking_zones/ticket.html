@@ -90,16 +90,24 @@
     </div>
   </div>
 
-  <!-- 3. Redesigned Live Arrival Countdown Banner (For Eligible Unpaid Holds) -->
-  {% if reservation.status == 'CONFIRMED' and reservation.payment_method == 'PAY_AT_EXIT' and reservation.arrival_deadline %}
+  <!-- 3. Redesigned Live Arrival Countdown Banner (For Confirmed Holds before Entry) -->
+  {% if reservation.status == 'CONFIRMED' and not reservation.checked_in_at and reservation.arrival_deadline %}
     <div class="no-print sp-arrival-banner" id="arrival-countdown-card" data-reveal="up">
       <div class="sp-arrival-banner-info">
         <div class="sp-arrival-banner-heading">
-          Enter within 3 hours after booking. Pay when you leave.
-          <div style="font-size:0.85rem; font-weight:normal; opacity:0.9;">(ចូលចតក្នុងរយៈពេល ៣ ម៉ោងបន្ទាប់ពីការកក់។ បង់ប្រាក់នៅពេលអ្នកចេញ)</div>
+          {% if reservation.payment_method == 'DEPOSIT' %}
+            Enter within 5 hours after payment. Space guaranteed.
+            <div style="font-size:0.85rem; font-weight:normal; opacity:0.9;">(ចូលចតក្នុងរយៈពេល ៥ ម៉ោងបន្ទាប់ពីការទូទាត់ប្រាក់កក់។ រក្សាទុកកន្លែងចតជូន)</div>
+          {% else %}
+            Enter within 3 hours after booking. Pay when you leave.
+            <div style="font-size:0.85rem; font-weight:normal; opacity:0.9;">(ចូលចតក្នុងរយៈពេល ៣ ម៉ោងបន្ទាប់ពីការកក់។ បង់ប្រាក់នៅពេលអ្នកចេញ)</div>
+          {% endif %}
         </div>
         <div class="sp-arrival-banner-deadline">
           Enter before <strong>{{ reservation.arrival_deadline|date:"g:i A" }}</strong> on <strong>{{ reservation.arrival_deadline|date:"d M Y" }}</strong>.
+          {% if reservation.payment_method == 'DEPOSIT' %}
+            <span style="display:block; font-size:0.8rem; margin-top:0.2rem; color:#fecaca;">(Deposit is retained for customer no-show if not entered before deadline)</span>
+          {% endif %}
         </div>
       </div>
       <div class="sp-arrival-banner-timer-block">
@@ -255,8 +263,15 @@
           <div style="font-size:0.82rem; margin-top:0.25rem;">
             Enter before: <strong>{{ reservation.arrival_deadline|date:"d M Y, H:i" }}</strong>
           </div>
-        {% else %}
+        {% elif reservation.arrival_deadline %}
+          <strong>Enter within 5 hours after payment. Space guaranteed.</strong>
+          <div style="font-size:0.82rem; margin-top:0.25rem;">
+            Enter before: <strong>{{ reservation.arrival_deadline|date:"d M Y, H:i" }}</strong>
+          </div>
+        {% elif reservation.start_time and reservation.finish_time %}
           <strong>{{ reservation.start_datetime|date:"d M Y, H:i" }}</strong> to <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
+        {% else %}
+          <strong>5 hours after payment verification</strong>
         {% endif %}
         <div style="font-size:0.78rem; color:var(--color-print-muted); margin-top:0.25rem;">
           Reserved: <strong>{{ reservation.effective_reserved_days }} day{{ reservation.effective_reserved_days|pluralize }}</strong> (24h/day after entry)

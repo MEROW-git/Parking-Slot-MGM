@@ -1,8 +1,11 @@
 import math
+import re
 import secrets
+import time
 from datetime import timedelta, datetime
 from decimal import Decimal
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
 from .models import ParkingZone, Reservation, PaymentTransaction
@@ -16,8 +19,8 @@ class BillingService:
     """
 
     @staticmethod
-    def calculate_bill(reservation: Reservation, as_of: datetime = None) -> dict:
-        now = as_of or timezone.now()
+    def calculate_bill(reservation: Reservation, as_of: datetime = None, exit_time: datetime = None) -> dict:
+        now = exit_time or as_of or timezone.now()
         daily_rate = reservation.daily_rate or (reservation.parking_zone.price if reservation.parking_zone_id else 3000)
         overstay_multiplier = Decimal(str(reservation.overstay_multiplier or 2.0))
         overstay_rate = int(round(Decimal(daily_rate) * overstay_multiplier))
@@ -264,14 +267,11 @@ class CapacityService:
                 res_deadline = res_start + timedelta(days=res_days)
                 res_end = max(now, res_deadline)
             else:
-                if res.payment_method == 'PAY_AT_EXIT':
-                    if res.arrival_deadline and now >= res.arrival_deadline:
-                        continue
-                    res_start = res.start_time or res.effective_start_time
-                    res_arrival_end = res.arrival_deadline or (res_start + timedelta(hours=3))
-                else:
-                    res_start = res.effective_start_time
-                    res_arrival_end = res.effective_finish_time
+                # Arrival hold prior to physical entry
+                if res.arrival_deadline and now >= res.arrival_deadline:
+                    continue
+                res_start = res.start_time or res.effective_start_time
+                res_arrival_end = res.arrival_deadline or res.effective_finish_time
                 res_end = res_arrival_end + timedelta(days=res_days)
 
             # Check overlap between [req_start, req_end] and [res_start, res_end]
@@ -309,7 +309,7 @@ class PaymentService:
 
     @staticmethod
     @transaction.atomic
-    def confirm_deposit(txn_id: int, provider_ref: str = None) -> tuple[bool, str]:
+    def confirm_deposit(txn_id: int, provider_ref: str = None, confirmed_at: datetime = None) -> tuple[bool, str]:
         """Idempotent deposit confirmation."""
         txn = PaymentTransaction.objects.select_for_update().get(id=txn_id)
         reservation = Reservation.objects.select_for_update().get(id=txn.reservation_id)
@@ -318,7 +318,7 @@ class PaymentService:
         if txn.status == 'SUCCESS' and reservation.status == 'CONFIRMED':
             return True, 'Deposit payment already confirmed.'
 
-        now = timezone.now()
+        now = confirmed_at or timezone.now()
 
         # Late confirmation check: if reservation expired while payment was in-flight
         if reservation.status == 'EXPIRED' or (reservation.payment_deadline and now > reservation.payment_deadline):
@@ -333,6 +333,14 @@ class PaymentService:
             txn.provider_ref = provider_ref
         txn.completed_at = now
         txn.save()
+
+        # Store arrival deadline once (exactly 5 hours after verified payment).
+        # Refreshes, retries, and duplicate payment callbacks must never extend it.
+        if not reservation.arrival_deadline:
+            deposit_hold_hours = getattr(settings, 'DEPOSIT_ARRIVAL_HOLD_HOURS', 5)
+            reservation.arrival_deadline = now + timedelta(hours=deposit_hold_hours)
+            reservation.finish_time = reservation.arrival_deadline
+            reservation.finish_date = timezone.localdate(reservation.arrival_deadline)
 
         reservation.deposit_amount = txn.amount
         reservation.payment_status = 'PARTIALLY_PAID'
@@ -480,6 +488,14 @@ class PaymentService:
                 raw_response={'confirmed_by': staff_tag, 'confirmed_at': now.isoformat()}
             )
 
+        # Store arrival deadline once (exactly 5 hours after verified payment).
+        # Refreshes, retries, and duplicate payment callbacks must never extend it.
+        if not reservation.arrival_deadline:
+            deposit_hold_hours = getattr(settings, 'DEPOSIT_ARRIVAL_HOLD_HOURS', 5)
+            reservation.arrival_deadline = now + timedelta(hours=deposit_hold_hours)
+            reservation.finish_time = reservation.arrival_deadline
+            reservation.finish_date = timezone.localdate(reservation.arrival_deadline)
+
         reservation.deposit_amount = txn.amount
         reservation.payment_status = 'PARTIALLY_PAID'
         reservation.status = 'CONFIRMED'
@@ -496,7 +512,7 @@ class GateService:
     """
 
     @staticmethod
-    def validate_entry(token_or_code: str, zone_id: int = None) -> tuple[bool, Reservation | None, str]:
+    def validate_entry(token_or_code: str, zone_id: int = None, check_time: datetime = None) -> tuple[bool, Reservation | None, str]:
         token_or_code = token_or_code.strip()
         reservation = (
             Reservation.objects
@@ -518,7 +534,7 @@ class GateService:
         if zone_id and reservation.parking_zone_id != zone_id:
             return False, reservation, f'Ticket is for "{reservation.parking_zone.name}", not this parking facility.'
 
-        now = timezone.now()
+        now = check_time or timezone.now()
 
         if reservation.status == 'CHECKED_IN':
             return False, reservation, 'Vehicle is already checked into the facility.'
@@ -542,16 +558,24 @@ class GateService:
             # For PAY_AT_EXIT:
             # - Arrival starts immediately upon server booking
             # - Arrival deadline is booking time + configured hold duration (default 3 hours)
-            # - Deadline can cross midnight; no conflicting 07:00/22:00 cutoffs
+            # - Deadline can cross midnight
             deadline = reservation.arrival_deadline or reservation.effective_finish_time
             if deadline and now >= deadline:
                 reservation.status = 'EXPIRED'
-                reservation.save(update_fields=['status'])
+                reservation.staff_notes = (reservation.staff_notes + f"\n[No-Show] 3-hour arrival window expired at {now.isoformat()}.").strip()
+                reservation.save(update_fields=['status', 'staff_notes'])
                 return False, reservation, 'The 3-hour arrival window for this unpaid booking has expired.'
         else:
-            # DEPOSIT mode: leave deposit-mode rules unchanged
-            if now >= reservation.effective_finish_time:
-                return False, reservation, 'The booked arrival window has ended.'
+            # For DEPOSIT:
+            # - 5 hours after server-verified payment
+            # - Reject QR on expiry, release capacity, retain first-day payment for customer no-show
+            deadline = reservation.arrival_deadline or reservation.effective_finish_time
+            if deadline and now >= deadline:
+                reservation.status = 'EXPIRED'
+                reservation.deposit_forfeited = True
+                reservation.staff_notes = (reservation.staff_notes + f"\n[No-Show] 5-hour arrival deadline passed at {now.isoformat()}. First-day deposit forfeited per policy.").strip()
+                reservation.save(update_fields=['status', 'deposit_forfeited', 'staff_notes'])
+                return False, reservation, 'The 5-hour arrival window has expired. Reservation is marked as no-show and first-day deposit is forfeited per policy.'
             if reservation.deposit_amount < reservation.daily_rate:
                 return False, reservation, 'First-day deposit has not been recorded.'
 
@@ -730,17 +754,253 @@ class ExpiryService:
             res.save(update_fields=['status', 'staff_notes'])
             results['deposit_timeouts'] += 1
 
-        # 3. Deposited no-shows: booked finish time passed without ever checking in
+        # 3. Deposited no-shows: 5-hour arrival deadline passed without entry
         no_shows = Reservation.objects.select_for_update().filter(
             payment_method='DEPOSIT',
             status='CONFIRMED',
-            finish_time__lt=now,
             checked_in_at__isnull=True
         )
         for res in no_shows:
-            res.status = 'EXPIRED'
-            res.staff_notes = (res.staff_notes + f"\n[Auto-Expire] No-show at booked end {now.isoformat()}. Deposit retained per policy.").strip()
-            res.save(update_fields=['status', 'staff_notes'])
-            results['no_shows'] += 1
+            deadline = res.arrival_deadline or res.finish_time
+            if deadline and deadline < now:
+                res.status = 'EXPIRED'
+                res.deposit_forfeited = True
+                res.staff_notes = (res.staff_notes + f"\n[Auto-Expire] No-show at arrival deadline {now.isoformat()}. Deposit retained per policy.").strip()
+                res.save(update_fields=['status', 'deposit_forfeited', 'staff_notes'])
+                results['no_shows'] += 1
 
         return results
+
+
+class AntiSpamService:
+    """
+    Protects parking facilities against unpaid-hold spam, plate squatting,
+    rapid automated submissions, and excessive unpaid no-shows.
+    """
+
+    @staticmethod
+    def normalize_plate(plate: str) -> str:
+        """
+        Normalizes full vehicle license plate by stripping spaces, hyphens, periods,
+        and uppercase. Example: 'Phnom Penh 2AZ-1234' -> 'PHNOMPENH2AZ1234'
+        """
+        if not plate:
+            return ''
+        return re.sub(r'[\s\-_.]+', '', str(plate)).upper()
+
+    @staticmethod
+    def check_request_throttling(request, user=None) -> tuple[bool, str]:
+        """
+        Enforces tiered request throttling:
+        - Primary signal: Account-based throttling (default 10 requests per minute).
+        - Secondary signal: IP-based throttling (default 30 requests per minute, accommodating shared Wi-Fi/NAT).
+        """
+        user_limit = getattr(settings, 'BOOKING_RATE_LIMIT_PER_MINUTE', 10)
+        ip_limit = getattr(settings, 'BOOKING_IP_RATE_LIMIT_PER_MINUTE', 30)
+
+        now_epoch = int(time.time())
+        window = now_epoch // 60
+
+        # Primary user-based throttle
+        target_user = user or (request.user if request and request.user.is_authenticated else None)
+        if target_user:
+            user_key = f"throttle_booking_usr_{target_user.pk}_{window}"
+            user_count = cache.get(user_key, 0)
+            if user_count >= user_limit:
+                return False, "Too many booking requests from this account. Please wait a minute before trying again."
+            cache.set(user_key, user_count + 1, timeout=70)
+
+        # Secondary IP-based throttle
+        client_ip = ''
+        if request:
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                client_ip = x_forwarded_for.split(',')[0].strip()
+            else:
+                client_ip = request.META.get('REMOTE_ADDR', '')
+
+        if client_ip:
+            ip_key = f"throttle_booking_ip_{client_ip}_{window}"
+            ip_count = cache.get(ip_key, 0)
+            if ip_count >= ip_limit:
+                return False, "Too many booking requests from your network. Please wait a minute before trying again."
+            cache.set(ip_key, ip_count + 1, timeout=70)
+
+        return True, ""
+
+    @staticmethod
+    def find_duplicate_submission(user, zone, normalized_plate: str, payment_method: str = None, within_seconds: int = 120) -> Reservation | None:
+        """
+        Detects idempotent duplicate submissions (e.g. double-clicks, network retries)
+        from the same customer for the same vehicle plate & facility within a short window.
+        Returns the existing reservation if found so it can be returned without consuming extra capacity.
+        """
+        cutoff = timezone.now() - timedelta(seconds=within_seconds)
+        qs = Reservation.objects.filter(
+            customer=user,
+            parking_zone=zone,
+            created_on__gte=cutoff,
+            status__in=['CONFIRMED', 'PAYMENT_PENDING']
+        )
+        if payment_method:
+            qs = qs.filter(payment_method=payment_method)
+
+        for res in qs:
+            if AntiSpamService.normalize_plate(res.plate_number) == normalized_plate:
+                return res
+        return None
+
+    @staticmethod
+    def check_active_reservation_limit(user) -> tuple[bool, Reservation | None, str]:
+        """
+        Enforces one active reservation per account, including PAYMENT_PENDING.
+        Automatically expires any stale holds first so legitimate customers aren't falsely blocked.
+        """
+        now = timezone.now()
+        active_candidates = Reservation.objects.filter(
+            customer=user,
+            status__in=['CONFIRMED', 'CHECKED_IN', 'PAYMENT_PENDING'],
+            checked_out=False
+        )
+
+        for res in active_candidates:
+            # Check on-the-fly expiration
+            if res.status == 'PAYMENT_PENDING' and res.payment_deadline and now >= res.payment_deadline:
+                res.status = 'EXPIRED'
+                res.staff_notes = (res.staff_notes + f"\n[Auto-Expire] Deposit checkout timeout at {now.isoformat()}").strip()
+                res.save(update_fields=['status', 'staff_notes'])
+                continue
+
+            if res.status == 'CONFIRMED' and not res.checked_in_at and res.arrival_deadline and now >= res.arrival_deadline:
+                res.status = 'EXPIRED'
+                if res.payment_method == 'DEPOSIT':
+                    res.deposit_forfeited = True
+                res.staff_notes = (res.staff_notes + f"\n[Auto-Expire] Arrival deadline passed at {now.isoformat()}").strip()
+                res.save(update_fields=['status', 'deposit_forfeited', 'staff_notes'])
+                continue
+
+            # Found an active valid reservation
+            msg = (
+                f"You already have an active reservation at {res.parking_zone.name} "
+                f"(Ticket #{res.ticket_code}, Status: {res.get_status_display()}). "
+                f"Only one active reservation is permitted per account."
+            )
+            return False, res, msg
+
+        return True, None, ""
+
+    @staticmethod
+    def check_simultaneous_plate_hold(plate: str, exclude_reservation_id: int = None) -> tuple[bool, Reservation | None, str]:
+        """
+        Prevents simultaneous holds for the same normalized full vehicle plate across all facilities.
+        """
+        norm_target = AntiSpamService.normalize_plate(plate)
+        now = timezone.now()
+        active_candidates = Reservation.objects.filter(
+            status__in=['CONFIRMED', 'CHECKED_IN', 'PAYMENT_PENDING'],
+            checked_out=False
+        )
+        if exclude_reservation_id:
+            active_candidates = active_candidates.exclude(id=exclude_reservation_id)
+
+        for res in active_candidates:
+            # Check on-the-fly expiration for candidates
+            if res.status == 'PAYMENT_PENDING' and res.payment_deadline and now >= res.payment_deadline:
+                res.status = 'EXPIRED'
+                res.save(update_fields=['status'])
+                continue
+            if res.status == 'CONFIRMED' and not res.checked_in_at and res.arrival_deadline and now >= res.arrival_deadline:
+                res.status = 'EXPIRED'
+                if res.payment_method == 'DEPOSIT':
+                    res.deposit_forfeited = True
+                res.save(update_fields=['status', 'deposit_forfeited'])
+                continue
+
+            if AntiSpamService.normalize_plate(res.plate_number) == norm_target:
+                msg = (
+                    f"A reservation is already active for vehicle plate '{res.plate_number}' at {res.parking_zone.name} "
+                    f"(Ticket #{res.ticket_code}). Simultaneous holds for the same vehicle plate are not permitted."
+                )
+                return False, res, msg
+
+        return True, None, ""
+
+    @staticmethod
+    def check_pay_later_eligibility(user) -> tuple[bool, str, dict]:
+        """
+        Validates whether user is allowed to book with PAY_AT_EXIT:
+        1. 10-minute cooldown after cancelling an unpaid hold.
+        2. Two unpaid no-shows within 7 days disable pay-later for 24 hours (with available-at timestamp).
+        3. Maximum 3 new pay-later holds per account in rolling 24 hours.
+        """
+        now = timezone.now()
+        meta = {}
+
+        # 1. 10-minute cancellation cooldown
+        cooldown_mins = getattr(settings, 'UNPAID_CANCEL_COOLDOWN_MINUTES', 10)
+        recent_cancel = Reservation.objects.filter(
+            customer=user,
+            payment_method='PAY_AT_EXIT',
+            status='CANCELLED',
+            cancelled_at__isnull=False,
+            cancelled_at__gte=now - timedelta(minutes=cooldown_mins)
+        ).order_by('-cancelled_at').first()
+
+        if recent_cancel:
+            cooldown_ends = recent_cancel.cancelled_at + timedelta(minutes=cooldown_mins)
+            remaining_secs = max(0, (cooldown_ends - now).total_seconds())
+            remaining_mins = int(math.ceil(remaining_secs / 60.0))
+            meta['cooldown_ends'] = cooldown_ends
+            meta['cooldown_minutes_remaining'] = remaining_mins
+            msg = (
+                f"Please wait {remaining_mins} minute{'s' if remaining_mins != 1 else ''} before creating another pay-later hold "
+                f"({cooldown_mins}-minute cooldown after cancelling an unpaid hold). You can still book using 'Pay first day now'."
+            )
+            return False, msg, meta
+
+        # 2. Two unpaid no-shows within 7 days -> 24-hour lockout
+        noshow_threshold = getattr(settings, 'UNPAID_NOSHOW_THRESHOLD', 2)
+        penalty_hours = getattr(settings, 'UNPAID_NOSHOW_PENALTY_HOURS', 24)
+
+        recent_noshows = list(Reservation.objects.filter(
+            customer=user,
+            payment_method='PAY_AT_EXIT',
+            status='EXPIRED',
+            checked_in_at__isnull=True,
+            created_on__gte=now - timedelta(days=7)
+        ).order_by('-created_on')[:noshow_threshold])
+
+        if len(recent_noshows) >= noshow_threshold:
+            # Determine lockout anchor: the arrival deadline or creation of the second (most recent) no-show
+            latest_noshow = recent_noshows[0]
+            noshow_anchor = latest_noshow.arrival_deadline or (latest_noshow.created_on + timedelta(hours=3))
+            lockout_until = noshow_anchor + timedelta(hours=penalty_hours)
+
+            if now < lockout_until:
+                avail_str = lockout_until.strftime('%b %d, %Y at %I:%M %p')
+                meta['lockout_until'] = lockout_until
+                meta['available_at'] = avail_str
+                msg = (
+                    f"Pay when you leave is temporarily disabled due to {noshow_threshold} unpaid no-shows in the last 7 days. "
+                    f"It will become available again on {avail_str}. You can still reserve using 'Pay first day now'."
+                )
+                return False, msg, meta
+
+        # 3. Maximum 3 new pay-later holds in rolling 24 hours
+        max_daily_holds = getattr(settings, 'MAX_PAY_LATER_HOLDS_PER_24H', 3)
+        holds_last_24h = Reservation.objects.filter(
+            customer=user,
+            payment_method='PAY_AT_EXIT',
+            created_on__gte=now - timedelta(hours=24)
+        ).count()
+
+        if holds_last_24h >= max_daily_holds:
+            meta['max_holds_reached'] = True
+            msg = (
+                f"You have reached the maximum limit of {max_daily_holds} pay-later holds in a 24-hour period. "
+                f"Please choose 'Pay first day now' or try again later."
+            )
+            return False, msg, meta
+
+        return True, "", meta
+

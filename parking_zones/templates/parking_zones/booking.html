@@ -76,18 +76,18 @@
 
               <div class="sp-pay-card-footer">
                 <div class="sp-pay-arrival-note">
-                  <strong>Arrival:</strong> Within your booked arrival window.
+                  <strong>Arrival:</strong> Enter within 5 hours after payment. Space guaranteed.
                 </div>
                 <div class="sp-pay-arrival-note-kh">
-                  <strong>ការមកដល់៖</strong> ក្នុងកំឡុងពេលមកដល់ដែលបានកក់ទុក។
+                  <strong>ការមកដល់៖</strong> ចូលចតក្នុងរយៈពេល ៥ ម៉ោងបន្ទាប់ពីការទូទាត់ប្រាក់កក់។
                 </div>
               </div>
             </label>
 
             <!-- Card B: Pay when you leave -->
-            <label class="sp-pay-card{% if form.payment_method.value == 'PAY_AT_EXIT' %} is-selected{% endif %}" id="card-pay-exit" for="id_payment_method_exit">
+            <label class="sp-pay-card{% if form.payment_method.value == 'PAY_AT_EXIT' %} is-selected{% endif %}{% if not pay_later_allowed %} is-disabled{% endif %}" id="card-pay-exit" for="id_payment_method_exit" {% if not pay_later_allowed %}style="opacity:0.65; cursor:not-allowed;"{% endif %}>
               <div class="sp-pay-card-header">
-                <input type="radio" name="payment_method" value="PAY_AT_EXIT" id="id_payment_method_exit" class="sp-pay-card-radio" {% if form.payment_method.value == 'PAY_AT_EXIT' %}checked{% endif %}>
+                <input type="radio" name="payment_method" value="PAY_AT_EXIT" id="id_payment_method_exit" class="sp-pay-card-radio" {% if form.payment_method.value == 'PAY_AT_EXIT' %}checked{% endif %} {% if not pay_later_allowed %}disabled{% endif %}>
                 <div class="sp-pay-card-heading">
                   <span class="sp-pay-card-title">Pay when you leave</span>
                   <span class="sp-pay-card-title-kh">បង់ប្រាក់នៅពេលអ្នកចេញ</span>
@@ -106,6 +106,11 @@
                 <p class="sp-pay-card-text-kh">
                   បង់តាមរយៈពេលចតជាក់ស្តែងនៅពេលចេញ។
                 </p>
+                {% if not pay_later_allowed %}
+                  <div class="sp-pay-lockout-hint" style="margin-top:0.4rem; padding:0.35rem 0.5rem; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); border-radius:4px; font-size:0.78rem; color:#f87171;">
+                    ⚠️ {{ pay_later_reason }}
+                  </div>
+                {% endif %}
               </div>
 
               <div class="sp-pay-card-footer">
@@ -158,46 +163,17 @@
           </div>
         </div>
 
-        <!-- Booked Arrival Window (Shown and enabled when DEPOSIT is selected; hidden and disabled for PAY_AT_EXIT) -->
-        <div id="deposit-arrival-fields" style="{% if form.payment_method.value == 'PAY_AT_EXIT' %}display:none;{% else %}display:grid;{% endif %} grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
-          <div class="sp-form-group">
-            <label class="sp-label" for="id_start_date">
-              Arrival Date & Time (កាលបរិច្ឆេទ និងម៉ោងមកដល់)
-              <span class="sp-required" aria-hidden="true">*</span>
-            </label>
-            <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 0.5rem;">
-              {{ form.start_date }}
-              {{ form.start_time }}
+        <!-- Deposit 5-hour notice (Shown when DEPOSIT is selected) -->
+        <div class="sp-deposit-timing-box" id="deposit-timing-box" style="{% if form.payment_method.value == 'PAY_AT_EXIT' %}display:none;{% else %}display:block;{% endif %} background:rgba(59, 130, 246, 0.08); border:1px solid rgba(59, 130, 246, 0.35); border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem;">
+          <div style="display:flex; align-items:flex-start; gap:0.75rem;">
+            <div style="font-size:1.5rem; line-height:1;" aria-hidden="true">⏱</div>
+            <div>
+              <strong style="font-size:1.02rem; color:#1d4ed8; display:block;">Enter within 5 hours after payment. Space guaranteed.</strong>
+              <span style="font-size:0.85rem; color:#1e40af; display:block; margin-top:0.2rem;">(ចូលចតក្នុងរយៈពេល ៥ ម៉ោងបន្ទាប់ពីការទូទាត់ប្រាក់កក់។ រក្សាទុកកន្លែងចតជូន)</span>
+              <p style="margin:0.35rem 0 0 0; font-size:0.82rem; color:#2563eb; line-height:1.4;">
+                The 5-hour arrival deadline begins upon verified deposit payment. <em>Important: First-day payment is non-refundable on customer no-show if you do not arrive before the 5-hour deadline.</em>
+              </p>
             </div>
-            <div class="sp-field-help" style="font-size: 0.8rem; color: var(--sp-color-text-muted, #64748b); margin-top: 0.25rem;">
-              Start of permitted arrival window.
-            </div>
-            {% if form.start_date.errors or form.start_time.errors %}
-              <div class="sp-field-feedback">
-                {% for err in form.start_date.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
-                {% for err in form.start_time.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-
-          <div class="sp-form-group">
-            <label class="sp-label" for="id_finish_date">
-              Latest Arrival / Planned Date (កាលបរិច្ឆេទចុងក្រោយ)
-              <span class="sp-required" aria-hidden="true">*</span>
-            </label>
-            <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 0.5rem;">
-              {{ form.finish_date }}
-              {{ form.finish_time }}
-            </div>
-            <div class="sp-field-help" style="font-size: 0.8rem; color: var(--sp-color-text-muted, #64748b); margin-top: 0.25rem;">
-              End of permitted arrival window.
-            </div>
-            {% if form.finish_date.errors or form.finish_time.errors %}
-              <div class="sp-field-feedback">
-                {% for err in form.finish_date.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
-                {% for err in form.finish_time.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
-              </div>
-            {% endif %}
           </div>
         </div>
 
@@ -491,11 +467,7 @@
     }
 
     // 3. Payment Method Selection & Dynamic Timing Field Switching
-    var startDateEl = document.getElementById('id_start_date');
-    var startTimeEl = document.getElementById('id_start_time');
-    var finishDateEl = document.getElementById('id_finish_date');
-    var finishTimeEl = document.getElementById('id_finish_time');
-    var depositArrivalContainer = document.getElementById('deposit-arrival-fields');
+    var depositTimingBox = document.getElementById('deposit-timing-box');
     var payExitTimingBox = document.getElementById('pay-exit-timing-box');
 
     var radioDeposit = document.getElementById('id_payment_method_deposit');
@@ -527,28 +499,16 @@
 
       if (isExit) {
         // PAY_AT_EXIT mode:
-        // Hide and disable Arrival Date & Time and Latest Arrival / Planned Date
-        if (depositArrivalContainer) depositArrivalContainer.style.display = 'none';
+        if (depositTimingBox) depositTimingBox.style.display = 'none';
         if (payExitTimingBox) payExitTimingBox.style.display = 'block';
-
-        if (startDateEl) startDateEl.disabled = true;
-        if (startTimeEl) startTimeEl.disabled = true;
-        if (finishDateEl) finishDateEl.disabled = true;
-        if (finishTimeEl) finishTimeEl.disabled = true;
 
         if (sumDeposit) sumDeposit.style.display = 'none';
         if (sumExit) sumExit.style.display = 'block';
         if (btnText) btnText.textContent = 'Reserve parking (កក់កន្លែងចំណត) →';
       } else {
         // DEPOSIT mode:
-        // Show and enable Arrival Date & Time and Latest Arrival / Planned Date
-        if (depositArrivalContainer) depositArrivalContainer.style.display = 'grid';
+        if (depositTimingBox) depositTimingBox.style.display = 'block';
         if (payExitTimingBox) payExitTimingBox.style.display = 'none';
-
-        if (startDateEl) startDateEl.disabled = false;
-        if (startTimeEl) startTimeEl.disabled = false;
-        if (finishDateEl) finishDateEl.disabled = false;
-        if (finishTimeEl) finishTimeEl.disabled = false;
 
         if (sumDeposit) sumDeposit.style.display = 'block';
         if (sumExit) sumExit.style.display = 'none';
@@ -564,30 +524,6 @@
     }
     if (radioExit) {
       radioExit.addEventListener('change', updatePaymentUI);
-    }
-
-    // 4. Synchronize reserved_days and finish_date for DEPOSIT mode
-    var reservedDaysEl = document.getElementById('id_reserved_days');
-
-    function syncFinishDateFromDays() {
-      if (!startDateEl || !finishDateEl || !reservedDaysEl) return;
-      var startVal = startDateEl.value;
-      var daysVal = parseInt(reservedDaysEl.value, 10) || 1;
-      if (startVal) {
-        var d = new Date(startVal);
-        d.setDate(d.getDate() + daysVal);
-        var yyyy = d.getFullYear();
-        var mm = String(d.getMonth() + 1).padStart(2, '0');
-        var dd = String(d.getDate()).padStart(2, '0');
-        finishDateEl.value = yyyy + '-' + mm + '-' + dd;
-      }
-    }
-
-    if (reservedDaysEl) {
-      reservedDaysEl.addEventListener('change', syncFinishDateFromDays);
-    }
-    if (startDateEl) {
-      startDateEl.addEventListener('change', syncFinishDateFromDays);
     }
 
     // Initial setup

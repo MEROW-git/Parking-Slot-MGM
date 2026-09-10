@@ -251,37 +251,27 @@ class ReservationForm(forms.ModelForm):
             cleaned_data['finish_datetime'] = arrival_deadline
             cleaned_data['arrival_deadline'] = arrival_deadline
 
-            # Clear any field errors that might have been raised on date/time fields
-            for f in ['start_date', 'finish_date', 'start_time', 'finish_time']:
-                if f in self._errors:
-                    del self._errors[f]
         else:
-            # Leave deposit-mode rules unchanged
-            start_date = cleaned_data.get('start_date')
-            finish_date = cleaned_data.get('finish_date')
-            raw_start_time = cleaned_data.get('start_time') or time(7, 0)
-            raw_finish_time = cleaned_data.get('finish_time') or time(22, 0)
+            # Pay first day now (DEPOSIT):
+            # - Remove arrival date/time requirements from client
+            # - Arrival window (5 hours) will be granted after server-verified payment
+            # - Server booking time is now; duration starts at actual entry
+            start_dt = now
+            days = int(cleaned_data.get('reserved_days') or 1)
+            finish_dt = now + timedelta(days=days)
 
-            if not start_date:
-                self.add_error('start_date', 'Please enter a start date.')
-            elif start_date < today:
-                self.add_error('start_date', 'Start date cannot be in the past.')
+            cleaned_data['start_date'] = timezone.localdate(start_dt)
+            cleaned_data['finish_date'] = timezone.localdate(finish_dt)
+            cleaned_data['start_time'] = start_dt.time()
+            cleaned_data['finish_time'] = finish_dt.time()
+            cleaned_data['start_datetime'] = start_dt
+            cleaned_data['finish_datetime'] = finish_dt
+            cleaned_data['arrival_deadline'] = None
 
-            if not finish_date:
-                self.add_error('finish_date', 'Please enter a finish date.')
-            elif start_date and finish_date < start_date:
-                self.add_error('finish_date', 'Finish date must be on or after start date.')
-
-            # Construct timezone-aware start and finish datetimes
-            if start_date and finish_date:
-                start_dt = timezone.make_aware(datetime.combine(start_date, raw_start_time), tz)
-                finish_dt = timezone.make_aware(datetime.combine(finish_date, raw_finish_time), tz)
-
-                if finish_dt <= start_dt:
-                    self.add_error('finish_time', 'Finish time must be after start time.')
-
-                cleaned_data['start_datetime'] = start_dt
-                cleaned_data['finish_datetime'] = finish_dt
+        # Clear any field errors that might have been raised on date/time fields
+        for f in ['start_date', 'finish_date', 'start_time', 'finish_time']:
+            if f in self._errors:
+                del self._errors[f]
 
         reserved_days_val = cleaned_data.get('reserved_days')
         if not reserved_days_val:
@@ -419,6 +409,12 @@ class ReservationForm(forms.ModelForm):
             timeout_mins = getattr(settings, 'PAYMENT_TIMEOUT_MINUTES', 15)
             instance.payment_deadline = now + timedelta(minutes=timeout_mins)
             instance.arrival_deadline = None
+            booking_time = self.cleaned_data.get('start_datetime') or now
+            finish_time = self.cleaned_data.get('finish_datetime') or (booking_time + timedelta(days=instance.reserved_days))
+            instance.start_time = booking_time
+            instance.finish_time = finish_time
+            instance.start_date = timezone.localdate(booking_time)
+            instance.finish_date = timezone.localdate(finish_time)
 
         if commit:
             instance.save()

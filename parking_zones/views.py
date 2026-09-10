@@ -16,7 +16,7 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 from .models import ParkingZone, Reservation, PaymentTransaction
 from .forms import ReservationForm
-from .services import BillingService, CapacityService, PaymentService, GateService, ExpiryService
+from .services import BillingService, CapacityService, PaymentService, GateService, ExpiryService, AntiSpamService
 from .qr import generate_access_qr_base64, render_access_qr_response, generate_demo_payment_qr_base64
 from .payments import DemoPaymentAdapter
 
@@ -58,20 +58,23 @@ def zone_detail(request, slug):
 
 @login_required
 def booking(request):
-    """Reserve a parking slot with payment method selection and capacity enforcement."""
-    # Pre-check active reservation
-    active_reservation = Reservation.objects.filter(
-        customer=request.user,
-        status__in=['CONFIRMED', 'CHECKED_IN']
-    ).first()
+    """Reserve a parking slot with payment method selection, anti-spam enforcement, and capacity checks."""
+    # 1. Request Throttling Check
+    throttle_ok, throttle_msg = AntiSpamService.check_request_throttling(request)
+    if not throttle_ok:
+        messages.error(request, throttle_msg)
+        return redirect('dashboard')
 
-    if active_reservation:
-        messages.warning(
-            request,
-            f'You already have an active reservation at {active_reservation.parking_zone.name} '
-            f'(Ticket: {active_reservation.ticket_code}). Please check out before booking another space.'
-        )
+    # 2. Check Active Reservation Limit (1 per account, including PAYMENT_PENDING)
+    has_no_active, active_reservation, active_msg = AntiSpamService.check_active_reservation_limit(request.user)
+    if not has_no_active and active_reservation:
+        messages.warning(request, active_msg)
+        if active_reservation.status == 'PAYMENT_PENDING':
+            return redirect('pay_deposit', ticket_code=active_reservation.ticket_code)
         return redirect('ticket_code', ticket_code=active_reservation.ticket_code)
+
+    # 3. Check Pay-Later Eligibility for this customer
+    pay_later_allowed, pay_later_reason, pay_later_meta = AntiSpamService.check_pay_later_eligibility(request.user)
 
     zones_list = list(ParkingZone.objects.all())
     selected_zone_slug = request.GET.get('zone')
@@ -81,6 +84,10 @@ def booking(request):
         selected_zone = next((z for z in zones_list if z.slug == selected_zone_slug and z.vacant_slots > 0), None)
         if selected_zone:
             initial_data['parking_zone'] = selected_zone
+
+    # Default to PAY_AT_EXIT if eligible, or DEPOSIT if pay-later is locked out
+    if not pay_later_allowed:
+        initial_data['payment_method'] = 'DEPOSIT'
 
     zones_meta = {
         str(z.id): {
@@ -103,6 +110,67 @@ def booking(request):
             finish_dt = form.cleaned_data.get('finish_datetime')
             payment_method = form.cleaned_data.get('payment_method', 'DEPOSIT')
             reserved_days = form.cleaned_data.get('reserved_days', 1)
+            plate_number = form.cleaned_data.get('plate_number', '')
+            normalized_plate = AntiSpamService.normalize_plate(plate_number)
+
+            # Check for duplicate submission first (double-clicks / retries within 2 minutes)
+            # Duplicate submissions must return the existing booking without consuming extra capacity
+            duplicate_res = AntiSpamService.find_duplicate_submission(
+                user=request.user,
+                zone=zone,
+                normalized_plate=normalized_plate,
+                payment_method=payment_method,
+                within_seconds=120
+            )
+            if duplicate_res:
+                if duplicate_res.status == 'PAYMENT_PENDING':
+                    messages.info(request, f"Resuming your pending booking for vehicle {duplicate_res.plate_number}.")
+                    return redirect('pay_deposit', ticket_code=duplicate_res.ticket_code)
+                messages.info(request, f"Your reservation for vehicle {duplicate_res.plate_number} is already confirmed.")
+                return redirect('ticket_code', ticket_code=duplicate_res.ticket_code)
+
+            # Anti-Spam Check: One active reservation per account
+            has_no_active, existing_active, active_err = AntiSpamService.check_active_reservation_limit(request.user)
+            if not has_no_active:
+                messages.warning(request, active_err)
+                if existing_active and existing_active.status == 'PAYMENT_PENDING':
+                    return redirect('pay_deposit', ticket_code=existing_active.ticket_code)
+                elif existing_active:
+                    return redirect('ticket_code', ticket_code=existing_active.ticket_code)
+                return redirect('dashboard')
+
+            # Anti-Spam Check: Pay-Later Rules
+            if payment_method == 'PAY_AT_EXIT':
+                can_pay_later, pay_later_err, _ = AntiSpamService.check_pay_later_eligibility(request.user)
+                if not can_pay_later:
+                    messages.error(request, pay_later_err)
+                    return render(request, 'parking_zones/booking.html', {
+                        'form': form,
+                        'title': 'Reserve Parking Slot | SomPark',
+                        'active_reservation': None,
+                        'parking_zones': zones_list,
+                        'selected_zone': zone,
+                        'zones_meta_json': zones_meta_json,
+                        'pay_later_allowed': False,
+                        'pay_later_reason': pay_later_err,
+                        'pay_later_meta': pay_later_meta,
+                    })
+
+            # Anti-Spam Check: Prevent simultaneous holds for the same normalized vehicle plate across facilities
+            plate_free, plate_holder, plate_err = AntiSpamService.check_simultaneous_plate_hold(normalized_plate)
+            if not plate_free:
+                messages.error(request, plate_err)
+                return render(request, 'parking_zones/booking.html', {
+                    'form': form,
+                    'title': 'Reserve Parking Slot | SomPark',
+                    'active_reservation': None,
+                    'parking_zones': zones_list,
+                    'selected_zone': zone,
+                    'zones_meta_json': zones_meta_json,
+                    'pay_later_allowed': pay_later_allowed,
+                    'pay_later_reason': pay_later_reason,
+                    'pay_later_meta': pay_later_meta,
+                })
 
             try:
                 with transaction.atomic():
@@ -115,27 +183,34 @@ def booking(request):
                         return render(request, 'parking_zones/booking.html', {
                             'form': form,
                             'title': 'Reserve Parking Slot | SomPark',
-                            'active_reservation': active_reservation,
+                            'active_reservation': None,
                             'parking_zones': zones_list,
                             'selected_zone': zone,
                             'zones_meta_json': zones_meta_json,
+                            'pay_later_allowed': pay_later_allowed,
+                            'pay_later_reason': pay_later_reason,
+                            'pay_later_meta': pay_later_meta,
                         })
 
-                    # Check for duplicate active reservation for this user inside transaction
-                    if Reservation.objects.filter(customer=request.user, status__in=['CONFIRMED', 'CHECKED_IN']).exists():
+                    # Final race condition check inside transaction
+                    if Reservation.objects.filter(
+                        customer=request.user,
+                        status__in=['CONFIRMED', 'CHECKED_IN', 'PAYMENT_PENDING'],
+                        checked_out=False
+                    ).exists():
                         messages.warning(request, 'You already have an active reservation.')
-                        return redirect('home')
+                        return redirect('dashboard')
 
                     reservation = form.save(commit=False)
                     reservation.customer = request.user
                     reservation.save()
 
                     if payment_method == 'DEPOSIT':
-                        # Create deposit transaction with 15-minute checkout timer
+                        # Create deposit transaction with short 15-minute checkout timer
                         PaymentService.create_deposit_transaction(reservation)
                         messages.info(
                             request,
-                            'Please complete your first-day deposit payment to confirm your guaranteed parking space.'
+                            'Please complete your first-day deposit payment to confirm your 5-hour guaranteed arrival window.'
                         )
                         return redirect('pay_deposit', ticket_code=reservation.ticket_code)
                     else:
@@ -151,9 +226,6 @@ def booking(request):
                 messages.error(request, f'An unexpected error occurred during reservation: {str(e)}')
                 return redirect('book')
     else:
-        today = timezone.localdate()
-        initial_data.setdefault('start_date', today)
-        initial_data.setdefault('finish_date', today)
         form = ReservationForm(initial=initial_data)
 
     if not selected_zone:
@@ -173,6 +245,9 @@ def booking(request):
         'parking_zones': zones_list,
         'selected_zone': selected_zone,
         'zones_meta_json': zones_meta_json,
+        'pay_later_allowed': pay_later_allowed,
+        'pay_later_reason': pay_later_reason,
+        'pay_later_meta': pay_later_meta,
     }
     return render(request, 'parking_zones/booking.html', context)
 
@@ -192,6 +267,14 @@ def pay_deposit(request, ticket_code):
     if reservation.status == 'CONFIRMED' and reservation.payment_status == 'PARTIALLY_PAID':
         messages.success(request, 'Deposit payment has already been verified.')
         return redirect('ticket_code', ticket_code=reservation.ticket_code)
+
+    now = timezone.now()
+    if reservation.status == 'PAYMENT_PENDING' and reservation.payment_deadline and now >= reservation.payment_deadline:
+        reservation.status = 'EXPIRED'
+        reservation.staff_notes = (reservation.staff_notes + f"\n[Request-Time Check] Deposit checkout timeout passed at {now.isoformat()}.").strip()
+        reservation.save(update_fields=['status', 'staff_notes'])
+        messages.error(request, 'The deposit checkout window has expired. Please book a new slot.')
+        return redirect('book')
 
     if reservation.status in ('EXPIRED', 'CANCELLED'):
         messages.error(request, f'This reservation is {reservation.get_status_display().lower()}. Please book a new slot.')
@@ -464,9 +547,12 @@ def cancel_booking(request, ticket_code):
         messages.info(request, f'This reservation is already {reservation.get_status_display().lower()}.')
         return redirect('dashboard')
 
+    now = timezone.now()
     reservation.status = 'CANCELLED'
-    reservation.staff_notes = (reservation.staff_notes + f"\nCancelled by {request.user.username} at {timezone.now().isoformat()}").strip()
-    reservation.save(update_fields=['status', 'staff_notes'])
+    reservation.cancelled_at = now
+    reservation.deposit_forfeited = False  # Forfeiture applies only to no-shows, not operator/user cancellations
+    reservation.staff_notes = (reservation.staff_notes + f"\nCancelled by {request.user.username} at {now.isoformat()}").strip()
+    reservation.save(update_fields=['status', 'cancelled_at', 'deposit_forfeited', 'staff_notes'])
 
     messages.success(request, f'Reservation #{reservation.ticket_code} was cancelled.')
     return redirect('dashboard')
@@ -496,6 +582,21 @@ def ticket_detail(request, ticket_code=None):
         return redirect('book')
 
     now = timezone.now()
+
+    # Request-time expiry check: ensure expired holds fail and transition immediately
+    if reservation.status == 'CONFIRMED' and not reservation.checked_in_at and reservation.arrival_deadline and now >= reservation.arrival_deadline:
+        reservation.status = 'EXPIRED'
+        if reservation.payment_method == 'DEPOSIT':
+            reservation.deposit_forfeited = True
+            reservation.staff_notes = (reservation.staff_notes + f"\n[Request-Time Check] 5-hour arrival deadline passed at {now.isoformat()}. First-day deposit retained.").strip()
+        else:
+            reservation.staff_notes = (reservation.staff_notes + f"\n[Request-Time Check] 3-hour arrival deadline passed at {now.isoformat()}.").strip()
+        reservation.save(update_fields=['status', 'deposit_forfeited', 'staff_notes'])
+    elif reservation.status == 'PAYMENT_PENDING' and reservation.payment_deadline and now >= reservation.payment_deadline:
+        reservation.status = 'EXPIRED'
+        reservation.staff_notes = (reservation.staff_notes + f"\n[Request-Time Check] Deposit checkout timeout passed at {now.isoformat()}.").strip()
+        reservation.save(update_fields=['status', 'staff_notes'])
+
     bill = BillingService.calculate_bill(reservation, as_of=now)
     qr_data_uri = generate_access_qr_base64(reservation.access_token)
     is_exit_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
@@ -527,9 +628,20 @@ def ticket_gate_mode(request, ticket_code):
     else:
         reservation = get_object_or_404(Reservation, ticket_code=ticket_code, customer=request.user)
 
+    now = timezone.now()
+
+    # Request-time expiry check for gate mode
+    if reservation.status == 'CONFIRMED' and not reservation.checked_in_at and reservation.arrival_deadline and now >= reservation.arrival_deadline:
+        reservation.status = 'EXPIRED'
+        if reservation.payment_method == 'DEPOSIT':
+            reservation.deposit_forfeited = True
+            reservation.staff_notes = (reservation.staff_notes + f"\n[Request-Time Check] 5-hour arrival deadline passed at {now.isoformat()}. Deposit retained.").strip()
+        else:
+            reservation.staff_notes = (reservation.staff_notes + f"\n[Request-Time Check] 3-hour arrival deadline passed at {now.isoformat()}.").strip()
+        reservation.save(update_fields=['status', 'deposit_forfeited', 'staff_notes'])
+
     mode = request.GET.get('mode', 'entry')
     qr_data_uri = generate_access_qr_base64(reservation.access_token)
-    now = timezone.now()
     bill = BillingService.calculate_bill(reservation, as_of=now)
     is_exit_authorized = bool(reservation.exit_authorized_until and now <= reservation.exit_authorized_until)
 

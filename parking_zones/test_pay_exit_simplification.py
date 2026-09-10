@@ -429,7 +429,7 @@ class PayAtExitSimplificationFlowTests(TestCase):
         # Payment choice card appears before timing fields
         pos_payment = content.find('id="group_payment_choices"')
         pos_duration = content.find('id="id_reserved_days"')
-        pos_deposit_timing = content.find('id="deposit-arrival-fields"')
+        pos_deposit_timing = content.find('id="deposit-timing-box"')
         pos_timing_notice = content.find('id="pay-exit-timing-box"')
 
         self.assertNotEqual(pos_payment, -1)
@@ -651,13 +651,13 @@ class PayAtExitSimplificationFlowTests(TestCase):
 
     def test_deposit_mode_rules_remain_unchanged(self):
         """
-        DEPOSIT mode rules:
-        - Omitting dates raises validation errors.
-        - Past date raises validation error.
-        - Valid dates create PAYMENT_PENDING reservation with 15-minute deposit transaction.
+        Simplified DEPOSIT mode rules:
+        - Arrival date/time inputs removed; server automatically handles timing.
+        - Booking creates PAYMENT_PENDING reservation with 15-minute deposit transaction.
+        - After payment confirmation, sets 5-hour arrival deadline.
         """
-        # A: Missing dates in DEPOSIT mode fails
-        resp_missing = self.client.post(reverse('book'), data={
+        # A: Simplified DEPOSIT booking without arrival dates succeeds
+        resp = self.client.post(reverse('book'), data={
             'parking_zone': self.zone.id,
             'payment_method': 'DEPOSIT',
             'reserved_days': 1,
@@ -665,51 +665,23 @@ class PayAtExitSimplificationFlowTests(TestCase):
             'plate_code': '2AZ-8888',
             'phone_number': '+85512345678',
         })
-        self.assertEqual(resp_missing.status_code, 200)
-        form_missing = resp_missing.context['form']
-        self.assertIn('start_date', form_missing.errors)
-        self.assertIn('Please enter a start date.', form_missing.errors['start_date'])
-        self.assertIn('finish_date', form_missing.errors)
-        self.assertIn('Please enter a finish date.', form_missing.errors['finish_date'])
-
-        # B: Past date in DEPOSIT mode fails
-        yesterday = timezone.localdate() - timedelta(days=1)
-        resp_past = self.client.post(reverse('book'), data={
-            'parking_zone': self.zone.id,
-            'payment_method': 'DEPOSIT',
-            'reserved_days': 1,
-            'plate_province': 'Phnom Penh',
-            'plate_code': '2AZ-8888',
-            'phone_number': '+85512345678',
-            'start_date': yesterday.strftime('%Y-%m-%d'),
-            'finish_date': yesterday.strftime('%Y-%m-%d'),
-        })
-        self.assertEqual(resp_past.status_code, 200)
-        form_past = resp_past.context['form']
-        self.assertIn('start_date', form_past.errors)
-        self.assertIn('Start date cannot be in the past.', form_past.errors['start_date'])
-
-        # C: Valid DEPOSIT booking creates PAYMENT_PENDING with deposit transaction
-        tomorrow = timezone.localdate() + timedelta(days=1)
-        resp_valid = self.client.post(reverse('book'), data={
-            'parking_zone': self.zone.id,
-            'payment_method': 'DEPOSIT',
-            'reserved_days': 1,
-            'plate_province': 'Phnom Penh',
-            'plate_code': '2AZ-8888',
-            'phone_number': '+85512345678',
-            'start_date': tomorrow.strftime('%Y-%m-%d'),
-            'finish_date': (tomorrow + timedelta(days=1)).strftime('%Y-%m-%d'),
-            'start_time': '08:00',
-            'finish_time': '20:00',
-        })
-        self.assertEqual(resp_valid.status_code, 302)
+        self.assertEqual(resp.status_code, 302)
         res = Reservation.objects.filter(customer=self.user, plate_number='Phnom Penh 2AZ-8888').first()
         self.assertIsNotNone(res)
         self.assertEqual(res.status, 'PAYMENT_PENDING')
         self.assertEqual(res.payment_method, 'DEPOSIT')
         self.assertIsNotNone(res.payment_deadline)
-        self.assertTrue(res.transactions.filter(purpose='DEPOSIT', status='PENDING').exists())
+        self.assertIsNone(res.arrival_deadline)
+
+        txn = res.transactions.filter(purpose='DEPOSIT', status='PENDING').first()
+        self.assertIsNotNone(txn)
+
+        # B: Payment verification sets 5-hour arrival deadline
+        success, _ = PaymentService.confirm_deposit(txn.id)
+        self.assertTrue(success)
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CONFIRMED')
+        self.assertIsNotNone(res.arrival_deadline)
 
     def test_ticket_detail_displays_simplified_pay_at_exit_info(self):
         """
