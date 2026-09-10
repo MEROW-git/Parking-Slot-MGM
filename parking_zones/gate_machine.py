@@ -343,9 +343,18 @@ def virtual_gate(request):
                     if custom_detected_plate and normalize_license_plate(custom_detected_plate) != normalize_license_plate(expected_plate):
                         detected_plate = custom_detected_plate
                     else:
-                        detected_plate = '2X-9999'
+                        detected_plate = custom_detected_plate or '2X-9999'
                 else:
-                    detected_plate = incoming_detected_plate or custom_detected_plate or expected_plate
+                    # Mismatch simulation is OFF: the virtual camera reads the real vehicle plate
+                    if custom_detected_plate and expected_plate and normalize_license_plate(custom_detected_plate) == normalize_license_plate(expected_plate):
+                        detected_plate = custom_detected_plate
+                    elif not expected_plate and (custom_detected_plate or incoming_detected_plate):
+                        detected_plate = custom_detected_plate or incoming_detected_plate
+                    else:
+                        detected_plate = expected_plate or '2AZ-1234'
+                        # Clear stale mismatch override so the UI input field resets
+                        if custom_detected_plate and expected_plate and normalize_license_plate(custom_detected_plate) != normalize_license_plate(expected_plate):
+                            custom_detected_plate = ''
 
                 if not expected_plate:
                     plate_matched = True

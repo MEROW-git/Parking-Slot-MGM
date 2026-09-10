@@ -374,6 +374,23 @@
     return String(p).replace(/[\s\-_.]+/g, '').toUpperCase();
   }
 
+  // When the user unchecks "Simulate plate mismatch", clear any custom mismatch input so it reverts to the matching plate
+  if (mismatchCb) {
+    mismatchCb.addEventListener('change', () => {
+      if (!mismatchCb.checked) {
+        if (customPlateInput) customPlateInput.value = '';
+        if (detectedPlateInput) detectedPlateInput.value = '';
+        const expectedVal = document.getElementById('vg-telemetry-expected-plate')?.textContent?.trim() || '';
+        if (carPlateEl) carPlateEl.textContent = expectedVal || 'CAM-OK';
+        setAnprState('READY');
+      } else {
+        if (customPlateInput && !customPlateInput.value.trim()) {
+          customPlateInput.value = '2X-9999';
+        }
+      }
+    });
+  }
+
   function setAnprState(state, detected, expected) {
     if (!anprUnit || !anprHudText) return;
 
@@ -439,11 +456,19 @@
       const isMismatch = mismatchCb?.checked;
       const customVal = customPlateInput?.value?.trim();
       const currentDetected = detectedPlateInput?.value?.trim();
+      const expectedVal = document.getElementById('vg-telemetry-expected-plate')?.textContent?.trim() || '';
 
       if (isMismatch) {
         simulatedDetected = customVal || '2X-9999';
       } else {
-        simulatedDetected = customVal || currentDetected || '2AZ-1234';
+        // Mismatch is OFF: clear stale mismatch overrides so we detect the real matching plate
+        if (customPlateInput && customVal && normalizePlate(customVal) !== normalizePlate(expectedVal)) {
+          customPlateInput.value = '';
+        }
+        if (detectedPlateInput) {
+          detectedPlateInput.value = '';
+        }
+        simulatedDetected = expectedVal || '2AZ-1234';
       }
 
       // 1. CAMERA READY
@@ -1058,17 +1083,17 @@
     formData.set('payment_provider', provider);
     formData.set('outcome', outcome);
 
-    const detectedPlateHidden = document.getElementById('vg-detected-plate-input');
-    if (detectedPlateHidden && detectedPlateHidden.value) {
-      formData.set('detected_plate', detectedPlateHidden.value);
-    }
-    const customDetectedPlate = document.getElementById('custom-detected-plate-input');
-    if (customDetectedPlate && customDetectedPlate.value) {
-      formData.set('custom_detected_plate', customDetectedPlate.value);
-    }
     const mismatchCb = document.getElementById('simulate-plate-mismatch-cb');
     if (mismatchCb && mismatchCb.checked) {
       formData.set('simulate_plate_mismatch', 'true');
+      const detectedPlateHidden = document.getElementById('vg-detected-plate-input');
+      if (detectedPlateHidden && detectedPlateHidden.value) {
+        formData.set('detected_plate', detectedPlateHidden.value);
+      }
+      const customDetectedPlate = document.getElementById('custom-detected-plate-input');
+      if (customDetectedPlate && customDetectedPlate.value) {
+        formData.set('custom_detected_plate', customDetectedPlate.value);
+      }
     }
 
     try {

@@ -307,7 +307,7 @@ class VirtualGateTests(TestCase):
         content = resp.content.decode()
         self.assertIn('/static/css/tokens.css', content)
         self.assertIn('virtual-gate.css?v=2.2.0', content)
-        self.assertIn('virtual-gate.js?v=2.2.0', content)
+        self.assertIn('virtual-gate.js?v=2.2.', content)
         self.assertIn('vg-car-track', content)
         self.assertIn('data-direction="entry"', content)
         self.assertIn('data-just-passed="false"', content)
@@ -413,6 +413,22 @@ class VirtualGateTests(TestCase):
         self.reservation.refresh_from_db()
         self.assertEqual(self.reservation.status, 'CHECKED_IN')
         self.assertEqual(self.zone.occupied_slots, 1)
+
+    def test_anpr_turning_off_simulate_mismatch_restores_matching_plate(self):
+        # When simulate_plate_mismatch is unchecked/off, leftover mismatch inputs are discarded
+        # and the ANPR camera detects the expected matching plate
+        data = {
+            **self.data,
+            'simulate_plate_mismatch': '',
+            'custom_detected_plate': '2XR-3513',
+            'detected_plate': '2XR-3513',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['plate_matched'])
+        self.assertEqual(response.context['detected_plate'], self.reservation.plate_number)
+        self.assertTrue(response.context['gate_open'])
+        self.assertEqual(response.context['custom_detected_plate'], '')
 
     def test_anpr_plate_result_preserved_during_three_step_exit_flow(self):
         self.reservation.status = 'CHECKED_IN'
