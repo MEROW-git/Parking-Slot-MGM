@@ -9,6 +9,84 @@ from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.utils import timezone
 
+from .crypto import (
+    encrypt_plate,
+    decrypt_plate,
+    compute_plate_hmac,
+    CIPHERTEXT_PREFIX,
+    PlateCryptoConfigurationError,
+    PlateDecryptionError,
+)
+
+
+class EncryptedPlateCharField(models.CharField):
+    """
+    Model field for vehicle license plates.
+    Transparently decrypts authenticated ciphertext plates ('enc:v1:...') when loaded
+    from the database into Python strings, and encrypts plaintext plates before saving.
+    Legacy unencrypted plates are read as plaintext seamlessly.
+    """
+    def from_db_value(self, value, expression, connection):
+        if value is None:
+            return value
+        return decrypt_plate(value)
+
+    def to_python(self, value):
+        if value is None:
+            return value
+        return decrypt_plate(value)
+
+    def get_prep_value(self, value):
+        if value is None:
+            return value
+        val_str = str(value).strip()
+        if not val_str:
+            return ''
+        return encrypt_plate(val_str)
+
+
+@EncryptedPlateCharField.register_lookup
+class EncryptedPlateExact(models.Lookup):
+    """
+    Custom lookup allowing queries like Reservation.objects.filter(plate_number='2AZ-1234').
+    Matches against plate_lookup_hmac column via keyed HMAC, and falls back to
+    matching unencrypted legacy plaintext for unmigrated rows.
+    """
+    lookup_name = 'exact'
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        raw_rhs_val = self.rhs
+        if raw_rhs_val is None:
+            return f'{lhs} IS NULL', []
+
+        rhs_str = str(raw_rhs_val)
+        plain_val = rhs_str
+        if rhs_str.startswith(CIPHERTEXT_PREFIX):
+            try:
+                plain_val = decrypt_plate(rhs_str)
+            except Exception:
+                pass
+
+        qn = connection.ops.quote_name
+        col_plain = qn('plate_number')
+        col_hmac = qn('plate_lookup_hmac')
+
+        lhs_hmac = lhs.replace(col_plain, col_hmac) if col_plain in lhs else lhs.replace('plate_number', 'plate_lookup_hmac')
+
+        try:
+            target_hmac = compute_plate_hmac(plain_val)
+        except Exception:
+            target_hmac = ''
+
+        if target_hmac:
+            sql = f'({lhs_hmac} = %s OR {lhs} = %s)'
+            return sql, lhs_params + [target_hmac, plain_val]
+        else:
+            sql = f'({lhs} = %s OR {lhs_hmac} = %s)'
+            return sql, lhs_params + [plain_val, '']
+
+
 
 def generate_ticket_code():
     chars = string.ascii_uppercase + string.digits
@@ -182,7 +260,8 @@ class Reservation(models.Model):
     ticket_code = models.CharField(max_length=20, default=generate_ticket_code, unique=True)
     customer = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='reservations')
     parking_zone = models.ForeignKey(ParkingZone, on_delete=models.CASCADE, related_name='reservations')
-    plate_number = models.CharField(max_length=40, blank=True, help_text='Cambodian vehicle plate e.g. 2AZ-1234')
+    plate_number = EncryptedPlateCharField(max_length=255, blank=True, help_text='Cambodian vehicle plate e.g. 2AZ-1234')
+    plate_lookup_hmac = models.CharField(max_length=64, db_index=True, blank=True, default='', help_text='Keyed HMAC-SHA256 lookup index for exact matching')
     phone_number = models.CharField(max_length=30, blank=True, help_text='Contact phone e.g. +855 12 345 678')
     is_walk_in = models.BooleanField(default=False, help_text='True for walk-in tickets issued at gate')
 
@@ -323,6 +402,22 @@ class Reservation(models.Model):
         # Generate access token if not present
         if not self.access_token:
             self.access_token = generate_access_token()
+
+        # Synchronize plate_lookup_hmac with current plate_number
+        if self.plate_number:
+            try:
+                self.plate_lookup_hmac = compute_plate_hmac(self.plate_number)
+            except Exception:
+                pass
+        else:
+            self.plate_lookup_hmac = ''
+
+        # Ensure plate_lookup_hmac is included in update_fields if plate_number was updated
+        if 'update_fields' in kwargs and kwargs['update_fields'] is not None:
+            uf = set(kwargs['update_fields'])
+            if 'plate_number' in uf:
+                uf.add('plate_lookup_hmac')
+                kwargs['update_fields'] = list(uf)
 
         super().save(*args, **kwargs)
 

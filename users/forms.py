@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth import password_validation
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import AuthenticationForm
 
@@ -58,6 +59,17 @@ class UserRegistrationForm(forms.ModelForm):
         password_confirm = cleaned_data.get('password_confirm')
         if password and password_confirm and password != password_confirm:
             self.add_error('password_confirm', 'Passwords do not match. Please verify.')
+
+        if password:
+            user_candidate = User(
+                username=cleaned_data.get('username', ''),
+                email=cleaned_data.get('email', '')
+            )
+            try:
+                password_validation.validate_password(password, user=user_candidate)
+            except forms.ValidationError as error:
+                self.add_error('password', error)
+
         return cleaned_data
 
 

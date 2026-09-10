@@ -912,7 +912,7 @@ class AntiSpamService:
         """
         Detects idempotent duplicate submissions (e.g. double-clicks, network retries)
         from the same customer for the same vehicle plate & facility within a short window.
-        Returns the existing reservation if found so it can be returned without consuming extra capacity.
+        Uses plate_lookup_hmac index for O(1) matching with fallback to legacy rows.
         """
         cutoff = timezone.now() - timedelta(seconds=within_seconds)
         qs = Reservation.objects.filter(
@@ -923,6 +923,19 @@ class AntiSpamService:
         )
         if payment_method:
             qs = qs.filter(payment_method=payment_method)
+
+        target_hmac = ''
+        if normalized_plate:
+            try:
+                from .crypto import compute_plate_hmac
+                target_hmac = compute_plate_hmac(normalized_plate)
+            except Exception:
+                pass
+
+        if target_hmac:
+            candidate = qs.filter(plate_lookup_hmac=target_hmac).first()
+            if candidate:
+                return candidate
 
         for res in qs:
             if AntiSpamService.normalize_plate(res.plate_number) == normalized_plate:
@@ -982,6 +995,14 @@ class AntiSpamService:
         if exclude_reservation_id:
             active_candidates = active_candidates.exclude(id=exclude_reservation_id)
 
+        target_hmac = ''
+        if norm_target:
+            try:
+                from .crypto import compute_plate_hmac
+                target_hmac = compute_plate_hmac(norm_target)
+            except Exception:
+                pass
+
         for res in active_candidates:
             # Check on-the-fly expiration for candidates
             if res.status == 'PAYMENT_PENDING' and res.payment_deadline and now >= res.payment_deadline:
@@ -995,7 +1016,13 @@ class AntiSpamService:
                 res.save(update_fields=['status', 'deposit_forfeited'])
                 continue
 
-            if AntiSpamService.normalize_plate(res.plate_number) == norm_target:
+            matches = False
+            if target_hmac and res.plate_lookup_hmac:
+                matches = (res.plate_lookup_hmac == target_hmac)
+            else:
+                matches = (AntiSpamService.normalize_plate(res.plate_number) == norm_target)
+
+            if matches:
                 msg = (
                     f"A reservation is already active for vehicle plate '{res.plate_number}' at {res.parking_zone.name} "
                     f"(Ticket #{res.ticket_code}). Simultaneous holds for the same vehicle plate are not permitted."

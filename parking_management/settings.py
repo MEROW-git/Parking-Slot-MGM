@@ -352,3 +352,18 @@ BOOKING_IP_RATE_LIMIT_PER_MINUTE = int(os.environ.get('BOOKING_IP_RATE_LIMIT_PER
 
 # Asset versioning for cache busting
 ASSET_VERSION = os.environ.get('ASSET_VERSION', '1.5.0')
+
+# Vehicle License Plate Application-Level Cryptography
+PLATE_ENCRYPTION_KEY = os.environ.get('PLATE_ENCRYPTION_KEY', '').strip()
+PLATE_SEARCH_HMAC_KEY = os.environ.get('PLATE_SEARCH_HMAC_KEY', '').strip()
+
+# Test defaults (only used when executing 'manage.py test' if environment variables are not supplied)
+import sys
+if 'test' in sys.argv:
+    TEST_PLATE_ENCRYPTION_KEY = os.environ.get('TEST_PLATE_ENCRYPTION_KEY') or 'k8g_T3rFfWjL8j4zL3v5mQ1yP9rU2wE4tY6uI8oP0sA='
+    TEST_PLATE_SEARCH_HMAC_KEY = os.environ.get('TEST_PLATE_SEARCH_HMAC_KEY') or '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+    if not PLATE_ENCRYPTION_KEY:
+        PLATE_ENCRYPTION_KEY = TEST_PLATE_ENCRYPTION_KEY
+    if not PLATE_SEARCH_HMAC_KEY:
+        PLATE_SEARCH_HMAC_KEY = TEST_PLATE_SEARCH_HMAC_KEY
+

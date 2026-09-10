@@ -1,5 +1,7 @@
 from django.contrib import admin
+from django.db.models import Q
 from .models import ParkingZone, Reservation, PaymentTransaction
+from .crypto import compute_plate_hmac
 
 
 class PaymentTransactionInline(admin.TabularInline):
@@ -37,6 +39,30 @@ class ReservationAdmin(admin.ModelAdmin):
     def overstay_status(self, obj):
         return obj.is_overstay
 
+    def get_search_results(self, request, queryset, search_term):
+        """Enhances admin search to match encrypted vehicle plates via keyed HMAC lookup."""
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        term = (search_term or '').strip()
+        if term:
+            candidate_hmacs = []
+            candidate_terms = [term]
+            lower_term = term.lower()
+            if not any(lower_term.startswith(p) for p in ('phnom penh', 'kandal', 'siem reap', 'battambang', 'cambodia')):
+                candidate_terms.append(f"Phnom Penh {term}")
+
+            for t in candidate_terms:
+                try:
+                    h = compute_plate_hmac(t)
+                    if h and h not in candidate_hmacs:
+                        candidate_hmacs.append(h)
+                except Exception:
+                    pass
+
+            if candidate_hmacs:
+                hmac_matches = self.model.objects.filter(plate_lookup_hmac__in=candidate_hmacs)
+                queryset = (queryset | hmac_matches).distinct()
+        return queryset, may_have_duplicates
+
 
 @admin.register(PaymentTransaction)
 class PaymentTransactionAdmin(admin.ModelAdmin):
@@ -48,3 +74,28 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     @admin.display(description='Amount (KHR)')
     def amount_display(self, obj):
         return f"{obj.amount:,} {obj.currency}"
+
+    def get_search_results(self, request, queryset, search_term):
+        """Enhances transaction search to match encrypted vehicle plates via reservation HMAC."""
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        term = (search_term or '').strip()
+        if term:
+            candidate_hmacs = []
+            candidate_terms = [term]
+            lower_term = term.lower()
+            if not any(lower_term.startswith(p) for p in ('phnom penh', 'kandal', 'siem reap', 'battambang', 'cambodia')):
+                candidate_terms.append(f"Phnom Penh {term}")
+
+            for t in candidate_terms:
+                try:
+                    h = compute_plate_hmac(t)
+                    if h and h not in candidate_hmacs:
+                        candidate_hmacs.append(h)
+                except Exception:
+                    pass
+
+            if candidate_hmacs:
+                hmac_matches = self.model.objects.filter(reservation__plate_lookup_hmac__in=candidate_hmacs)
+                queryset = (queryset | hmac_matches).distinct()
+        return queryset, may_have_duplicates
+

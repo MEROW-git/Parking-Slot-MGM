@@ -146,7 +146,7 @@ class Command(BaseCommand):
         if user_created:
             demo_user.set_password('password123')
             demo_user.save()
-            self.stdout.write(self.style.SUCCESS("  + Created demo customer: username 'demo' / password 'password123'"))
+            self.stdout.write(self.style.SUCCESS("  + Created demo customer: username 'demo' (password initialized)"))
         else:
             self.stdout.write(self.style.NOTICE("  - Demo customer 'demo' already exists (password preserved)"))
 
