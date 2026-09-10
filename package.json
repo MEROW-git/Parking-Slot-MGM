@@ -5,10 +5,10 @@
   "main": "server.ts",
   "type": "module",
   "scripts": {
-    "dev": "gunicorn --bind 0.0.0.0:3000 --workers 2 --timeout 60 parking_management.wsgi:application",
-    "build": "python3 manage.py collectstatic --noinput",
-    "start": "gunicorn --bind 0.0.0.0:3000 --workers 2 --timeout 60 parking_management.wsgi:application",
-    "lint": "python3 manage.py check"
+    "dev": "./run.sh",
+    "build": "python3 manage.py collectstatic --noinput || .venv/bin/python manage.py collectstatic --noinput",
+    "start": "./run.sh",
+    "lint": "python3 manage.py check || .venv/bin/python manage.py check"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
