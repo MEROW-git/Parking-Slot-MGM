@@ -35,6 +35,8 @@ class ParkingZone(models.Model):
     price = models.PositiveIntegerField(default=3000, help_text='Price in KHR (Riel) per session/day')
     description = models.TextField(blank=True)
     operating_hours = models.CharField(max_length=100, default='06:00 - 22:00')
+    latitude = models.FloatField(default=11.5564, blank=True, null=True, help_text='Latitude for map coordinates')
+    longitude = models.FloatField(default=104.9282, blank=True, null=True, help_text='Longitude for map coordinates')
 
     class Meta:
         ordering = ['name']
@@ -117,6 +119,25 @@ class ParkingZone(models.Model):
         """Spaces available right now considering physical occupancy and active holds."""
         used = self.occupied_slots + self.active_holds_count
         return max(0, self.num_of_slots - used)
+
+    @property
+    def coordinates(self):
+        """Returns geographic coordinates dictionary for map markers."""
+        DEFAULTS = {
+            'riverside-promenade': (11.5683, 104.9312),
+            'bkk1-commercial-plaza': (11.5510, 104.9250),
+            'toul-kork-plaza': (11.5795, 104.8965),
+            'sen-sok-central': (11.5880, 104.8770),
+            'olympic-stadium-complex': (11.5575, 104.9125),
+            'city-center-vattanac': (11.5740, 104.9195),
+        }
+        if self.latitude is not None and self.longitude is not None:
+            if self.latitude != 11.5564 or self.longitude != 104.9282:
+                return {'lat': round(self.latitude, 6), 'lng': round(self.longitude, 6)}
+        if self.slug in DEFAULTS:
+            lat, lng = DEFAULTS[self.slug]
+            return {'lat': lat, 'lng': lng}
+        return {'lat': round(self.latitude or 11.5564, 6), 'lng': round(self.longitude or 104.9282, 6)}
 
     def decrement_slot(self):
         if self.vacant_slots <= 0 or self.occupied_slots >= self.num_of_slots:

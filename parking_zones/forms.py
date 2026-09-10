@@ -155,7 +155,7 @@ class ReservationForm(forms.ModelForm):
             'spellcheck': 'false',
             'autocomplete': 'off',
             'aria-label': 'Plate Number (លេខផ្លាក)',
-            'aria-describedby': 'plate-code-help plate-preview-box',
+            'aria-describedby': 'plate-preview-box',
         }),
         label='Plate Number (លេខផ្លាក)'
     )
@@ -357,13 +357,13 @@ class ReservationForm(forms.ModelForm):
 
         if 'plate_code' in self.errors:
             self.fields['plate_code'].widget.attrs['aria-invalid'] = 'true'
-            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'error_plate_code plate-code-help plate-preview-box'
+            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'error_plate_code plate-preview-box'
             c_class = self.fields['plate_code'].widget.attrs.get('class', '')
             if 'is-invalid' not in c_class:
                 self.fields['plate_code'].widget.attrs['class'] = f'{c_class} is-invalid'.strip()
         else:
             self.fields['plate_code'].widget.attrs.pop('aria-invalid', None)
-            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'plate-code-help plate-preview-box'
+            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'plate-preview-box'
 
         return cleaned_data
 

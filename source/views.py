@@ -1,4 +1,7 @@
+import json
+from django.conf import settings
 from django.shortcuts import render
+from django.urls import reverse
 from django.db.models import Sum
 from parking_zones.models import ParkingZone, Reservation
 
@@ -31,8 +34,32 @@ def home(request):
 
     districts = ParkingZone.objects.values_list('district', flat=True).distinct()
 
+    zones_map_data = []
+    for z in zones:
+        coords = z.coordinates
+        zones_map_data.append({
+            'id': z.id,
+            'name': z.name,
+            'khmer_name': z.khmer_name,
+            'slug': z.slug,
+            'address': z.address,
+            'district': z.district,
+            'price': z.price,
+            'price_formatted': z.price_khr_formatted,
+            'vacant_slots': z.vacant_slots,
+            'num_of_slots': z.num_of_slots,
+            'occupied_slots': z.occupied_slots,
+            'availability_status': z.availability_status,
+            'lat': coords['lat'],
+            'lng': coords['lng'],
+            'book_url': reverse('book') + f'?zone={z.slug}',
+            'detail_url': reverse('zone_detail', kwargs={'slug': z.slug}),
+        })
+
     context = {
         'all_parking_zones': zones,
+        'zones_map_json': json.dumps(zones_map_data),
+        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
         'total_slots': total_slots,
         'total_vacant': total_vacant,
         'total_occupied': total_occupied,

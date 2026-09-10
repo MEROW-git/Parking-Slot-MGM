@@ -63,6 +63,35 @@
         <li>Lighting & Rain Protection</li>
       </ul>
     </div>
+
+    <!-- Interactive Zone Location Card (Google Maps Demo) -->
+    <div class="sp-zone-map-card" data-reveal="up" data-reveal-delay="100" style="margin-top:1.5rem; background:var(--color-paper-2); border:var(--rule-fine) solid var(--color-rule); border-radius:var(--radius-card); padding:1.5rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <span class="sp-badge sp-badge-demo">Demo</span>
+          <h3 style="margin:0; font-size:1.15rem;">Location & Map (ទីតាំងចំណត)</h3>
+        </div>
+        <span style="font-size:0.85rem; color:var(--color-muted);">{{ parking_zone.district }}</span>
+      </div>
+
+      <div class="sp-single-map-wrapper" style="border-radius:var(--radius-input); overflow:hidden; border:var(--rule-fine) solid var(--color-rule-2); height:280px; position:relative;">
+        <div id="sompark-single-map-canvas" style="width:100%; height:100%;" data-zone="{{ zone_map_json|escape }}" aria-label="Interactive map for {{ parking_zone.name }}"></div>
+
+        <!-- Fallback if Maps JS fails or auth fails -->
+        <div id="sompark-single-map-fallback" style="display:none; padding:2rem; text-align:center; height:100%; background:var(--color-paper-3);">
+          <div style="font-size:2rem; margin-bottom:0.5rem;">📍</div>
+          <strong style="display:block; margin-bottom:0.35rem; color:var(--color-ink);">{{ parking_zone.name }}</strong>
+          <p style="font-size:0.9rem; color:var(--color-ink-2); margin-bottom:1rem;">{{ parking_zone.address }}</p>
+          <a href="https://www.google.com/maps/search/?api=1&query={{ parking_zone.coordinates.lat }},{{ parking_zone.coordinates.lng }}" target="_blank" rel="noopener noreferrer" class="sp-btn sp-btn-secondary sp-btn-sm">
+            Open in External Maps ↗
+          </a>
+        </div>
+      </div>
+      <div style="margin-top:0.75rem; font-size:0.8rem; color:var(--color-muted); display:flex; justify-content:space-between;">
+        <span>GPS: {{ parking_zone.coordinates.lat }}, {{ parking_zone.coordinates.lng }}</span>
+        <a href="https://www.google.com/maps/search/?api=1&query={{ parking_zone.coordinates.lat }},{{ parking_zone.coordinates.lng }}" target="_blank" rel="noopener noreferrer" style="color:var(--color-accent); text-decoration:none; font-weight:600;">Get Directions ↗</a>
+      </div>
+    </div>
   </div>
 
   <!-- Right Column: Booking Card -->
@@ -113,4 +142,21 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {% load static %}
+  <script src="{% static 'js/sompark-map.js' %}"></script>
+  {% if google_maps_api_key %}
+    <script async defer
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initSomParkMap"
+      onerror="window.somparkMapScriptError && window.somparkMapScriptError()">
+    </script>
+  {% else %}
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (window.initSomParkMapFallback) window.initSomParkMapFallback();
+      });
+    </script>
+  {% endif %}
 {% endblock %}

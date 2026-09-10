@@ -39,6 +39,23 @@ Copy the template configuration to create your local `.env` file:
 Copy-Item .env.example .env
 ```
 
+Generate a private Django signing secret:
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+Paste the output into `SECRET_KEY=` in `.env`. Django requires this value before
+running checks, migrations, or the server. If using the optional Express server
+(`server.ts`, Node 20.12+), generate a different value for `SESSION_SECRET=` too.
+Existing deployment environment variables take precedence over `.env`.
+
+Keep `.env` private; Git ignores it. Commit only empty credential placeholders in
+`.env.example`. The optional `GEMINI_API_KEY` and `GOOGLE_MAPS_API_KEY` slots are
+reserved for future integrations; the current app does not call either service.
+Demo bank payments require no provider key. Adding keys does not implement real
+bank payments. A Maps JavaScript key would be browser-visible and must be
+restricted separately; a Gemini key must stay on the server. Keys exposed in old
+Git commits must be revoked/replaced at the provider even after removal from code.
+
 Open `.env` in your text editor and verify the **Local MySQL** settings:
 ```env
 DB_CONNECTION=mysql

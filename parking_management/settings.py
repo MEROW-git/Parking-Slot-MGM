@@ -15,10 +15,17 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY',
-    'django-insecure-sompark-khmer-parking-phnom-penh-2026-safe-key'
-)
+SECRET_KEY = os.environ.get('SECRET_KEY', '').strip()
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        'Set SECRET_KEY in .env or the deployment environment before starting Django. '
+        'See .env.example for instructions.'
+    )
+
+# Reserved for future integrations; these do not enable a provider by themselves.
+# Keep private provider keys on the server, out of template contexts and responses.
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
+GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', '').strip()
 
 # Robust debug parsing: defaults to False for safe production deployment
 _debug_env = os.environ.get('DEBUG', 'False').strip().lower()

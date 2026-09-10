@@ -26,6 +26,8 @@ PHNOM_PENH_ZONES = [
         'district': 'Riverside',
         'price': 3000,
         'operating_hours': '06:00 - 23:30',
+        'latitude': 11.5683,
+        'longitude': 104.9312,
         'description': 'Scenic parking along Phnom Penh riverside, convenient for restaurants, river cruises, and Royal Palace visitors.',
     },
     {
@@ -39,6 +41,8 @@ PHNOM_PENH_ZONES = [
         'district': 'BKK1',
         'price': 4000,
         'operating_hours': '24/7 Covered Access',
+        'latitude': 11.5510,
+        'longitude': 104.9250,
         'description': 'Central multi-level covered parking in the vibrant BKK1 business, cafe, and dining district.',
     },
     {
@@ -52,6 +56,8 @@ PHNOM_PENH_ZONES = [
         'district': 'Toul Kork',
         'price': 2500,
         'operating_hours': '06:00 - 22:00',
+        'latitude': 11.5795,
+        'longitude': 104.8965,
         'description': 'Spacious parking lot with direct access to TK Avenue and commercial shopping in Toul Kork.',
     },
     {
@@ -65,6 +71,8 @@ PHNOM_PENH_ZONES = [
         'district': 'Sen Sok',
         'price': 3000,
         'operating_hours': '08:00 - 22:30',
+        'latitude': 11.5880,
+        'longitude': 104.8770,
         'description': 'High-capacity parking facility serving the growing Sen Sok retail and entertainment area.',
     },
     {
@@ -78,6 +86,8 @@ PHNOM_PENH_ZONES = [
         'district': 'Olympic',
         'price': 2000,
         'operating_hours': '05:30 - 22:00',
+        'latitude': 11.5575,
+        'longitude': 104.9125,
         'description': 'Convenient parking for sports events, fitness activities, and nearby Olympic Market shoppers.',
     },
     {
@@ -91,6 +101,8 @@ PHNOM_PENH_ZONES = [
         'district': 'Phnom Penh City Center',
         'price': 5000,
         'operating_hours': '24/7 Security Patrol',
+        'latitude': 11.5740,
+        'longitude': 104.9195,
         'description': 'Premium financial district parking featuring automated boom gates and 24-hour security.',
     },
 ]

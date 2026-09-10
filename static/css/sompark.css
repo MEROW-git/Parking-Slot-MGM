@@ -4071,3 +4071,254 @@ code {
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   Google Maps Demo & AI Smart Parking Assistant Components
+   ========================================================================== */
+
+/* Demo Badge */
+.sp-badge-demo {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-theme="dark"] .sp-badge-demo {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+/* Maps Section */
+.sp-map-section {
+  padding: 3rem 0;
+  border-bottom: var(--rule-fine) solid var(--color-rule);
+}
+
+.sp-map-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sp-map-legend {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  background: var(--color-paper-2);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-input);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  font-size: 0.82rem;
+  color: var(--color-ink-2);
+}
+
+.sp-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.sp-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sp-dot-available { background: #10b981; }
+.sp-dot-limited { background: #f59e0b; }
+.sp-dot-full { background: #ef4444; }
+
+.sp-map-wrapper {
+  position: relative;
+  background: var(--color-paper-2);
+  border-radius: var(--radius-card);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.sp-map-canvas {
+  width: 100%;
+  height: 440px;
+  background: var(--color-paper-3);
+}
+
+/* Map Fallback Directory */
+.sp-map-fallback {
+  padding: 1.75rem;
+  background: var(--color-paper-2);
+}
+
+.sp-fallback-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--color-paper-3);
+  border: var(--rule-fine) solid var(--color-rule);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius-input);
+  margin-bottom: 1.5rem;
+}
+
+.sp-fallback-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.sp-fallback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.sp-fallback-card {
+  background: var(--color-paper);
+  border: var(--rule-fine) solid var(--color-rule);
+  border-radius: var(--radius-input);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
+}
+
+.sp-fallback-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+}
+
+.sp-fallback-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.sp-fallback-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: var(--rule-fine) solid var(--color-rule);
+}
+
+/* AI Smart Parking Assistant Section */
+.sp-ai-assistant-section {
+  padding: 2.5rem 0;
+  border-bottom: var(--rule-fine) solid var(--color-rule);
+}
+
+.sp-ai-card {
+  background: var(--color-paper-2);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.sp-ai-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ea580c 0%, #f59e0b 50%, #10b981 100%);
+}
+
+.sp-ai-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sp-ai-input-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.sp-ai-input-row .sp-input {
+  flex: 1;
+}
+
+.sp-ai-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.sp-chip {
+  background: var(--color-paper);
+  border: var(--rule-fine) solid var(--color-rule);
+  color: var(--color-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--dur-short) var(--ease-out);
+}
+
+.sp-chip:hover {
+  background: var(--color-paper-3);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.sp-ai-response {
+  margin-top: 1.25rem;
+  animation: sp-fade-in 0.3s var(--ease-out);
+}
+
+.sp-ai-response-bubble {
+  background: var(--color-paper);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  padding: 1.25rem 1.5rem;
+}
+
+.sp-ai-response-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.sp-ai-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--color-ink);
+}
+
+.sp-ai-login-prompt {
+  background: var(--color-paper);
+  border: var(--rule-fine) solid var(--color-rule);
+  border-radius: var(--radius-input);
+  padding: 1.25rem;
+  text-align: center;
+}
+

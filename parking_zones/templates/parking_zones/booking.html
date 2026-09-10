@@ -206,9 +206,6 @@
                 <span class="sp-required" aria-hidden="true">*</span>
               </label>
               {{ form.plate_code }}
-              <p class="sp-field-help" id="plate-code-help">
-                Type a space or hyphen between both parts; it will be saved as 2AZ-1234.
-              </p>
               {% if form.plate_code.errors %}
                 <div class="sp-field-feedback" id="error_plate_code">
                   {% for error in form.plate_code.errors %}
@@ -359,7 +356,6 @@
     var codeEl = document.getElementById('id_plate_code');
     var prevValEl = document.getElementById('plate-preview-text');
     var codeLabelEl = document.getElementById('plate-code-label-text');
-    var codeHelpEl = document.getElementById('plate-code-help');
 
     function isCustomPlate() {
       return provEl && provEl.value === 'Cambodia';
@@ -374,14 +370,9 @@
       if (isCustomPlate()) {
         codeEl.placeholder = 'e.g. MEOW or MY CAR';
         if (codeLabelEl) codeLabelEl.textContent = 'Custom Plate Text (អក្សរផ្លាកផ្ទាល់ខ្លួន)';
-        if (codeHelpEl) codeHelpEl.hidden = true;
       } else {
         codeEl.placeholder = 'e.g. 2AZ 1234';
         if (codeLabelEl) codeLabelEl.textContent = 'Standard Plate Number (លេខផ្លាក)';
-        if (codeHelpEl) {
-          codeHelpEl.hidden = false;
-          codeHelpEl.textContent = 'Type a space or hyphen between both parts; it will be saved as 2AZ-1234.';
-        }
       }
     }
 

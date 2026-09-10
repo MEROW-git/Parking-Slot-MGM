@@ -53,6 +53,119 @@
   </div>
 </section>
 
+<!-- Google Maps Demo Section -->
+<section class="sp-map-section" id="parking-map-section" aria-labelledby="map-heading">
+  <div class="sp-map-head" data-reveal="up">
+    <div>
+      <div style="display:flex; align-items:center; gap:0.65rem; margin-bottom:0.35rem;">
+        <span class="sp-badge sp-badge-demo" id="map-demo-badge">Demo</span>
+        <span style="font-size:0.8rem; font-weight:700; color:var(--color-muted); text-transform:uppercase; letter-spacing:0.05em;">Phnom Penh Capital</span>
+      </div>
+      <h2 id="map-heading">Interactive Parking Map (ផែនទីចំណតផ្ទាល់)</h2>
+      <p>Real-time slot availability across Phnom Penh facilities. Click any marker to view rates and book instantly.</p>
+    </div>
+
+    <div class="sp-map-legend" aria-label="Map status legend">
+      <span class="sp-legend-item"><span class="sp-legend-dot sp-dot-available"></span> Available</span>
+      <span class="sp-legend-item"><span class="sp-legend-dot sp-dot-limited"></span> Limited (&le; 15%)</span>
+      <span class="sp-legend-item"><span class="sp-legend-dot sp-dot-full"></span> Full (ពេញ)</span>
+    </div>
+  </div>
+
+  <div class="sp-map-wrapper" data-reveal="up" data-reveal-delay="40">
+    <div id="sompark-map-canvas" class="sp-map-canvas" data-zones="{{ zones_map_json|escape }}" aria-label="Interactive Google Map showing parking locations in Phnom Penh"></div>
+    
+    <!-- Graceful Fallback Container (Displayed if demo key auth fails, quota exceeded, or script blocked) -->
+    <div id="sompark-map-fallback" class="sp-map-fallback" style="display: none;" aria-live="polite">
+      <div class="sp-fallback-banner">
+        <div class="sp-fallback-icon">📍</div>
+        <div>
+          <strong style="display:block; font-size:0.95rem; color:var(--color-ink);">Google Maps Demo (Fallback Directory)</strong>
+          <span class="sp-fallback-message" style="font-size:0.85rem; color:var(--color-ink-2);">Google Maps demo mode is currently displaying the live parking directory.</span>
+        </div>
+      </div>
+      <div class="sp-fallback-grid" id="map-fallback-items">
+        {% for zone in all_parking_zones %}
+        <div class="sp-fallback-card">
+          <div class="sp-fallback-card-top">
+            <div>
+              <h4 style="margin:0 0 0.15rem 0; font-size:1rem; color:var(--color-ink);">{{ zone.name }}</h4>
+              <span style="font-size:0.8rem; color:var(--color-muted);">{{ zone.district }}</span>
+            </div>
+            {% include "components/availability_indicator.html" with status=zone.availability_status vacant=zone.vacant_slots total=zone.num_of_slots id=zone.slug %}
+          </div>
+          <p style="font-size:0.82rem; color:var(--color-ink-2); margin:0.4rem 0 0.75rem 0;">{{ zone.address }}</p>
+          <div class="sp-fallback-card-foot">
+            <span style="font-family:var(--font-outlier); font-weight:800; font-size:1.1rem; color:var(--color-ink);">{{ zone.price_khr_formatted }}</span>
+            {% if not zone.is_full %}
+              <a href="{% url 'book' %}?zone={{ zone.slug }}" class="sp-btn sp-btn-primary sp-btn-sm" id="fallback-book-{{ zone.slug }}">Reserve Spot (កក់) →</a>
+            {% else %}
+              <span class="sp-btn sp-btn-secondary sp-btn-sm" style="opacity:0.6; cursor:not-allowed;">Full (ពេញ)</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI Smart Parking Assistant Card -->
+<section class="sp-ai-assistant-section" id="ai-assistant-section" aria-labelledby="ai-heading">
+  <div class="sp-ai-card" data-reveal="up">
+    <div class="sp-ai-card-head">
+      <div style="display:flex; align-items:center; gap:0.5rem;">
+        <span class="sp-badge sp-badge-demo">Gemini AI</span>
+        <h3 id="ai-heading" style="margin:0; font-size:1.15rem;">Smart Parking Assistant (ជំនួយការឆ្លាតវៃ)</h3>
+      </div>
+      <span style="font-size:0.8rem; color:var(--color-muted);">Phnom Penh Live Advice · Backend Protected</span>
+    </div>
+    
+    <p style="font-size:0.9rem; color:var(--color-ink-2); margin:0.5rem 0 1rem 0;">
+      Ask our AI assistant to find the ideal parking spot by price, operating hours, or district across Phnom Penh.
+    </p>
+
+    {% if user.is_authenticated %}
+      <form id="ai-assistant-form" class="sp-ai-form">
+        {% csrf_token %}
+        <div class="sp-ai-input-row">
+          <input type="text" id="ai-query-input" name="query" maxlength="500" placeholder="e.g. Where can I park near Riverside under 3,500 KHR with spaces available?" class="sp-input" required autocomplete="off">
+          <button type="submit" class="sp-btn sp-btn-primary" id="btn-ask-ai">
+            <span id="ai-btn-text">Ask Gemini</span>
+            <span id="ai-btn-spinner" style="display:none;">Thinking...</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="sp-ai-chips">
+        <span style="font-size:0.75rem; color:var(--color-muted); font-weight:700;">Quick Prompts:</span>
+        <button type="button" class="sp-chip" data-prompt="Find parking near Riverside promenade with available slots.">Riverside with spaces</button>
+        <button type="button" class="sp-chip" data-prompt="Where can I park in BKK1 or Central Market under 3,500 KHR?">Under 3,500 KHR</button>
+        <button type="button" class="sp-chip" data-prompt="Which parking facilities are open 24/7 in Phnom Penh?">Open 24/7</button>
+      </div>
+
+      <div id="ai-response-container" class="sp-ai-response" style="display:none;" aria-live="polite">
+        <div class="sp-ai-response-bubble">
+          <div class="sp-ai-response-meta">
+            <strong style="color:var(--color-accent);">SomPark Assistant</strong>
+            <span id="ai-response-time" style="font-size:0.75rem; color:var(--color-muted);">Just now</span>
+          </div>
+          <div id="ai-response-text" class="sp-ai-text"></div>
+        </div>
+      </div>
+    {% else %}
+      <div class="sp-ai-login-prompt">
+        <p style="margin:0 0 0.75rem 0; font-size:0.9rem; color:var(--color-ink-2);">
+          Sign in to use the Gemini Smart Parking Assistant.
+        </p>
+        <a href="{% url 'login' %}?next={% url 'home' %}#ai-assistant-section" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-ai-login">
+          Sign In to Ask Assistant →
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
 <section class="sp-zone-directory" id="parking-zones" aria-labelledby="zones-heading">
   <div class="sp-directory-head" data-reveal="up">
     <div>
@@ -85,3 +198,89 @@
   {% endif %}
 </section>
 {% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'js/sompark-map.js' %}"></script>
+  {% if google_maps_api_key %}
+    <script async defer
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initSomParkMap"
+      onerror="window.somparkMapScriptError && window.somparkMapScriptError()">
+    </script>
+  {% else %}
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (window.initSomParkMapFallback) {
+          window.initSomParkMapFallback('No Google Maps key provided. Displaying live directory.');
+        }
+      });
+    </script>
+  {% endif %}
+
+  <!-- AI Assistant Client Script -->
+  <script>
+    (function() {
+      var form = document.getElementById('ai-assistant-form');
+      if (!form) return;
+
+      var input = document.getElementById('ai-query-input');
+      var btn = document.getElementById('btn-ask-ai');
+      var btnText = document.getElementById('ai-btn-text');
+      var btnSpinner = document.getElementById('ai-btn-spinner');
+      var resContainer = document.getElementById('ai-response-container');
+      var resText = document.getElementById('ai-response-text');
+
+      // Quick prompt chip click handler
+      var chips = document.querySelectorAll('.sp-chip');
+      chips.forEach(function(chip) {
+        chip.addEventListener('click', function() {
+          input.value = this.getAttribute('data-prompt') || '';
+          input.focus();
+        });
+      });
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var q = input.value.trim();
+        if (!q) return;
+
+        btn.disabled = true;
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline';
+
+        var formData = new FormData(form);
+
+        fetch("{% url 'ai_parking_assistant' %}", {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(function(res) {
+          return res.json().then(function(data) {
+            return { ok: res.ok, status: res.status, data: data };
+          });
+        })
+        .then(function(result) {
+          resContainer.style.display = 'block';
+          if (result.ok) {
+            resText.innerHTML = (result.data.recommendation || '').replace(/\n/g, '<br>');
+          } else {
+            resText.innerHTML = '<span style="color:var(--color-accent);">' + (result.data.message || 'An error occurred.') + '</span>';
+          }
+          resContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        })
+        .catch(function(err) {
+          resContainer.style.display = 'block';
+          resText.innerHTML = '<span style="color:var(--color-accent);">Unable to connect to assistant. Please choose from available zones above.</span>';
+        })
+        .finally(function() {
+          btn.disabled = false;
+          btnText.style.display = 'inline';
+          btnSpinner.style.display = 'none';
+        });
+      });
+    })();
+  </script>
+{% endblock %}
+

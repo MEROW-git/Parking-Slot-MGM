@@ -3,11 +3,21 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'node:fs';
+import { loadEnvFile } from 'node:process';
 import bcrypt from 'bcryptjs';
 import { dbStore } from './src/store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Node 20.12+ loads local secrets while preserving deployment environment values.
+const envPath = path.join(__dirname, '.env');
+if (existsSync(envPath)) loadEnvFile(envPath);
+const sessionSecret = process.env.SESSION_SECRET?.trim();
+if (!sessionSecret) {
+  throw new Error('Set SESSION_SECRET in .env or the deployment environment before starting Express.');
+}
 
 const app = express();
 const PORT = 3000;
@@ -23,7 +33,7 @@ app.use(express.json());
 app.use(cookieParser() as any);
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'parking-secret-key-sompark-2026',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 24 * 60 * 60 * 1000 },

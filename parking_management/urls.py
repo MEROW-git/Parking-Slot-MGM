@@ -31,6 +31,7 @@ urlpatterns = [
     path('ticket/<str:ticket_code>/qr.png', pz_views.ticket_qr_image, name='ticket_qr_image'),
     path('ticket/<str:ticket_code>/gate-mode/', pz_views.ticket_gate_mode, name='ticket_gate_mode'),
     path('all_tickets/', pz_views.all_tickets, name='all_tickets'),
+    path('api/ai-assistant/', pz_views.ai_parking_assistant, name='ai_parking_assistant'),
 
     # Staff Operations Workbench & Gate Scanner
     path('staff/dashboard/', pz_views.admin_dashboard, name='admin_dashboard'),

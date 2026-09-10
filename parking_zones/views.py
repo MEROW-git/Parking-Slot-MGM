@@ -14,11 +14,13 @@ from django.db import transaction
 from django.db.models import Sum
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.http import JsonResponse
 from .models import ParkingZone, Reservation, PaymentTransaction
 from .forms import ReservationForm
 from .services import BillingService, CapacityService, PaymentService, GateService, ExpiryService, AntiSpamService
 from .qr import generate_access_qr_base64, render_access_qr_response, generate_demo_payment_qr_base64
 from .payments import DemoPaymentAdapter
+from .ai import check_ai_rate_limit, GeminiService
 
 
 def staff_required(view_func):
@@ -48,8 +50,30 @@ def zone_detail(request, slug):
             status__in=['CONFIRMED', 'CHECKED_IN']
         ).first()
 
+    coords = zone.coordinates
+    zone_map_data = {
+        'id': zone.id,
+        'name': zone.name,
+        'khmer_name': zone.khmer_name,
+        'slug': zone.slug,
+        'address': zone.address,
+        'district': zone.district,
+        'price': zone.price,
+        'price_formatted': zone.price_khr_formatted,
+        'vacant_slots': zone.vacant_slots,
+        'num_of_slots': zone.num_of_slots,
+        'occupied_slots': zone.occupied_slots,
+        'availability_status': zone.availability_status,
+        'lat': coords['lat'],
+        'lng': coords['lng'],
+        'book_url': reverse('book') + f'?zone={zone.slug}',
+        'detail_url': reverse('zone_detail', kwargs={'slug': zone.slug}),
+    }
+
     context = {
         'parking_zone': zone,
+        'zone_map_json': json.dumps(zone_map_data),
+        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
         'title': f'{zone.name} - SomPark Phnom Penh',
         'user_active_res': user_active_res,
     }
@@ -1005,3 +1029,78 @@ def admin_dashboard(request):
         'title': 'Staff Operations Dashboard | SomPark Phnom Penh',
     }
     return render(request, 'parking_zones/admin_dashboard.html', context)
+
+
+@login_required
+@require_POST
+def ai_parking_assistant(request):
+    """
+    Authenticated, rate-limited AI assistant endpoint for finding parking.
+    - Requires authentication.
+    - Limits queries to 5 requests per user per minute to control API costs.
+    - Caps user query length at 500 characters.
+    - Scrubs customer PII (phone numbers, license plates, QR tokens) before sending to Gemini.
+    - Returns AI recommendations with live zone availability and direct booking links.
+    """
+    # 1. Rate limiting check (max 5 requests per minute per user)
+    if not check_ai_rate_limit(request.user.id, max_requests=5, window_seconds=60):
+        return JsonResponse({
+            'status': 'error',
+            'code': 'RATE_LIMIT_EXCEEDED',
+            'message': 'Rate limit reached (max 5 requests per minute). Please wait a moment before asking again.'
+        }, status=429)
+
+    # 2. Input validation & length cap
+    raw_query = request.POST.get('query', '').strip()
+    if not raw_query:
+        return JsonResponse({
+            'status': 'error',
+            'code': 'EMPTY_QUERY',
+            'message': 'Please enter a question or parking preference.'
+        }, status=400)
+
+    if len(raw_query) > 500:
+        return JsonResponse({
+            'status': 'error',
+            'code': 'QUERY_TOO_LONG',
+            'message': 'Query exceeds maximum allowed length of 500 characters.'
+        }, status=400)
+
+    # 3. Fetch live available zones with non-sensitive metadata
+    zones = ParkingZone.objects.filter(vacant_slots__gt=0).order_by('-vacant_slots', 'price')
+    available_zones_data = []
+    for z in zones:
+        available_zones_data.append({
+            'id': z.id,
+            'name': z.name,
+            'khmer_name': z.khmer_name,
+            'slug': z.slug,
+            'address': z.address,
+            'district': z.district,
+            'price': z.price,
+            'price_formatted': z.price_khr_formatted,
+            'vacant_slots': z.vacant_slots,
+            'num_of_slots': z.num_of_slots,
+            'operating_hours': z.operating_hours,
+            'book_url': reverse('book') + f'?zone={z.slug}',
+            'detail_url': reverse('zone_detail', kwargs={'slug': z.slug}),
+        })
+
+    # 4. Call Gemini service (safely scrubs PII inside service)
+    result = GeminiService.recommend_parking(raw_query, available_zones_data)
+
+    if result.get('success'):
+        return JsonResponse({
+            'status': 'success',
+            'recommendation': result.get('recommendation', ''),
+            'zones': available_zones_data[:4]
+        })
+    else:
+        # Graceful fallback response
+        return JsonResponse({
+            'status': 'fallback',
+            'code': result.get('reason', 'FALLBACK'),
+            'recommendation': result.get('message', 'AI assistant is currently unavailable. Here are top parking options:'),
+            'zones': available_zones_data[:4]
+        })
+
