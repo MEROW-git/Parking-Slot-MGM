@@ -276,6 +276,20 @@
     if (replayBox) {
       replayBox.hidden = true;
     }
+    const standardActions = document.getElementById('vg-standard-actions');
+    if (standardActions) {
+      standardActions.style.display = '';
+      const checkBtn = document.getElementById('btn-check-open');
+      if (checkBtn) checkBtn.disabled = false;
+    }
+    const exitFlow = document.getElementById('vg-exit-flow');
+    if (exitFlow) exitFlow.style.display = 'none';
+    const settlementBox = document.getElementById('vg-settlement-box');
+    if (settlementBox) settlementBox.style.display = 'none';
+    const reopenBox = document.getElementById('vg-reopen-box');
+    if (reopenBox) reopenBox.style.display = 'none';
+    const resetBox = document.getElementById('vg-reset-box');
+    if (resetBox) resetBox.style.display = 'none';
   }
 
   document.querySelectorAll('#id_zone, #id_code').forEach(input => {
@@ -518,6 +532,28 @@
       const passBox = document.getElementById('vg-pass-actions-box');
       if (passBox) passBox.style.display = 'none';
 
+      // Update stepper to Step 3 Completed
+      const step3 = document.getElementById('vg-step-3');
+      if (step3) {
+        step3.classList.remove('is-active', 'is-pending');
+        step3.classList.add('is-completed');
+      }
+      const conn23 = document.getElementById('vg-connector-2-3');
+      if (conn23) {
+        conn23.classList.add('is-completed');
+        conn23.classList.remove('is-active');
+      }
+      const step3Desc = document.getElementById('vg-step-3-desc');
+      if (step3Desc) step3Desc.textContent = 'Vehicle passed · Closed';
+
+      // Show reset box for "Start another ticket"
+      const resetBox = document.getElementById('vg-reset-box');
+      if (resetBox) resetBox.style.display = 'block';
+
+      // Hide standard actions while reset box is active
+      const standardActions = document.getElementById('vg-standard-actions');
+      if (standardActions) standardActions.style.display = 'none';
+
       // Show replay box
       const replayBox = document.getElementById('vg-replay-box');
       if (replayBox) replayBox.hidden = false;
@@ -541,12 +577,9 @@
         statusBadge.textContent = `${result.status} (${result.status_display})`;
       }
 
-      // Re-enable form fields for next vehicle check
+      // Re-enable form fields; preserve selected facility, direction, and ticket code
       if (checkBtn) checkBtn.disabled = false;
-      if (codeInput) {
-        codeInput.disabled = false;
-        codeInput.value = '';
-      }
+      if (codeInput) codeInput.disabled = false;
       if (zoneSelect) zoneSelect.disabled = false;
       modeRadios.forEach(r => r.disabled = false);
 

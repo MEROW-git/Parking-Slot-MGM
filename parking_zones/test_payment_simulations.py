@@ -67,6 +67,11 @@ class PaymentSimulationTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Cash payment of 5,000 KHR confirmed received by attendant')
 
+        # Direct barrier open with signed permit — no second check ticket required!
+        self.assertTrue(resp.context['gate_open'])
+        self.assertIsNotNone(resp.context['permit'])
+        self.assertEqual(resp.context['bill']['balance_due'], 0)
+
         res.refresh_from_db()
         self.assertEqual(res.payment_status, 'PAID')
         self.assertEqual(res.balance_paid, 5000)
@@ -77,7 +82,7 @@ class PaymentSimulationTests(TestCase):
         self.assertEqual(res.status, 'CHECKED_IN')
 
     def test_virtual_exit_aba_qr_demo_success(self):
-        """Simulated ABA QR payment success authorizes exit departure window."""
+        """Simulated ABA QR payment success authorizes exit departure window and directly opens barrier."""
         res = self._create_checked_in_reservation(payment_method='PAY_AT_EXIT')
         vg_url = reverse('admin_virtual_gate')
         data = {
@@ -91,6 +96,11 @@ class PaymentSimulationTests(TestCase):
         resp = self.client.post(vg_url, data)
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Simulated ABA payment of 5,000 KHR verified')
+
+        # Direct barrier open with signed permit — no second check ticket required!
+        self.assertTrue(resp.context['gate_open'])
+        self.assertIsNotNone(resp.context['permit'])
+        self.assertEqual(resp.context['bill']['balance_due'], 0)
 
         res.refresh_from_db()
         self.assertEqual(res.payment_status, 'PAID')
@@ -123,6 +133,8 @@ class PaymentSimulationTests(TestCase):
         self.assertEqual(res.balance_paid, 0)
         self.assertIsNone(res.exit_authorized_until)
         self.assertFalse(resp.context['gate_open'])
+        self.assertIsNone(resp.context.get('permit'))
+        self.assertEqual(resp.context['bill']['balance_due'], 5000)
 
     def test_virtual_exit_aba_qr_demo_cancellation(self):
         """Simulated ABA QR payment cancellation leaves vehicle checked in and unpaid."""
@@ -144,6 +156,9 @@ class PaymentSimulationTests(TestCase):
         self.assertEqual(res.payment_status, 'UNPAID')
         self.assertEqual(res.balance_paid, 0)
         self.assertIsNone(res.exit_authorized_until)
+        self.assertFalse(resp.context['gate_open'])
+        self.assertIsNone(resp.context.get('permit'))
+        self.assertEqual(resp.context['bill']['balance_due'], 5000)
 
     @override_settings(DEMO_PAYMENT_ENABLED=False)
     def test_virtual_exit_disabled_demo_mode_is_rejected_never_converted_to_cash(self):
@@ -257,25 +272,170 @@ class PaymentSimulationTests(TestCase):
         vg_url = reverse('admin_virtual_gate')
         data = {'zone': self.zone.pk, 'code': res.ticket_code, 'mode': 'exit'}
 
-        # 1. Settle balance
-        self.client.post(vg_url, {**data, 'action': 'settle', 'payment_provider': 'CASH'})
+        # 1. Settle balance -> directly opens barrier with signed permit
+        settle_resp = self.client.post(vg_url, {**data, 'action': 'settle', 'payment_provider': 'CASH'})
+        self.assertTrue(settle_resp.context['gate_open'])
+        permit = settle_resp.context['permit']
+        self.assertIsNotNone(permit)
         self.zone.refresh_from_db()
         self.assertEqual(self.zone.occupied_slots, 1)
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_IN')
 
-        # 2. Check ticket & open barrier
-        open_resp = self.client.post(vg_url, {**data, 'action': 'open'})
-        self.assertTrue(open_resp.context['gate_open'])
-        permit = open_resp.context['permit']
-        self.zone.refresh_from_db()
-        self.assertEqual(self.zone.occupied_slots, 1)
-
-        # 3. Vehicle passes barrier
+        # 2. Vehicle passes barrier directly using permit from settlement (no duplicate check needed)
         pass_resp = self.client.post(vg_url, {**data, 'action': 'pass', 'permit': permit})
         self.assertTrue(pass_resp.context['passed'])
         self.zone.refresh_from_db()
         res.refresh_from_db()
         self.assertEqual(self.zone.occupied_slots, 0)
         self.assertEqual(res.status, 'CHECKED_OUT')
+
+    def test_cash_payment_success_advances_directly_to_gate_open_with_valid_permit(self):
+        """Cash-payment success advances directly to gate_open=True with a valid 120s permit."""
+        res = self._create_checked_in_reservation(payment_method='PAY_AT_EXIT')
+        vg_url = reverse('admin_virtual_gate')
+        data = {
+            'zone': self.zone.pk,
+            'code': res.ticket_code,
+            'mode': 'exit',
+            'action': 'settle',
+            'payment_provider': 'CASH',
+        }
+        resp = self.client.post(vg_url, data)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['gate_open'])
+        self.assertIsNotNone(resp.context['permit'])
+        self.assertGreaterEqual(resp.context['permit_expires_at'], int(time.time()) + 115)
+        self.assertEqual(resp.context['bill']['balance_due'], 0)
+
+        # Vehicle must NOT be automatically checked out yet
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_IN')
+
+        # Generic "Check ticket & open barrier" button container must be hidden
+        self.assertIn('id="vg-standard-actions"', resp.content.decode())
+        self.assertIn('style="display: none;"', resp.content.decode())
+
+        # Step 3 and passage action buttons are rendered
+        self.assertContains(resp, 'Vehicle passed &mdash; close barrier')
+        self.assertContains(resp, 'Close without passage')
+        self.assertContains(resp, 'id="vg-step-3"')
+
+    def test_aba_demo_success_advances_directly_to_gate_open_with_valid_permit(self):
+        """ABA demo success advances directly to gate_open=True with a valid 120s permit."""
+        res = self._create_checked_in_reservation(payment_method='PAY_AT_EXIT')
+        vg_url = reverse('admin_virtual_gate')
+        data = {
+            'zone': self.zone.pk,
+            'code': res.ticket_code,
+            'mode': 'exit',
+            'action': 'settle',
+            'payment_provider': 'DEMO',
+            'outcome': 'success',
+        }
+        resp = self.client.post(vg_url, data)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['gate_open'])
+        self.assertIsNotNone(resp.context['permit'])
+        self.assertGreaterEqual(resp.context['permit_expires_at'], int(time.time()) + 115)
+        self.assertEqual(resp.context['bill']['balance_due'], 0)
+
+        # Vehicle is still CHECKED_IN
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_IN')
+        self.assertContains(resp, 'Simulated ABA payment of 5,000 KHR verified')
+
+    def test_payment_failure_and_cancellation_never_open_barrier(self):
+        """Failure and cancellation keep gate_open=False, permit=None, and show retry message."""
+        res = self._create_checked_in_reservation(payment_method='PAY_AT_EXIT')
+        vg_url = reverse('admin_virtual_gate')
+        base_data = {
+            'zone': self.zone.pk,
+            'code': res.ticket_code,
+            'mode': 'exit',
+            'action': 'settle',
+            'payment_provider': 'DEMO',
+        }
+
+        # 1. Failure
+        resp_fail = self.client.post(vg_url, {**base_data, 'outcome': 'failure'})
+        self.assertFalse(resp_fail.context['gate_open'])
+        self.assertIsNone(resp_fail.context.get('permit'))
+        self.assertGreater(resp_fail.context['bill']['balance_due'], 0)
+        self.assertContains(resp_fail, 'Simulated ABA payment failed')
+        self.assertContains(resp_fail, 'Please retry')
+
+        # 2. Cancellation
+        resp_cancel = self.client.post(vg_url, {**base_data, 'outcome': 'cancel'})
+        self.assertFalse(resp_cancel.context['gate_open'])
+        self.assertIsNone(resp_cancel.context.get('permit'))
+        self.assertGreater(resp_cancel.context['bill']['balance_due'], 0)
+        self.assertContains(resp_cancel, 'Simulated ABA payment was cancelled')
+        self.assertContains(resp_cancel, 'Please retry')
+
+    def test_remaining_balance_never_opens_barrier(self):
+        """Attempting to open the exit barrier when balance remains is denied."""
+        res = self._create_checked_in_reservation(payment_method='PAY_AT_EXIT')
+        vg_url = reverse('admin_virtual_gate')
+        data = {'zone': self.zone.pk, 'code': res.ticket_code, 'mode': 'exit', 'action': 'open'}
+
+        resp = self.client.post(vg_url, data)
+        self.assertFalse(resp.context['gate_open'])
+        self.assertIsNone(resp.context.get('permit'))
+        self.assertGreater(resp.context['bill']['balance_due'], 0)
+        self.assertContains(resp, 'Outstanding balance of 5,000 KHR must be settled before exit')
+
+    def test_vehicle_passage_requires_signed_permit_and_completes_checkout_only_once(self):
+        """Passage requires a valid signed permit, checks out vehicle once, and is idempotent."""
+        res = self._create_checked_in_reservation(payment_method='PAY_AT_EXIT')
+        vg_url = reverse('admin_virtual_gate')
+        data = {'zone': self.zone.pk, 'code': res.ticket_code, 'mode': 'exit'}
+
+        # 1. Attempt passage without permit -> rejected
+        resp_no_permit = self.client.post(vg_url, {**data, 'action': 'pass', 'permit': ''})
+        self.assertFalse(resp_no_permit.context.get('passed', False))
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_IN')
+
+        # 2. Settle payment -> get valid signed permit
+        settle_resp = self.client.post(vg_url, {**data, 'action': 'settle', 'payment_provider': 'CASH'})
+        self.assertTrue(settle_resp.context['gate_open'])
+        permit = settle_resp.context['permit']
+
+        # 3. Confirm vehicle passage with permit -> checks out
+        pass_resp1 = self.client.post(vg_url, {**data, 'action': 'pass', 'permit': permit})
+        self.assertTrue(pass_resp1.context['passed'])
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_OUT')
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.occupied_slots, 0)
+
+        # 4. Repeated pass click is idempotent and does not corrupt state
+        pass_resp2 = self.client.post(vg_url, {**data, 'action': 'pass', 'permit': permit})
+        self.zone.refresh_from_db()
+        self.assertEqual(self.zone.occupied_slots, 0)
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_OUT')
+
+    def test_no_second_check_ticket_action_required(self):
+        """Attendant exits vehicle in 2 actions: Settle -> Pass. No second 'check' action required."""
+        res = self._create_checked_in_reservation(payment_method='PAY_AT_EXIT')
+        vg_url = reverse('admin_virtual_gate')
+        data = {'zone': self.zone.pk, 'code': res.ticket_code, 'mode': 'exit'}
+
+        # Action 1: Settle
+        settle_resp = self.client.post(vg_url, {**data, 'action': 'settle', 'payment_provider': 'CASH'})
+        self.assertTrue(settle_resp.context['gate_open'], "Barrier must be open immediately after settle!")
+        permit = settle_resp.context['permit']
+
+        # Action 2: Pass directly
+        pass_resp = self.client.post(vg_url, {**data, 'action': 'pass', 'permit': permit})
+        self.assertTrue(pass_resp.context['passed'], "Passage must succeed using permit from settle!")
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'CHECKED_OUT')
+
+        # Reset button appears after passage
+        self.assertContains(pass_resp, 'btn-start-another-ticket')
 
     # =========================================================================
     # 2. First-Day Deposit Page: ABA QR Demo and Staff-Only Cash Deposit

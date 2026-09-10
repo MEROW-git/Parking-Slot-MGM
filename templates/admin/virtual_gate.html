@@ -95,8 +95,8 @@
         </div>
         <p id="vg-camera-status" class="vg-camera-status" role="status" aria-live="polite"></p>
 
-        <!-- Standard Actions: Scan & Check Ticket -->
-        <div class="vg-actions">
+        <!-- Standard Actions: Scan & Check Ticket (Hidden during active 3-step exit flow or after passage) -->
+        <div class="vg-actions" id="vg-standard-actions" {% if form.mode.value == 'exit' and reservation %}style="display: none;"{% endif %}>
           <button type="button" id="vg-camera-toggle" class="vg-btn vg-btn-secondary">
             <span class="vg-btn-icon" aria-hidden="true">&#128247;</span>
             <span id="vg-camera-btn-text">Scan QR with camera</span>
@@ -105,6 +105,89 @@
             Check ticket &amp; open barrier
           </button>
         </div>
+
+        <!-- Three-Step Exit Flow Indicator (Active during Exit mode with verified reservation) -->
+        {% if form.mode.value == 'exit' and reservation %}
+          <div class="vg-exit-flow" id="vg-exit-flow">
+            <div class="vg-exit-flow-header">
+              <span class="vg-exit-flow-badge">PAY-AT-EXIT DEPARTURE FLOW</span>
+              <span class="vg-exit-flow-session">Ticket #{{ reservation.ticket_code }} &middot; {{ reservation.plate_number }}</span>
+            </div>
+
+            <div class="vg-stepper" role="navigation" aria-label="Exit Payment and Departure Steps">
+              <!-- Step 1: Ticket verified -->
+              <div class="vg-step {% if reservation %}is-completed{% else %}is-active{% endif %}" id="vg-step-1">
+                <div class="vg-step-marker">
+                  <span class="vg-step-number">1</span>
+                  <span class="vg-step-check" aria-hidden="true">&#10003;</span>
+                </div>
+                <div class="vg-step-details">
+                  <div class="vg-step-label">STEP 1</div>
+                  <div class="vg-step-title">Ticket verified</div>
+                  <div class="vg-step-desc">Checked in &middot; Active</div>
+                </div>
+              </div>
+
+              <div class="vg-step-connector {% if bill.balance_due == 0 or gate_open or passed %}is-completed{% endif %}" id="vg-connector-1-2"></div>
+
+              <!-- Step 2: Payment completed -->
+              <div class="vg-step {% if bill.balance_due == 0 or passed %}is-completed{% elif bill.balance_due > 0 %}is-active{% else %}is-pending{% endif %}" id="vg-step-2">
+                <div class="vg-step-marker">
+                  <span class="vg-step-number">2</span>
+                  <span class="vg-step-check" aria-hidden="true">&#10003;</span>
+                </div>
+                <div class="vg-step-details">
+                  <div class="vg-step-label">STEP 2</div>
+                  <div class="vg-step-title">Payment completed</div>
+                  <div class="vg-step-desc" id="vg-step-2-desc">
+                    {% if bill.balance_due == 0 or passed %}
+                      0 KHR due &middot; Settled
+                    {% elif bill.balance_due > 0 %}
+                      {{ bill.balance_due|floatformat:"0" }} KHR balance due
+                    {% else %}
+                      Awaiting payment
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="vg-step-connector {% if passed %}is-completed{% elif gate_open %}is-active{% endif %}" id="vg-connector-2-3"></div>
+
+              <!-- Step 3: Exit barrier opened — waiting for vehicle -->
+              <div class="vg-step {% if passed %}is-completed{% elif gate_open %}is-active{% else %}is-pending{% endif %}" id="vg-step-3">
+                <div class="vg-step-marker">
+                  <span class="vg-step-number">3</span>
+                  <span class="vg-step-check" aria-hidden="true">&#10003;</span>
+                </div>
+                <div class="vg-step-details">
+                  <div class="vg-step-label">STEP 3</div>
+                  <div class="vg-step-title">Exit barrier opened</div>
+                  <div class="vg-step-desc" id="vg-step-3-desc">
+                    {% if passed %}
+                      Vehicle passed &middot; Closed
+                    {% elif gate_open %}
+                      Barrier OPEN &middot; Waiting
+                    {% else %}
+                      Waiting for vehicle
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- Barrier Re-open Action (If Payment Settled but Barrier Closed Without Passage) -->
+        {% if form.mode.value == 'exit' and reservation and bill.balance_due == 0 and not gate_open and not passed %}
+          <div class="vg-reopen-actions" id="vg-reopen-box" style="margin-top: 1rem;">
+            <div class="vg-alert vg-alert-info" style="margin-bottom: 0.75rem;">
+              <strong>Payment Settled:</strong> Remaining balance is 0 KHR. Click below to open the barrier for the departing vehicle.
+            </div>
+            <button type="submit" name="action" value="open" class="vg-btn vg-btn-primary" id="btn-reopen-barrier" style="width: 100%; justify-content: center;">
+              &#9654; Open barrier &mdash; waiting for vehicle
+            </button>
+          </div>
+        {% endif %}
 
         <!-- Passage Confirmation Actions (When Gate Is Open) -->
         {% if gate_open %}
@@ -203,8 +286,26 @@
             </div>
 
             <p class="vg-settlement-alt" style="margin-top: 0.75rem;">
-              Or open the <a href="{% url 'staff_gate_scanner' %}?zone_id={{ form.zone.value|default:reservation.parking_zone_id }}&token={{ reservation.ticket_code }}&mode=exit&return_to=virtual_gate" class="vg-inline-link">full staff payment terminal</a> to process external settlement and return here.
+              Or open the <a href="{% url 'staff_gate_scanner' %}?zone_id={{ form.zone.value|default:'' }}&token={{ reservation.ticket_code|default:'' }}&mode=exit&return_to=virtual_gate" class="vg-inline-link">full staff payment terminal</a> to process external settlement and return here.
             </p>
+          </div>
+        {% endif %}
+
+        <!-- Reset Action: Start Another Ticket (Only After Passage Completes) -->
+        {% if passed %}
+          <div class="vg-reset-box" id="vg-reset-box" style="margin-top: 1.25rem;">
+            <div class="vg-alert vg-alert-success" style="margin-bottom: 0.75rem;">
+              <strong>Passage Complete:</strong> Vehicle {{ reservation.plate_number|default:'' }} has exited. Session checked out.
+            </div>
+            <a href="{% url 'admin_virtual_gate' %}?zone={{ form.zone.value|default:'' }}&mode=exit" class="vg-btn vg-btn-primary" id="btn-start-another-ticket" style="width: 100%; justify-content: center; text-decoration: none;">
+              &#x21bb; Start another ticket
+            </a>
+          </div>
+        {% else %}
+          <div class="vg-reset-box" id="vg-reset-box" style="margin-top: 1.25rem; display: none;">
+            <a href="{% url 'admin_virtual_gate' %}?zone={{ form.zone.value|default:'' }}&mode=exit" class="vg-btn vg-btn-primary" id="btn-start-another-ticket" style="width: 100%; justify-content: center; text-decoration: none;">
+              &#x21bb; Start another ticket
+            </a>
           </div>
         {% endif %}
       </form>

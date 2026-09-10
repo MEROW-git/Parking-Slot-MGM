@@ -88,6 +88,8 @@ def virtual_gate(request):
         'passed': False,
         'just_passed': False,
         'permit_expires_at': None,
+        'reservation': None,
+        'bill': None,
     }
 
     # If GET has valid code and zone, inspect reservation for preview or telemetry reconciliation
@@ -225,22 +227,22 @@ def virtual_gate(request):
                                 return render(request, 'admin/virtual_gate.html', context)
 
                             if outcome == 'failure':
-                                notice = 'Simulated ABA payment failed: Bank rejected simulation or insufficient funds. Balance remains unpaid.'
+                                notice = 'Simulated ABA payment failed: Bank rejected simulation or insufficient funds. Balance remains unpaid. Please retry or choose Cash settlement.'
                                 context['notice'] = notice
                                 messages.error(request, notice)
                                 allowed, _, bill, _ = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
-                                context.update(reservation=reservation, bill=bill, gate_open=False)
+                                context.update(reservation=reservation, bill=bill, gate_open=False, permit=None, permit_expires_at=None)
                                 _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                                 if is_ajax:
                                     return JsonResponse({'success': False, 'notice': notice, 'balance_due': bill['balance_due']}, status=400)
                                 return render(request, 'admin/virtual_gate.html', context)
 
                             elif outcome == 'cancel':
-                                notice = 'Simulated ABA payment was cancelled. Balance remains unpaid.'
+                                notice = 'Simulated ABA payment was cancelled. Balance remains unpaid. Please retry simulation or choose Cash settlement.'
                                 context['notice'] = notice
                                 messages.info(request, notice)
                                 allowed, _, bill, _ = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
-                                context.update(reservation=reservation, bill=bill, gate_open=False)
+                                context.update(reservation=reservation, bill=bill, gate_open=False, permit=None, permit_expires_at=None)
                                 _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                                 if is_ajax:
                                     return JsonResponse({'success': False, 'notice': notice, 'balance_due': bill['balance_due']})
@@ -265,13 +267,42 @@ def virtual_gate(request):
                         context['notice'] = notice
                         messages.info(request, notice)
 
+                    # Re-check exit authorization after payment settlement
                     allowed, _, bill, prep_notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
-                    context.update(reservation=reservation, bill=bill, notice=context.get('notice') or prep_notice, gate_open=False)
+                    reservation.refresh_from_db()
+
+                    if allowed and bill.get('balance_due', 0) == 0 and reservation.status == 'CHECKED_IN':
+                        permit = signing.dumps(
+                            [request.user.pk, reservation.pk, zone.pk, mode], salt='virtual-gate'
+                        )
+                        permit_expires_at = int(time.time()) + 120
+                        open_notice = 'Payment completed. Barrier is OPEN — waiting for vehicle to pass.'
+                        context.update(
+                            reservation=reservation,
+                            bill=bill,
+                            notice=open_notice,
+                            gate_open=True,
+                            permit=permit,
+                            permit_expires_at=permit_expires_at,
+                        )
+                    else:
+                        context.update(
+                            reservation=reservation,
+                            bill=bill,
+                            notice=context.get('notice') or prep_notice,
+                            gate_open=False,
+                            permit=None,
+                            permit_expires_at=None,
+                        )
+
                     _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                     if is_ajax:
                         return JsonResponse({
                             'success': True,
                             'settled': True,
+                            'gate_open': context.get('gate_open', False),
+                            'permit': context.get('permit'),
+                            'permit_expires_at': context.get('permit_expires_at'),
                             'balance_due': bill['balance_due'],
                             'notice': context['notice'],
                             'ticket_code': reservation.ticket_code,

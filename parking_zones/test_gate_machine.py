@@ -162,17 +162,15 @@ class VirtualGateTests(TestCase):
         self.assertFalse(response.context['gate_open'])
         self.assertEqual(response.context['bill']['balance_due'], 4000)
 
-        # Settle via inline action='settle'
+        # Settle via inline action='settle' -> directly opens barrier with signed permit (no duplicate check needed)
         settle_resp = self.client.post(self.url, {**data, 'action': 'settle', 'payment_provider': 'CASH'})
-        self.assertFalse(settle_resp.context['gate_open'])  # Payment does NOT open barrier automatically!
+        self.assertTrue(settle_resp.context['gate_open'])
         self.assertEqual(settle_resp.context['bill']['balance_due'], 0)
+        self.assertIsNotNone(settle_resp.context['permit'])
+        permit = settle_resp.context['permit']
 
-        # Attendant opens barrier
-        open_resp = self.client.post(self.url, data)
-        self.assertTrue(open_resp.context['gate_open'])
-
-        # Vehicle passes through
-        pass_data = {**data, 'action': 'pass', 'permit': open_resp.context['permit']}
+        # Vehicle passes through directly using permit from settle step
+        pass_data = {**data, 'action': 'pass', 'permit': permit}
         self.client.post(self.url, pass_data)
         self.client.post(self.url, pass_data)  # Repeated pass is safe & idempotent
 
