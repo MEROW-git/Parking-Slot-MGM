@@ -409,7 +409,6 @@ def virtual_gate(request):
                         messages.error(request, err)
                         allowed, _, bill, _ = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
                         context.update(gate_open=False, permit=None, permit_expires_at=None, notice=err, bill=bill)
-                        _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                         if is_ajax:
                             return JsonResponse({
                                 'success': False,
@@ -590,7 +589,8 @@ def virtual_gate(request):
                     allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
 
                 context.update(reservation=reservation, bill=bill, notice=notice)
-                _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
+                if plate_matched:
+                    _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
 
                 # Action: Confirm vehicle passage & close barrier
                 if action == 'pass':

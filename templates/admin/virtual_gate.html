@@ -199,7 +199,9 @@
                   <div class="vg-step-label">STEP 2</div>
                   <div class="vg-step-title">Payment completed</div>
                   <div class="vg-step-desc" id="vg-step-2-desc">
-                    {% if bill.balance_due == 0 or passed %}
+                    {% if plate_matched == False %}
+                      Blocked &middot; Plate mismatch
+                    {% elif bill.balance_due == 0 or passed %}
                       0 KHR due &middot; Settled
                     {% elif bill.balance_due > 0 %}
                       {{ bill.balance_due|floatformat:"0" }} KHR balance due
@@ -237,7 +239,7 @@
         {% endif %}
 
         <!-- Barrier Re-open Action (If Payment Settled but Barrier Closed Without Passage) -->
-        {% if form.mode.value == 'exit' and reservation and bill.balance_due == 0 and not gate_open and not passed %}
+        {% if form.mode.value == 'exit' and reservation and bill.balance_due == 0 and not gate_open and not passed and plate_matched != False %}
           <div class="vg-reopen-actions" id="vg-reopen-box" style="margin-top: 1rem;">
             <div class="vg-alert vg-alert-info" style="margin-bottom: 0.75rem;">
               <strong>Payment Settled:</strong> Remaining balance is 0 KHR. Click below to open the barrier for the departing vehicle.
@@ -269,8 +271,8 @@
           </div>
         {% endif %}
 
-        <!-- Exit Settlement Actions (When Balance Is Due) -->
-        {% if bill.balance_due and not gate_open and not passed %}
+        <!-- Exit Settlement Actions (When Balance Is Due and Plate Matched) -->
+        {% if bill.balance_due and not gate_open and not passed and plate_matched != False %}
           <div class="vg-settlement-actions" id="vg-settlement-box">
             <div class="vg-alert vg-alert-warning" style="margin-bottom: 1rem;">
               <strong>Exit Payment Required:</strong> An outstanding balance of <strong>{{ bill.balance_due|floatformat:"0" }} KHR</strong> must be settled before opening the exit barrier.
@@ -346,6 +348,22 @@
 
             <p class="vg-settlement-alt" style="margin-top: 0.75rem;">
               Or open the <a href="{% url 'staff_gate_scanner' %}?zone_id={{ form.zone.value|default:'' }}&token={{ reservation.ticket_code|default:'' }}&mode=exit&return_to=virtual_gate" class="vg-inline-link">full staff payment terminal</a> to process external settlement and return here.
+            </p>
+          </div>
+        {% endif %}
+
+        <!-- Plate Mismatch Security Rejection Banner (When Exit Blocked) -->
+        {% if form.mode.value == 'exit' and reservation and plate_matched == False %}
+          <div class="vg-plate-mismatch-block" id="vg-plate-mismatch-box" style="margin-top: 1.25rem; background: rgba(239, 68, 68, 0.12); border: 1.5px solid #ef4444; border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.35rem;" aria-hidden="true">🚫</span>
+              <strong style="color: #ef4444; font-size: 1.05rem;">Security Alert: Vehicle Plate Mismatch</strong>
+            </div>
+            <p style="font-size: 0.88rem; color: #f8fafc; margin: 0 0 0.5rem; line-height: 1.45;">
+              Camera detected plate <strong>{{ detected_plate }}</strong> does not match ticket registered plate <strong>{{ expected_plate }}</strong>.
+            </p>
+            <p style="font-size: 0.82rem; color: #fca5a5; margin: 0; line-height: 1.4;">
+              Payment settlement and barrier opening are disabled while plate mismatch is present to prevent unauthorized vehicle departure.
             </p>
           </div>
         {% endif %}

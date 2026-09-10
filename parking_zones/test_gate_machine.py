@@ -407,7 +407,10 @@ class VirtualGateTests(TestCase):
         self.assertFalse(response.context['gate_open'])
         self.assertFalse(response.context['plate_matched'])
         self.assertEqual(response.context['detected_plate'], '2X-9999')
-        self.assertIn('ANPR Plate Mismatch', response.context['notice'])
+        content = response.content.decode()
+        self.assertIn('Security Alert: Vehicle Plate Mismatch', content)
+        self.assertNotIn('vg-settlement-actions', content)
+        self.assertNotIn('Attendant Confirms Cash Received', content)
 
         # Reservation must remain checked in and unpaid
         self.reservation.refresh_from_db()
