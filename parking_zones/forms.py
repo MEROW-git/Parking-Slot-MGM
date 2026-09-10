@@ -6,8 +6,12 @@ from django.utils import timezone
 from .models import ParkingZone, Reservation
 from .services import CapacityService
 
-# Centralized constant of Phnom Penh Capital and all 24 Cambodian Provinces
+# Personalized Cambodian plates use "Cambodia" instead of a province name.
+CUSTOM_PLATE_REGION = 'Cambodia'
+
+# Personalized plate option, Phnom Penh Capital, and all 24 Cambodian provinces.
 CAMBODIA_PROVINCES = (
+    (CUSTOM_PLATE_REGION, 'Cambodia / កម្ពុជា — Custom plate'),
     ('Phnom Penh', 'Phnom Penh / ភ្នំពេញ'),
     ('Banteay Meanchey', 'Banteay Meanchey / បន្ទាយមានជ័យ'),
     ('Battambang', 'Battambang / បាត់ដំបង'),
@@ -146,12 +150,12 @@ class ReservationForm(forms.ModelForm):
         widget=forms.TextInput(attrs={
             'class': 'sp-input font-mono uppercase',
             'id': 'id_plate_code',
-            'placeholder': 'e.g. 2AZ-1234',
+            'placeholder': 'e.g. 2AZ 1234',
             'autocapitalize': 'characters',
             'spellcheck': 'false',
             'autocomplete': 'off',
             'aria-label': 'Plate Number (លេខផ្លាក)',
-            'aria-describedby': 'plate-preview-box',
+            'aria-describedby': 'plate-code-help plate-preview-box',
         }),
         label='Plate Number (លេខផ្លាក)'
     )
@@ -312,20 +316,25 @@ class ReservationForm(forms.ModelForm):
                 self.add_error('plate_code', 'Please enter a vehicle plate number (សូមបញ្ចូលលេខផ្លាកលេខ).')
                 has_plate_error = True
             else:
-                cleaned_code = re.sub(r'\s+', ' ', raw_code).upper()
-
-                if not re.match(r'^[A-Z0-9\s\.\-]{2,15}$', cleaned_code):
-                    self.add_error(
-                        'plate_code',
-                        'Invalid plate format. Allowed characters: Latin letters, numbers, spaces, periods, and hyphens.'
+                if raw_province == CUSTOM_PLATE_REGION:
+                    # Custom plates can be customer-selected text and do not
+                    # require digits. Whitespace is only normalized for storage.
+                    cleaned_code = re.sub(r'\s+', ' ', raw_code).strip().upper()
+                else:
+                    # Accept a space, a hyphen, or no separator, then store one
+                    # canonical hyphen: "2AZ 1234" becomes "2AZ-1234".
+                    normal_match = re.fullmatch(
+                        r'([1-9][A-Z]{1,3})[\s-]*(\d{1,4})',
+                        raw_code.strip().upper(),
                     )
-                    has_plate_error = True
-                elif not re.search(r'\d', cleaned_code):
-                    self.add_error(
-                        'plate_code',
-                        'Plate number must include at least one digit (ត្រូវមានលេខយ៉ាងតិចមួយខ្ទង់).'
-                    )
-                    has_plate_error = True
+                    if normal_match:
+                        cleaned_code = f'{normal_match.group(1)}-{normal_match.group(2)}'
+                    else:
+                        self.add_error(
+                            'plate_code',
+                            'Use a standard plate such as 2AZ 1234 or 2AZ-1234. Select Cambodia for a custom plate.'
+                        )
+                        has_plate_error = True
 
             if not has_plate_error:
                 combined_plate = f"{raw_province} {cleaned_code}"
@@ -358,13 +367,13 @@ class ReservationForm(forms.ModelForm):
 
         if 'plate_code' in self.errors:
             self.fields['plate_code'].widget.attrs['aria-invalid'] = 'true'
-            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'error_plate_code plate-preview-box'
+            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'error_plate_code plate-code-help plate-preview-box'
             c_class = self.fields['plate_code'].widget.attrs.get('class', '')
             if 'is-invalid' not in c_class:
                 self.fields['plate_code'].widget.attrs['class'] = f'{c_class} is-invalid'.strip()
         else:
             self.fields['plate_code'].widget.attrs.pop('aria-invalid', None)
-            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'plate-preview-box'
+            self.fields['plate_code'].widget.attrs['aria-describedby'] = 'plate-code-help plate-preview-box'
 
         return cleaned_data
 

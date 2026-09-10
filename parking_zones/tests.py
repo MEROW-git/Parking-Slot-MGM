@@ -457,9 +457,10 @@ class VehiclePlateAndBookingFormTests(TestCase):
         self.tomorrow = self.today + datetime.timedelta(days=1)
 
     def test_cambodia_provinces_constant(self):
-        # 1 capital + 24 provinces = 25 total
-        self.assertEqual(len(CAMBODIA_PROVINCES), 25)
-        self.assertEqual(CAMBODIA_PROVINCES[0][0], 'Phnom Penh')
+        # 1 custom Cambodia option + 1 capital + 24 provinces = 26 total
+        self.assertEqual(len(CAMBODIA_PROVINCES), 26)
+        self.assertEqual(CAMBODIA_PROVINCES[0][0], 'Cambodia')
+        self.assertEqual(CAMBODIA_PROVINCES[1][0], 'Phnom Penh')
 
     def test_booking_page_renders_province_and_code_fields(self):
         self.client.login(username='customer1', password='pass1234')
@@ -482,6 +483,7 @@ class VehiclePlateAndBookingFormTests(TestCase):
         self.assertContains(response, 'id="id_plate_code"')
 
         # Phnom Penh option present
+        self.assertContains(response, 'Cambodia / កម្ពុជា — Custom plate')
         self.assertContains(response, 'Phnom Penh / ភ្នំពេញ')
         self.assertContains(response, 'Siem Reap / សៀមរាប')
 
@@ -633,7 +635,31 @@ class VehiclePlateAndBookingFormTests(TestCase):
             'phone_number': '012345678',
         })
         self.assertTrue(form.is_valid(), f"Errors: {form.errors}")
-        self.assertEqual(form.cleaned_data['plate_number'], 'Kandal 2AZ 1234')
+        self.assertEqual(form.cleaned_data['plate_number'], 'Kandal 2AZ-1234')
+
+    def test_cambodia_custom_plate_allows_text_without_digits(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Cambodia',
+            'plate_code': 'my car',
+            'phone_number': '012345678',
+        })
+        self.assertTrue(form.is_valid(), f"Errors: {form.errors}")
+        self.assertEqual(form.cleaned_data['plate_number'], 'Cambodia MY CAR')
+
+    def test_standard_plate_space_is_saved_as_hyphen(self):
+        form = ReservationForm(data={
+            'parking_zone': self.zone.id,
+            'start_date': self.today,
+            'finish_date': self.tomorrow,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2az 1234',
+            'phone_number': '012345678',
+        })
+        self.assertTrue(form.is_valid(), f"Errors: {form.errors}")
+        self.assertEqual(form.cleaned_data['plate_number'], 'Phnom Penh 2AZ-1234')
 
     def test_invalid_characters_are_rejected(self):
         form = ReservationForm(data={
