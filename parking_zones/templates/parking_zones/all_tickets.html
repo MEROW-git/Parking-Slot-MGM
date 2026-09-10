@@ -59,9 +59,9 @@
             </td>
             <td class="col-actions" style="text-align:right;">
               <div style="display:inline-flex; gap:var(--space-xs); justify-content:flex-end; flex-wrap:wrap;">
-                {% if not ticket.checked_out %}
+                {% if ticket.status == 'CONFIRMED' or ticket.status == 'CHECKED_IN' %}
                   <a href="{% url 'ticket_gate_mode' ticket.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-gate-{{ ticket.ticket_code }}" title="Show Gate QR Pass">
-                    ⚡ Gate Pass
+                    Gate Pass
                   </a>
                 {% endif %}
                 <a href="{% url 'ticket_code' ticket.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-view-{{ ticket.ticket_code }}">

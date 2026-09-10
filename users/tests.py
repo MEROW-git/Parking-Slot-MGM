@@ -210,6 +210,39 @@ class UserAuthenticationTests(TestCase):
         self.assertContains(response, 'Find parking')
         self.assertNotContains(response, 'SPK-ACT1234')
 
+    def test_cancelled_reservation_is_not_active_and_has_no_gate_pass(self):
+        """Cancelled bookings remain in history but expose no active gate controls."""
+        today = datetime.date.today()
+        reservation = Reservation.objects.create(
+            ticket_code='SPK-CANCEL1',
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='2AZ-1000',
+            phone_number='+85512100100',
+            start_date=today,
+            finish_date=today,
+            status='CANCELLED',
+            checked_out=False,
+        )
+
+        self.client.login(username='cambodia_driver', password='securepassword123')
+
+        dashboard_response = self.client.get(reverse('dashboard'))
+        self.assertIsNone(dashboard_response.context['active_reservation'])
+        self.assertNotContains(dashboard_response, 'id="btn-active-gate-pass"')
+        self.assertContains(dashboard_response, 'CANCELLED')
+
+        history_response = self.client.get(reverse('all_tickets'))
+        self.assertNotContains(
+            history_response,
+            f'id="btn-gate-{reservation.ticket_code}"',
+        )
+        self.assertNotContains(history_response, '⚡ Gate Pass')
+
+        home_response = self.client.get(reverse('home'))
+        self.assertIsNone(home_response.context['active_reservation'])
+        self.assertNotContains(home_response, 'id="active-res-banner"')
+
     def test_toast_notification_system_roles_and_dismiss_behavior(self):
         """
         Verify toast notification system accessibility:

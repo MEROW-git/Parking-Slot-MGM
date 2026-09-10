@@ -76,7 +76,9 @@ def dashboard(request):
         customer=request.user
     ).select_related('parking_zone').order_by('-created_on')
 
-    active_reservation = user_reservations.filter(checked_out=False).first()
+    active_reservation = user_reservations.filter(
+        status__in=['CONFIRMED', 'CHECKED_IN']
+    ).first()
     recent_reservations = user_reservations[:5]
     has_reservations = user_reservations.exists()
 

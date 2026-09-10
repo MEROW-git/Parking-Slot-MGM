@@ -115,7 +115,7 @@
         </div>
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
           <a href="{% url 'ticket_gate_mode' active_reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-active-gate-pass" title="Open Fullscreen Gate QR">
-            ⚡ Show Gate Pass
+            Show Gate Pass
           </a>
           <a href="{% url 'ticket_code' active_reservation.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-active-view-ticket">
             View Digital Ticket
@@ -221,9 +221,21 @@
                   {{ ticket.start_date|date:"d M Y" }} → {{ ticket.finish_date|date:"d M Y" }}
                 </td>
                 <td class="col-status">
-                  {% if ticket.checked_out %}
+                  {% if ticket.status == 'CHECKED_OUT' or ticket.checked_out %}
                     <span class="sp-avail-badge" style="background:var(--color-paper-3); color:var(--color-muted);">
                       COMPLETED
+                    </span>
+                  {% elif ticket.status == 'CANCELLED' %}
+                    <span class="sp-avail-badge" style="background:rgba(239,68,68,0.2); color:#f87171;">
+                      CANCELLED
+                    </span>
+                  {% elif ticket.status == 'EXPIRED' %}
+                    <span class="sp-avail-badge" style="background:rgba(239,68,68,0.2); color:#f87171;">
+                      EXPIRED
+                    </span>
+                  {% elif ticket.status == 'PAYMENT_PENDING' %}
+                    <span class="sp-avail-badge" style="background:rgba(250,204,21,0.18); color:#facc15;">
+                      PAYMENT PENDING
                     </span>
                   {% else %}
                     <span class="sp-avail-badge available">
@@ -266,4 +278,3 @@
 {% block extra_scripts %}
 <script src="{% static 'js/sompark-countdown.js' %}?v={{ ASSET_VERSION|default:'1.2.0' }}"></script>
 {% endblock %}
-

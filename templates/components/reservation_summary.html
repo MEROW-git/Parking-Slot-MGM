@@ -24,29 +24,29 @@ Usage:
     </p>
   </div>
   <div class="sp-res-actions">
-    <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-banner-gate-pass" title="Show Gate Access Pass">
-      Gate Pass (ប័ណ្ណចេញចូល)
-    </a>
+    {% if reservation.status == 'CONFIRMED' or reservation.status == 'CHECKED_IN' %}
+      <a href="{% url 'ticket_gate_mode' reservation.ticket_code %}" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-banner-gate-pass" title="Show Gate Access Pass">
+        Gate Pass (ប័ណ្ណចេញចូល)
+      </a>
+    {% endif %}
     <a href="{% url 'ticket_code' reservation.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-view-ticket">
       View Ticket
     </a>
-    {% if allow_checkout and not reservation.checked_out %}
-      {% if reservation.status == 'CHECKED_IN' %}
-        <form action="{% url 'checkout' %}" method="post" class="sp-inline-form" id="form-checkout-banner">
-          {% csrf_token %}
-          <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
-          <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-banner">
-            Check Out (ចេញពីចំណត)
-          </button>
-        </form>
-      {% else %}
-        <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" class="sp-inline-form" id="form-cancel-banner" onsubmit="return confirm('Cancel this parking hold?');">
-          {% csrf_token %}
-          <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#f87171;" id="btn-cancel-banner">
-            Cancel
-          </button>
-        </form>
-      {% endif %}
+    {% if allow_checkout and reservation.status == 'CHECKED_IN' %}
+      <form action="{% url 'checkout' %}" method="post" class="sp-inline-form" id="form-checkout-banner">
+        {% csrf_token %}
+        <input type="hidden" name="ticket_code" value="{{ reservation.ticket_code }}">
+        <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" id="btn-checkout-banner">
+          Check Out (ចេញពីចំណត)
+        </button>
+      </form>
+    {% elif allow_checkout and reservation.status == 'CONFIRMED' %}
+      <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" class="sp-inline-form" id="form-cancel-banner" onsubmit="return confirm('Cancel this parking hold?');">
+        {% csrf_token %}
+        <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#f87171;" id="btn-cancel-banner">
+          Cancel
+        </button>
+      </form>
     {% endif %}
   </div>
 </div>

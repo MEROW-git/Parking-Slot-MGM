@@ -9,7 +9,7 @@ def sompark_context(request):
     if request.user.is_authenticated:
         active_reservation = Reservation.objects.filter(
             customer=request.user,
-            checked_out=False
+            status__in=['CONFIRMED', 'CHECKED_IN'],
         ).select_related('parking_zone').first()
 
     return {
