@@ -264,10 +264,13 @@ class CapacityService:
                 res_deadline = res_start + timedelta(days=res_days)
                 res_end = max(now, res_deadline)
             else:
-                res_start = res.effective_start_time
-                if res.payment_method == 'PAY_AT_EXIT' and res.arrival_deadline:
-                    res_arrival_end = res.arrival_deadline
+                if res.payment_method == 'PAY_AT_EXIT':
+                    if res.arrival_deadline and now >= res.arrival_deadline:
+                        continue
+                    res_start = res.start_time or res.effective_start_time
+                    res_arrival_end = res.arrival_deadline or (res_start + timedelta(hours=3))
                 else:
+                    res_start = res.effective_start_time
                     res_arrival_end = res.effective_finish_time
                 res_end = res_arrival_end + timedelta(days=res_days)
 
@@ -401,13 +404,27 @@ class PaymentService:
     @transaction.atomic
     def record_exit_payment(reservation: Reservation, amount: int, provider: str = 'CASH', provider_ref: str = None) -> PaymentTransaction:
         now = timezone.now()
+        exit_mins = getattr(settings, 'EXIT_WINDOW_MINUTES', 5)
+
+        # Idempotency check: if already fully settled
+        current_bill = BillingService.calculate_bill(reservation, as_of=now)
+        if current_bill['balance_due'] <= 0 and reservation.payment_status == 'PAID':
+            if not reservation.exit_authorized_until or now > reservation.exit_authorized_until:
+                reservation.exit_authorized_until = now + timedelta(minutes=exit_mins)
+                reservation.save(update_fields=['exit_authorized_until'])
+            existing_txn = reservation.transactions.filter(purpose='EXIT_BALANCE', status='SUCCESS').first()
+            if existing_txn:
+                return existing_txn
+
+        # Collect only the remaining balance due
+        actual_amount = min(amount, current_bill['balance_due']) if current_bill['balance_due'] > 0 else amount
         is_demo = getattr(settings, 'DEMO_PAYMENT_ENABLED', True) if provider == 'DEMO' else False
 
         ref = provider_ref or f"EXIT-{secrets.token_hex(8).upper()}"
         txn = PaymentTransaction.objects.create(
             reservation=reservation,
             purpose='EXIT_BALANCE',
-            amount=amount,
+            amount=actual_amount,
             currency='KHR',
             status='SUCCESS',
             provider=provider,
@@ -416,13 +433,60 @@ class PaymentService:
             completed_at=now,
         )
 
-        reservation.balance_paid += amount
+        reservation.balance_paid += actual_amount
         reservation.payment_status = 'PAID'
-        exit_mins = getattr(settings, 'EXIT_WINDOW_MINUTES', 5)
         reservation.exit_authorized_until = now + timedelta(minutes=exit_mins)
         reservation.save(update_fields=['balance_paid', 'payment_status', 'exit_authorized_until'])
 
         return txn
+
+    @staticmethod
+    @transaction.atomic
+    def record_cash_deposit(reservation: Reservation, staff_user=None) -> tuple[bool, str]:
+        """
+        Allows staff to confirm a cash deposit received in person.
+        Customers cannot self-confirm cash deposits.
+        """
+        now = timezone.now()
+        if reservation.status == 'CONFIRMED' and reservation.payment_status == 'PARTIALLY_PAID':
+            return True, 'Deposit payment already confirmed.'
+
+        if reservation.status in ('EXPIRED', 'CANCELLED'):
+            return False, f'Cannot accept deposit for {reservation.status.lower()} reservation.'
+
+        txn = reservation.transactions.filter(purpose='DEPOSIT', status='PENDING').first()
+        staff_tag = staff_user.username if staff_user else 'STAFF'
+        ref = f"CASH-DEP-{secrets.token_hex(4).upper()}"
+
+        if txn:
+            txn.status = 'SUCCESS'
+            txn.provider = 'CASH'
+            txn.is_demo = False
+            txn.provider_ref = ref
+            txn.completed_at = now
+            txn.raw_response = {'confirmed_by': staff_tag, 'confirmed_at': now.isoformat()}
+            txn.save()
+        else:
+            txn = PaymentTransaction.objects.create(
+                reservation=reservation,
+                purpose='DEPOSIT',
+                amount=reservation.daily_rate,
+                currency='KHR',
+                status='SUCCESS',
+                provider='CASH',
+                provider_ref=ref,
+                is_demo=False,
+                completed_at=now,
+                raw_response={'confirmed_by': staff_tag, 'confirmed_at': now.isoformat()}
+            )
+
+        reservation.deposit_amount = txn.amount
+        reservation.payment_status = 'PARTIALLY_PAID'
+        reservation.status = 'CONFIRMED'
+        reservation.payment_deadline = None
+        reservation.save()
+
+        return True, f'Cash deposit of {txn.amount:,} KHR confirmed by staff ({staff_tag}).'
 
 
 class GateService:
@@ -473,16 +537,23 @@ class GateService:
 
         if now < reservation.effective_start_time:
             return False, reservation, 'The booked arrival window has not started yet.'
-        if now >= reservation.effective_finish_time:
-            return False, reservation, 'The booked arrival window has ended.'
-        if reservation.payment_method == 'DEPOSIT' and reservation.deposit_amount < reservation.daily_rate:
-            return False, reservation, 'First-day deposit has not been recorded.'
 
-        # Enforce 3-hour arrival deadline for unpaid holds
-        if reservation.payment_method == 'PAY_AT_EXIT' and reservation.arrival_deadline and now >= reservation.arrival_deadline:
-            reservation.status = 'EXPIRED'
-            reservation.save(update_fields=['status'])
-            return False, reservation, 'The 3-hour arrival window for this unpaid booking has expired.'
+        if reservation.payment_method == 'PAY_AT_EXIT':
+            # For PAY_AT_EXIT:
+            # - Arrival starts immediately upon server booking
+            # - Arrival deadline is booking time + configured hold duration (default 3 hours)
+            # - Deadline can cross midnight; no conflicting 07:00/22:00 cutoffs
+            deadline = reservation.arrival_deadline or reservation.effective_finish_time
+            if deadline and now >= deadline:
+                reservation.status = 'EXPIRED'
+                reservation.save(update_fields=['status'])
+                return False, reservation, 'The 3-hour arrival window for this unpaid booking has expired.'
+        else:
+            # DEPOSIT mode: leave deposit-mode rules unchanged
+            if now >= reservation.effective_finish_time:
+                return False, reservation, 'The booked arrival window has ended.'
+            if reservation.deposit_amount < reservation.daily_rate:
+                return False, reservation, 'First-day deposit has not been recorded.'
 
         # Capacity check
         zone = reservation.parking_zone

@@ -29,6 +29,20 @@ def generate_access_qr_base64(token_or_code: str) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
+def generate_demo_payment_qr_base64(reference: str, amount: int, currency: str = 'KHR') -> str:
+    """
+    Returns Base64 Data URI string of simulated ABA payment QR.
+    Payload clearly indicates demo payment, separate from gate access pass QR.
+    Does NOT initiate real banking transfers.
+    """
+    payload = f"sompark:payment:demo:{reference}:{amount}:{currency}"
+    img = make_qr_image(payload, box_size=6, border=3)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    encoded = base64.b64encode(buf.getvalue()).decode('ascii')
+    return f"data:image/png;base64,{encoded}"
+
+
 def render_access_qr_response(token_or_code: str) -> HttpResponse:
     """Returns streaming PNG HttpResponse for direct image tags."""
     payload = f"sompark:pass:{token_or_code}"

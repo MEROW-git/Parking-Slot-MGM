@@ -49,11 +49,11 @@ class ReservationForm(forms.ModelForm):
     )
 
     start_date = forms.DateField(
+        required=False,
         widget=forms.DateInput(attrs={
             'type': 'date',
             'class': 'sp-input',
             'id': 'id_start_date',
-            'required': 'required',
         }),
         label='Start Date (កាលបរិច្ឆេទចាប់ផ្តើម)'
     )
@@ -70,11 +70,11 @@ class ReservationForm(forms.ModelForm):
     )
 
     finish_date = forms.DateField(
+        required=False,
         widget=forms.DateInput(attrs={
             'type': 'date',
             'class': 'sp-input',
             'id': 'id_finish_date',
-            'required': 'required',
         }),
         label='Finish Date (កាលបរិច្ឆេទបញ្ចប់)'
     )
@@ -222,52 +222,71 @@ class ReservationForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        start_date = cleaned_data.get('start_date')
-        finish_date = cleaned_data.get('finish_date')
-        raw_start_time = cleaned_data.get('start_time') or time(7, 0)
-        raw_finish_time = cleaned_data.get('finish_time') or time(22, 0)
         payment_method = cleaned_data.get('payment_method') or 'DEPOSIT'
         zone = cleaned_data.get('parking_zone')
 
-        today = timezone.localdate()
+        now = timezone.now()
+        today = timezone.localdate(now)
         tz = timezone.get_current_timezone()
 
-        if start_date and start_date < today:
-            self.add_error('start_date', 'Start date cannot be in the past.')
+        if payment_method == 'PAY_AT_EXIT':
+            # Simplify Pay when you leave:
+            # - Ignore client-supplied arrival dates and times completely
+            # - Set arrival start to server booking time
+            # - Set arrival deadline to booking time + configured hold duration (default 3 hours)
+            # - Allow the three-hour arrival window to cross midnight; do not shorten to end of calendar day
+            hold_hours = getattr(settings, 'ARRIVAL_HOLD_HOURS', 3)
+            start_dt = now
+            arrival_deadline = now + timedelta(hours=hold_hours)
 
-        if start_date and finish_date and finish_date < start_date:
-            self.add_error('finish_date', 'Finish date must be on or after start date.')
-
-        # Construct timezone-aware start and finish datetimes
-        start_dt = None
-        finish_dt = None
-        if start_date and finish_date:
-            start_dt = timezone.make_aware(datetime.combine(start_date, raw_start_time), tz)
-            finish_dt = timezone.make_aware(datetime.combine(finish_date, raw_finish_time), tz)
-
-            if finish_dt <= start_dt:
-                self.add_error('finish_time', 'Finish time must be after start time.')
-
+            cleaned_data['start_date'] = timezone.localdate(start_dt)
+            cleaned_data['finish_date'] = timezone.localdate(arrival_deadline)
+            cleaned_data['start_time'] = start_dt.time()
+            cleaned_data['finish_time'] = arrival_deadline.time()
             cleaned_data['start_datetime'] = start_dt
-            cleaned_data['finish_datetime'] = finish_dt
+            cleaned_data['finish_datetime'] = arrival_deadline
+            cleaned_data['arrival_deadline'] = arrival_deadline
+
+            # Clear any field errors that might have been raised on date/time fields
+            for f in ['start_date', 'finish_date', 'start_time', 'finish_time']:
+                if f in self._errors:
+                    del self._errors[f]
+        else:
+            # Leave deposit-mode rules unchanged
+            start_date = cleaned_data.get('start_date')
+            finish_date = cleaned_data.get('finish_date')
+            raw_start_time = cleaned_data.get('start_time') or time(7, 0)
+            raw_finish_time = cleaned_data.get('finish_time') or time(22, 0)
+
+            if not start_date:
+                self.add_error('start_date', 'Please enter a start date.')
+            elif start_date < today:
+                self.add_error('start_date', 'Start date cannot be in the past.')
+
+            if not finish_date:
+                self.add_error('finish_date', 'Please enter a finish date.')
+            elif start_date and finish_date < start_date:
+                self.add_error('finish_date', 'Finish date must be on or after start date.')
+
+            # Construct timezone-aware start and finish datetimes
+            if start_date and finish_date:
+                start_dt = timezone.make_aware(datetime.combine(start_date, raw_start_time), tz)
+                finish_dt = timezone.make_aware(datetime.combine(finish_date, raw_finish_time), tz)
+
+                if finish_dt <= start_dt:
+                    self.add_error('finish_time', 'Finish time must be after start time.')
+
+                cleaned_data['start_datetime'] = start_dt
+                cleaned_data['finish_datetime'] = finish_dt
 
         reserved_days_val = cleaned_data.get('reserved_days')
         if not reserved_days_val:
-            if start_date and finish_date:
-                diff_days = (finish_date - start_date).days
+            if payment_method != 'PAY_AT_EXIT' and cleaned_data.get('start_date') and cleaned_data.get('finish_date'):
+                diff_days = (cleaned_data['finish_date'] - cleaned_data['start_date']).days
                 reserved_days_val = max(1, diff_days if diff_days > 0 else 1)
             else:
                 reserved_days_val = 1
         cleaned_data['reserved_days'] = int(reserved_days_val)
-
-        # Business Rule: Pay at exit is only available for same-day immediate arrival
-        if payment_method == 'PAY_AT_EXIT':
-            if start_date and start_date > today:
-                self.add_error(
-                    'payment_method',
-                    'Pay at exit (3-hour hold) is only available for immediate same-day arrival. '
-                    'For future dates, please select "Pay first day now" to secure your guaranteed spot.'
-                )
 
         if zone and zone.vacant_slots <= 0:
             self.add_error('parking_zone', f'Zone "{zone.name}" is currently at full capacity.')
@@ -377,7 +396,13 @@ class ReservationForm(forms.ModelForm):
             instance.status = 'CONFIRMED'
             instance.payment_status = 'UNPAID'
             hold_hours = getattr(settings, 'ARRIVAL_HOLD_HOURS', 3)
-            instance.arrival_deadline = now + timedelta(hours=hold_hours)
+            booking_time = self.cleaned_data.get('start_datetime') or now
+            arrival_deadline = self.cleaned_data.get('arrival_deadline') or (booking_time + timedelta(hours=hold_hours))
+            instance.start_time = booking_time
+            instance.arrival_deadline = arrival_deadline
+            instance.finish_time = arrival_deadline
+            instance.start_date = timezone.localdate(booking_time)
+            instance.finish_date = timezone.localdate(arrival_deadline)
             instance.payment_deadline = None
         else:
             instance.status = 'PAYMENT_PENDING'

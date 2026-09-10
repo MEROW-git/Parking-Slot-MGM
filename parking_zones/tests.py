@@ -419,7 +419,7 @@ class TicketViewBrandingTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Banner copy
-        self.assertContains(response, 'Arrive within 3 hours')
+        self.assertContains(response, 'Enter within 3 hours after booking. Pay when you leave.')
         self.assertContains(response, 'Enter before')
         self.assertContains(response, 'Time remaining:')
         self.assertContains(response, 'id="arrival-timer"')
@@ -519,8 +519,7 @@ class VehiclePlateAndBookingFormTests(TestCase):
         self.assertContains(response, 'បង់ប្រាក់នៅពេលអ្នកចេញ')
         self.assertContains(response, '0 ៛')
         self.assertContains(response, 'Pay for your actual parking time at exit.')
-        self.assertContains(response, 'Within 3 hours of booking. Same-day arrival only.')
-        self.assertContains(response, 'For future bookings, pay the first day now.')
+        self.assertContains(response, 'Enter within 3 hours after booking. Pay when you leave.')
 
         # Verify removal of old badges and technical phrases
         self.assertNotContains(response, 'RECOMMENDED')

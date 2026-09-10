@@ -221,13 +221,27 @@ class Reservation(models.Model):
         if not self.daily_rate and self.parking_zone_id:
             self.daily_rate = self.parking_zone.price
 
-        # Populate start_time and finish_time from dates if unset
-        if not self.start_time and self.start_date:
-            tz = timezone.get_current_timezone()
-            self.start_time = timezone.make_aware(datetime.combine(self.start_date, time(6, 0)), tz)
-        if not self.finish_time and self.finish_date:
-            tz = timezone.get_current_timezone()
-            self.finish_time = timezone.make_aware(datetime.combine(self.finish_date, time(22, 0)), tz)
+        # Populate start_time, finish_time, and arrival_deadline based on payment method
+        if self.payment_method == 'PAY_AT_EXIT':
+            from django.conf import settings
+            hold_hours = getattr(settings, 'ARRIVAL_HOLD_HOURS', 3)
+            booking_time = self.start_time or self.created_on or timezone.now()
+            self.start_time = booking_time
+            if not self.arrival_deadline:
+                self.arrival_deadline = booking_time + timedelta(hours=hold_hours)
+            self.finish_time = self.arrival_deadline
+            if not self.start_date:
+                self.start_date = timezone.localdate(self.start_time)
+            if not self.finish_date:
+                self.finish_date = timezone.localdate(self.arrival_deadline)
+        else:
+            # Populate start_time and finish_time from dates if unset (DEPOSIT mode)
+            if not self.start_time and self.start_date:
+                tz = timezone.get_current_timezone()
+                self.start_time = timezone.make_aware(datetime.combine(self.start_date, time(6, 0)), tz)
+            if not self.finish_time and self.finish_date:
+                tz = timezone.get_current_timezone()
+                self.finish_time = timezone.make_aware(datetime.combine(self.finish_date, time(22, 0)), tz)
 
         # Infer reserved_days when omitted or defaulted to 1 and times/dates span multiple days
         if not getattr(self, '_reserved_days_explicit', False):
@@ -291,14 +305,20 @@ class Reservation(models.Model):
         if self.start_time:
             return self.start_time
         tz = timezone.get_current_timezone()
-        return timezone.make_aware(datetime.combine(self.start_date, time(6, 0)), tz)
+        if self.start_date:
+            return timezone.make_aware(datetime.combine(self.start_date, time(6, 0)), tz)
+        return timezone.now()
 
     @property
     def effective_finish_time(self):
+        if self.payment_method == 'PAY_AT_EXIT' and self.arrival_deadline:
+            return self.arrival_deadline
         if self.finish_time:
             return self.finish_time
         tz = timezone.get_current_timezone()
-        return timezone.make_aware(datetime.combine(self.finish_date, time(22, 0)), tz)
+        if self.finish_date:
+            return timezone.make_aware(datetime.combine(self.finish_date, time(22, 0)), tz)
+        return timezone.now()
 
     @property
     def is_overstay(self):
@@ -374,7 +394,12 @@ class PaymentTransaction(models.Model):
     def amount_formatted(self):
         return f"{self.amount:,} ៛"
 
+    @property
+    def transaction_reference(self):
+        return self.provider_ref
+
     def save(self, *args, **kwargs):
         if not self.provider_ref:
             self.provider_ref = generate_payment_ref()
         super().save(*args, **kwargs)
+

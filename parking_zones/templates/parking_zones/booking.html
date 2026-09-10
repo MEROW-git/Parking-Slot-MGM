@@ -35,6 +35,97 @@
 
         {% include "components/form_field.html" with field=form.parking_zone %}
 
+        <!-- Payment Choices Selection (Placed before timing fields so form adapts clearly) -->
+        <div class="sp-form-group" id="group_payment_choices" style="margin-bottom:1.5rem;">
+          <div class="sp-payment-header">
+            <label class="sp-label" id="legend_payment_choice">
+              How would you like to pay? (តើអ្នកចង់ទូទាត់ប្រាក់ដោយរបៀបណា?)
+              <span class="sp-required" aria-hidden="true">*</span>
+            </label>
+            <div class="sp-facility-rate-indicator" id="facility-rate-display">
+              <span class="sp-facility-rate-label">Daily parking rate:</span>
+              <strong class="sp-facility-rate-val" id="facility-rate-amount">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
+              <span class="sp-facility-rate-kh">(តម្លៃចំណតប្រចាំថ្ងៃ៖ <span id="facility-rate-amount-kh">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</span>)</span>
+            </div>
+          </div>
+
+          <div class="sp-payment-cards" role="radiogroup" aria-labelledby="legend_payment_choice">
+            <!-- Card A: Pay first day now -->
+            <label class="sp-pay-card{% if form.payment_method.value != 'PAY_AT_EXIT' %} is-selected{% endif %}" id="card-pay-deposit" for="id_payment_method_deposit">
+              <div class="sp-pay-card-header">
+                <input type="radio" name="payment_method" value="DEPOSIT" id="id_payment_method_deposit" class="sp-pay-card-radio" {% if form.payment_method.value != 'PAY_AT_EXIT' %}checked{% endif %}>
+                <div class="sp-pay-card-heading">
+                  <span class="sp-pay-card-title">Pay first day now</span>
+                  <span class="sp-pay-card-title-kh">បង់ប្រាក់១ថ្ងៃដំបូងឥឡូវនេះ</span>
+                </div>
+              </div>
+
+              <div class="sp-pay-card-rate">
+                <strong class="sp-pay-amount" id="deposit-amount-display">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
+                <span class="sp-pay-amount-label">now (ឥឡូវនេះ)</span>
+              </div>
+
+              <div class="sp-pay-card-body">
+                <p class="sp-pay-card-text">
+                  Pay the remaining balance when you leave. Your first payment is deducted from the total.
+                </p>
+                <p class="sp-pay-card-text-kh">
+                  បង់សមតុល្យដែលនៅសល់នៅពេលអ្នកចេញ។ ការទូទាត់លើកដំបូងរបស់អ្នកនឹងត្រូវកាត់ចេញពីចំនួនសរុប។
+                </p>
+              </div>
+
+              <div class="sp-pay-card-footer">
+                <div class="sp-pay-arrival-note">
+                  <strong>Arrival:</strong> Within your booked arrival window.
+                </div>
+                <div class="sp-pay-arrival-note-kh">
+                  <strong>ការមកដល់៖</strong> ក្នុងកំឡុងពេលមកដល់ដែលបានកក់ទុក។
+                </div>
+              </div>
+            </label>
+
+            <!-- Card B: Pay when you leave -->
+            <label class="sp-pay-card{% if form.payment_method.value == 'PAY_AT_EXIT' %} is-selected{% endif %}" id="card-pay-exit" for="id_payment_method_exit">
+              <div class="sp-pay-card-header">
+                <input type="radio" name="payment_method" value="PAY_AT_EXIT" id="id_payment_method_exit" class="sp-pay-card-radio" {% if form.payment_method.value == 'PAY_AT_EXIT' %}checked{% endif %}>
+                <div class="sp-pay-card-heading">
+                  <span class="sp-pay-card-title">Pay when you leave</span>
+                  <span class="sp-pay-card-title-kh">បង់ប្រាក់នៅពេលអ្នកចេញ</span>
+                </div>
+              </div>
+
+              <div class="sp-pay-card-rate">
+                <strong class="sp-pay-amount">0 ៛</strong>
+                <span class="sp-pay-amount-label">now (ឥឡូវនេះ)</span>
+              </div>
+
+              <div class="sp-pay-card-body">
+                <p class="sp-pay-card-text">
+                  Pay for your actual parking time at exit.
+                </p>
+                <p class="sp-pay-card-text-kh">
+                  បង់តាមរយៈពេលចតជាក់ស្តែងនៅពេលចេញ។
+                </p>
+              </div>
+
+              <div class="sp-pay-card-footer">
+                <div class="sp-pay-arrival-note">
+                  <strong>Arrival:</strong> Enter within 3 hours after booking. Pay when you leave.
+                </div>
+                <div class="sp-pay-arrival-note-kh">
+                  <strong>ការមកដល់៖</strong> ចូលចតក្នុងរយៈពេល ៣ ម៉ោងបន្ទាប់ពីការកក់។ បង់ប្រាក់នៅពេលអ្នកចេញ។
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {% if form.payment_method.errors %}
+            <div class="sp-field-feedback">
+              {% for err in form.payment_method.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
         <!-- Explicit Reserved Duration Selection -->
         <div class="sp-form-group" style="margin-bottom: 1.25rem;">
           <label class="sp-label" for="id_reserved_days">
@@ -43,8 +134,8 @@
           </label>
           {{ form.reserved_days }}
           <div class="sp-field-help" style="margin-top: 0.35rem; font-size: 0.88rem; color: var(--sp-color-text-muted, #64748b);">
-            <strong>1 day = 24 hours after entry.</strong> Your parking deadline begins when you actually check in at the gate.
-            <div style="font-size: 0.8rem; color: #475569;">(១ ថ្ងៃ = ២៤ ម៉ោងបន្ទាប់ពីចូលចត។ ម៉ោងផុតកំណត់ចាប់ផ្តើមនៅពេលអ្នកចូលជាក់ស្តែងតាមច្រកទ្វារ។)</div>
+            <strong>Your parking duration starts when you enter.</strong> Actual parking deadline = check-in + reserved days × 24 hours.
+            <div style="font-size: 0.8rem; color: #475569;">(រយៈពេលចតរបស់អ្នកចាប់ផ្តើមនៅពេលអ្នកចូល។ ម៉ោងផុតកំណត់ចតជាក់ស្តែង = ពេលចូល + ចំនួនថ្ងៃកក់ × ២៤ ម៉ោង។)</div>
           </div>
           {% if form.reserved_days.errors %}
             <div class="sp-field-feedback">
@@ -53,8 +144,22 @@
           {% endif %}
         </div>
 
-        <!-- Booked Arrival Window -->
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+        <!-- Pay at Exit 3-hour notice (Shown when PAY_AT_EXIT is selected) -->
+        <div class="sp-pay-exit-timing-box" id="pay-exit-timing-box" style="{% if form.payment_method.value != 'PAY_AT_EXIT' %}display:none;{% else %}display:block;{% endif %} background:rgba(245, 158, 11, 0.08); border:1px solid rgba(245, 158, 11, 0.35); border-radius:8px; padding:1rem 1.25rem; margin-bottom:1.25rem;">
+          <div style="display:flex; align-items:flex-start; gap:0.75rem;">
+            <div style="font-size:1.5rem; line-height:1;" aria-hidden="true">⏱</div>
+            <div>
+              <strong style="font-size:1.02rem; color:#92400e; display:block;">Enter within 3 hours after booking. Pay when you leave.</strong>
+              <span style="font-size:0.85rem; color:#78350f; display:block; margin-top:0.2rem;">(ចូលចតក្នុងរយៈពេល ៣ ម៉ោងបន្ទាប់ពីការកក់។ បង់ប្រាក់នៅពេលអ្នកចេញ។)</span>
+              <p style="margin:0.35rem 0 0 0; font-size:0.82rem; color:#a16207; line-height:1.4;">
+                Your parking spot is held starting immediately upon booking. No arrival dates or planning required.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Booked Arrival Window (Shown and enabled when DEPOSIT is selected; hidden and disabled for PAY_AT_EXIT) -->
+        <div id="deposit-arrival-fields" style="{% if form.payment_method.value == 'PAY_AT_EXIT' %}display:none;{% else %}display:grid;{% endif %} grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
           <div class="sp-form-group">
             <label class="sp-label" for="id_start_date">
               Arrival Date & Time (កាលបរិច្ឆេទ និងម៉ោងមកដល់)
@@ -152,101 +257,6 @@
         </fieldset>
 
         {% include "components/form_field.html" with field=form.phone_number %}
-
-        <!-- Payment Choices Selection (Two Distinct Methods) -->
-        <div class="sp-form-group" id="group_payment_choices" style="margin-top:1.5rem;">
-          <div class="sp-payment-header">
-            <label class="sp-label" id="legend_payment_choice">
-              How would you like to pay? (តើអ្នកចង់ទូទាត់ប្រាក់ដោយរបៀបណា?)
-              <span class="sp-required" aria-hidden="true">*</span>
-            </label>
-            <div class="sp-facility-rate-indicator" id="facility-rate-display">
-              <span class="sp-facility-rate-label">Daily parking rate:</span>
-              <strong class="sp-facility-rate-val" id="facility-rate-amount">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
-              <span class="sp-facility-rate-kh">(តម្លៃចំណតប្រចាំថ្ងៃ៖ <span id="facility-rate-amount-kh">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</span>)</span>
-            </div>
-          </div>
-
-          <div class="sp-payment-cards" role="radiogroup" aria-labelledby="legend_payment_choice">
-            <!-- Card A: Pay first day now -->
-            <label class="sp-pay-card{% if form.payment_method.value != 'PAY_AT_EXIT' %} is-selected{% endif %}" id="card-pay-deposit" for="id_payment_method_deposit">
-              <div class="sp-pay-card-header">
-                <input type="radio" name="payment_method" value="DEPOSIT" id="id_payment_method_deposit" class="sp-pay-card-radio" {% if form.payment_method.value != 'PAY_AT_EXIT' %}checked{% endif %}>
-                <div class="sp-pay-card-heading">
-                  <span class="sp-pay-card-title">Pay first day now</span>
-                  <span class="sp-pay-card-title-kh">បង់ប្រាក់១ថ្ងៃដំបូងឥឡូវនេះ</span>
-                </div>
-              </div>
-
-              <div class="sp-pay-card-rate">
-                <strong class="sp-pay-amount" id="deposit-amount-display">{{ selected_zone.price_khr_formatted|default:"4,000 ៛" }}</strong>
-                <span class="sp-pay-amount-label">now (ឥឡូវនេះ)</span>
-              </div>
-
-              <div class="sp-pay-card-body">
-                <p class="sp-pay-card-text">
-                  Pay the remaining balance when you leave. Your first payment is deducted from the total.
-                </p>
-                <p class="sp-pay-card-text-kh">
-                  បង់សមតុល្យដែលនៅសល់នៅពេលអ្នកចេញ។ ការទូទាត់លើកដំបូងរបស់អ្នកនឹងត្រូវកាត់ចេញពីចំនួនសរុប។
-                </p>
-              </div>
-
-              <div class="sp-pay-card-footer">
-                <div class="sp-pay-arrival-note">
-                  <strong>Arrival:</strong> Within your booked arrival window.
-                </div>
-                <div class="sp-pay-arrival-note-kh">
-                  <strong>ការមកដល់៖</strong> ក្នុងកំឡុងពេលមកដល់ដែលបានកក់ទុក។
-                </div>
-              </div>
-            </label>
-
-            <!-- Card B: Pay when you leave -->
-            <label class="sp-pay-card{% if form.payment_method.value == 'PAY_AT_EXIT' %} is-selected{% endif %}" id="card-pay-exit" for="id_payment_method_exit">
-              <div class="sp-pay-card-header">
-                <input type="radio" name="payment_method" value="PAY_AT_EXIT" id="id_payment_method_exit" class="sp-pay-card-radio" {% if form.payment_method.value == 'PAY_AT_EXIT' %}checked{% endif %}>
-                <div class="sp-pay-card-heading">
-                  <span class="sp-pay-card-title">Pay when you leave</span>
-                  <span class="sp-pay-card-title-kh">បង់ប្រាក់នៅពេលអ្នកចេញ</span>
-                </div>
-              </div>
-
-              <div class="sp-pay-card-rate">
-                <strong class="sp-pay-amount">0 ៛</strong>
-                <span class="sp-pay-amount-label">now (ឥឡូវនេះ)</span>
-              </div>
-
-              <div class="sp-pay-card-body">
-                <p class="sp-pay-card-text">
-                  Pay for your actual parking time at exit.
-                </p>
-                <p class="sp-pay-card-text-kh">
-                  បង់តាមរយៈពេលចតជាក់ស្តែងនៅពេលចេញ។
-                </p>
-              </div>
-
-              <div class="sp-pay-card-footer">
-                <div class="sp-pay-arrival-note">
-                  <strong>Arrival:</strong> Within 3 hours of booking. Same-day arrival only.
-                </div>
-                <div class="sp-pay-arrival-note-kh">
-                  <strong>ការមកដល់៖</strong> ក្នុងរយៈពេល ៣ ម៉ោងបន្ទាប់ពីការកក់។ សម្រាប់តែការមកដល់ក្នុងថ្ងៃតែមួយប៉ុណ្ណោះ។
-                </div>
-                <div class="sp-pay-future-warning" id="future-date-notice" style="display:none;">
-                  <span class="sp-future-warn-en">For future bookings, pay the first day now.</span>
-                  <span class="sp-future-warn-kh">(សម្រាប់ការកក់ទុកសម្រាប់ថ្ងៃខាងមុខ សូមបង់ប្រាក់ថ្ងៃដំបូងឥឡូវនេះ។)</span>
-                </div>
-              </div>
-            </label>
-          </div>
-
-          {% if form.payment_method.errors %}
-            <div class="sp-field-feedback">
-              {% for err in form.payment_method.errors %}<p class="sp-field-error">{{ err }}</p>{% endfor %}
-            </div>
-          {% endif %}
-        </div>
 
         <!-- Compact Pricing Explanation & Detailed Rules Disclosure -->
         <div class="sp-pricing-box" id="pricing-explanation-box">
@@ -439,13 +449,18 @@
       }
     }
 
-    // 3. Payment Method Selection & Date Policy
+    // 3. Payment Method Selection & Dynamic Timing Field Switching
     var startDateEl = document.getElementById('id_start_date');
+    var startTimeEl = document.getElementById('id_start_time');
+    var finishDateEl = document.getElementById('id_finish_date');
+    var finishTimeEl = document.getElementById('id_finish_time');
+    var depositArrivalContainer = document.getElementById('deposit-arrival-fields');
+    var payExitTimingBox = document.getElementById('pay-exit-timing-box');
+
     var radioDeposit = document.getElementById('id_payment_method_deposit');
     var radioExit = document.getElementById('id_payment_method_exit');
     var cardDeposit = document.getElementById('card-pay-deposit');
     var cardExit = document.getElementById('card-pay-exit');
-    var futureNotice = document.getElementById('future-date-notice');
     var sumDeposit = document.getElementById('summary-deposit-block');
     var sumExit = document.getElementById('summary-exit-block');
     var btnText = document.getElementById('btn-submit-text');
@@ -470,43 +485,37 @@
       }
 
       if (isExit) {
+        // PAY_AT_EXIT mode:
+        // Hide and disable Arrival Date & Time and Latest Arrival / Planned Date
+        if (depositArrivalContainer) depositArrivalContainer.style.display = 'none';
+        if (payExitTimingBox) payExitTimingBox.style.display = 'block';
+
+        if (startDateEl) startDateEl.disabled = true;
+        if (startTimeEl) startTimeEl.disabled = true;
+        if (finishDateEl) finishDateEl.disabled = true;
+        if (finishTimeEl) finishTimeEl.disabled = true;
+
         if (sumDeposit) sumDeposit.style.display = 'none';
         if (sumExit) sumExit.style.display = 'block';
         if (btnText) btnText.textContent = 'Reserve parking (កក់កន្លែងចំណត) →';
       } else {
+        // DEPOSIT mode:
+        // Show and enable Arrival Date & Time and Latest Arrival / Planned Date
+        if (depositArrivalContainer) depositArrivalContainer.style.display = 'grid';
+        if (payExitTimingBox) payExitTimingBox.style.display = 'none';
+
+        if (startDateEl) startDateEl.disabled = false;
+        if (startTimeEl) startTimeEl.disabled = false;
+        if (finishDateEl) finishDateEl.disabled = false;
+        if (finishTimeEl) finishTimeEl.disabled = false;
+
         if (sumDeposit) sumDeposit.style.display = 'block';
         if (sumExit) sumExit.style.display = 'none';
         if (btnText) btnText.textContent = 'Continue to payment (បន្តទៅការទូទាត់) →';
       }
-    }
 
-    function checkDatePolicy() {
-      if (!startDateEl || !radioExit) return;
-      var todayStr = new Date().toISOString().split('T')[0];
-      var chosenDate = startDateEl.value;
-      var isFuture = chosenDate && chosenDate > todayStr;
-
-      if (isFuture) {
-        radioExit.disabled = true;
-        if (cardExit) {
-          cardExit.classList.add('is-disabled');
-        }
-        if (futureNotice) {
-          futureNotice.style.display = 'block';
-        }
-        if (radioExit.checked && radioDeposit) {
-          radioDeposit.checked = true;
-        }
-      } else {
-        radioExit.disabled = false;
-        if (cardExit) {
-          cardExit.classList.remove('is-disabled');
-        }
-        if (futureNotice) {
-          futureNotice.style.display = 'none';
-        }
-      }
-      updatePaymentUI();
+      // Preserve entered vehicle details when switching options
+      updatePlatePreview();
     }
 
     if (radioDeposit) {
@@ -515,9 +524,9 @@
     if (radioExit) {
       radioExit.addEventListener('change', updatePaymentUI);
     }
-    // 4. Synchronize reserved_days and finish_date
+
+    // 4. Synchronize reserved_days and finish_date for DEPOSIT mode
     var reservedDaysEl = document.getElementById('id_reserved_days');
-    var finishDateEl = document.getElementById('id_finish_date');
 
     function syncFinishDateFromDays() {
       if (!startDateEl || !finishDateEl || !reservedDaysEl) return;
@@ -537,14 +546,11 @@
       reservedDaysEl.addEventListener('change', syncFinishDateFromDays);
     }
     if (startDateEl) {
-      startDateEl.addEventListener('change', function() {
-        checkDatePolicy();
-        syncFinishDateFromDays();
-      });
-      checkDatePolicy();
-    } else {
-      updatePaymentUI();
+      startDateEl.addEventListener('change', syncFinishDateFromDays);
     }
+
+    // Initial setup
+    updatePaymentUI();
   })();
 </script>
 {% endblock %}

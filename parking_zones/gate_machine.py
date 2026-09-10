@@ -3,6 +3,7 @@ Admin virtual parking gate simulator.
 Simulates optical QR / physical barrier arm operations for Entrance and Exit.
 Passage confirmation delegates to real atomic parking services.
 """
+import secrets
 import time
 from django import forms
 from django.conf import settings
@@ -15,7 +16,20 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .models import ParkingZone, Reservation
+from .qr import generate_demo_payment_qr_base64
 from .services import BillingService, GateService, PaymentService
+
+
+def _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled):
+    """
+    Attaches simulated ABA payment QR to context when an outstanding balance is due.
+    QR payload uses 'sompark:payment:demo:...' distinct from parking access pass QR.
+    """
+    if reservation and bill and bill.get('balance_due', 0) > 0 and demo_enabled:
+        ref = f"ABA-EXIT-{reservation.ticket_code}"
+        context['demo_payment_qr'] = generate_demo_payment_qr_base64(ref, int(bill['balance_due']), currency='KHR')
+        context['demo_payment_ref'] = ref
+
 
 
 class GateMachineForm(forms.Form):
@@ -89,6 +103,7 @@ def virtual_gate(request):
             if str(reservation.parking_zone_id) == str(zone_id):
                 bill = BillingService.calculate_bill(reservation, as_of=timezone.now()) if mode == 'exit' else None
                 context.update(reservation=reservation, bill=bill)
+                _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                 if is_ajax:
                     return JsonResponse({
                         'success': True,
@@ -144,6 +159,7 @@ def virtual_gate(request):
                     if mode == 'exit':
                         bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
                         context.update(reservation=reservation, bill=bill)
+                        _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
                     else:
                         context.update(reservation=reservation)
                     if is_ajax:
@@ -158,24 +174,110 @@ def virtual_gate(request):
                 # Action: Settle exit balance
                 if action == 'settle':
                     if mode != 'exit':
-                        form.add_error(None, 'Payment settlement is only applicable in Exit mode.')
-                    else:
-                        bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
-                        amount_due = bill['balance_due']
-                        if amount_due > 0:
-                            provider = request.POST.get('payment_provider', 'CASH')
-                            if provider == 'DEMO' and not demo_enabled:
-                                provider = 'CASH'
-                            PaymentService.record_exit_payment(reservation, amount=amount_due, provider=provider)
-                            messages.success(
-                                request,
-                                f"Exit balance of {amount_due:,} KHR paid via {provider}. "
-                                f"5-minute departure window authorized."
-                            )
-                            reservation.refresh_from_db()
+                        err = 'Payment settlement is only applicable in Exit mode.'
+                        if is_ajax:
+                            return JsonResponse({'success': False, 'notice': err}, status=400)
+                        form.add_error(None, err)
+                        context.update(reservation=reservation, gate_open=False)
+                        return render(request, 'admin/virtual_gate.html', context)
 
-                        allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
-                        context.update(reservation=reservation, bill=bill, notice=notice, gate_open=False)
+                    if reservation.status != 'CHECKED_IN':
+                        err = (
+                            f"Cannot settle exit balance for reservation in status '{reservation.get_status_display()}'. "
+                            f"Vehicle must be currently checked in (CHECKED_IN)."
+                        )
+                        if is_ajax:
+                            return JsonResponse({'success': False, 'notice': err}, status=400)
+                        form.add_error(None, err)
+                        context.update(reservation=reservation, gate_open=False)
+                        return render(request, 'admin/virtual_gate.html', context)
+
+                    provider = (request.POST.get('payment_provider') or 'CASH').upper().strip()
+                    if provider not in ('CASH', 'DEMO'):
+                        err = f"Invalid payment method '{provider}'. Accepted methods are CASH or DEMO."
+                        if is_ajax:
+                            return JsonResponse({'success': False, 'notice': err}, status=400)
+                        form.add_error(None, err)
+                        context.update(reservation=reservation, gate_open=False)
+                        return render(request, 'admin/virtual_gate.html', context)
+
+                    if provider == 'DEMO' and not demo_enabled:
+                        err = 'Demo payment simulation is disabled. Disabled demo payments cannot be processed.'
+                        if is_ajax:
+                            return JsonResponse({'success': False, 'notice': err}, status=400)
+                        form.add_error(None, err)
+                        context.update(reservation=reservation, gate_open=False)
+                        return render(request, 'admin/virtual_gate.html', context)
+
+                    bill = BillingService.calculate_bill(reservation, as_of=timezone.now())
+                    amount_due = bill['balance_due']
+
+                    if amount_due > 0:
+                        if provider == 'DEMO':
+                            outcome = (request.POST.get('outcome') or request.POST.get('demo_outcome') or 'success').lower().strip()
+                            if outcome not in ('success', 'failure', 'cancel'):
+                                err = f"Invalid simulation outcome '{outcome}'. Must be success, failure, or cancel."
+                                if is_ajax:
+                                    return JsonResponse({'success': False, 'notice': err}, status=400)
+                                form.add_error(None, err)
+                                context.update(reservation=reservation, bill=bill, gate_open=False)
+                                _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
+                                return render(request, 'admin/virtual_gate.html', context)
+
+                            if outcome == 'failure':
+                                notice = 'Simulated ABA payment failed: Bank rejected simulation or insufficient funds. Balance remains unpaid.'
+                                context['notice'] = notice
+                                messages.error(request, notice)
+                                allowed, _, bill, _ = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
+                                context.update(reservation=reservation, bill=bill, gate_open=False)
+                                _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
+                                if is_ajax:
+                                    return JsonResponse({'success': False, 'notice': notice, 'balance_due': bill['balance_due']}, status=400)
+                                return render(request, 'admin/virtual_gate.html', context)
+
+                            elif outcome == 'cancel':
+                                notice = 'Simulated ABA payment was cancelled. Balance remains unpaid.'
+                                context['notice'] = notice
+                                messages.info(request, notice)
+                                allowed, _, bill, _ = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
+                                context.update(reservation=reservation, bill=bill, gate_open=False)
+                                _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
+                                if is_ajax:
+                                    return JsonResponse({'success': False, 'notice': notice, 'balance_due': bill['balance_due']})
+                                return render(request, 'admin/virtual_gate.html', context)
+
+                            else:  # outcome == 'success'
+                                ref = f"ABA-DEMO-{secrets.token_hex(4).upper()}"
+                                PaymentService.record_exit_payment(reservation, amount=amount_due, provider='DEMO', provider_ref=ref)
+                                notice = f"Simulated ABA payment of {amount_due:,} KHR verified. 5-minute departure window authorized."
+                                messages.success(request, notice)
+                                reservation.refresh_from_db()
+
+                        else:  # provider == 'CASH'
+                            attendant = request.user.username if request.user and request.user.is_authenticated else 'ATTENDANT'
+                            ref = f"CASH-EXIT-{secrets.token_hex(4).upper()}"
+                            PaymentService.record_exit_payment(reservation, amount=amount_due, provider='CASH', provider_ref=ref)
+                            notice = f"Cash payment of {amount_due:,} KHR confirmed received by attendant {attendant}. 5-minute departure window authorized."
+                            messages.success(request, notice)
+                            reservation.refresh_from_db()
+                    else:
+                        notice = 'No outstanding balance due. Exit authorization is ready.'
+                        context['notice'] = notice
+                        messages.info(request, notice)
+
+                    allowed, _, bill, prep_notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
+                    context.update(reservation=reservation, bill=bill, notice=context.get('notice') or prep_notice, gate_open=False)
+                    _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': True,
+                            'settled': True,
+                            'balance_due': bill['balance_due'],
+                            'notice': context['notice'],
+                            'ticket_code': reservation.ticket_code,
+                            'status': reservation.status,
+                            'payment_status': reservation.payment_status,
+                        })
                     return render(request, 'admin/virtual_gate.html', context)
 
                 # Action: Check ticket & open barrier
@@ -186,6 +288,8 @@ def virtual_gate(request):
                     allowed, _, bill, notice = GateService.prepare_exit(reservation.ticket_code, zone_id=zone.pk)
 
                 context.update(reservation=reservation, bill=bill, notice=notice)
+                _attach_exit_qr_if_needed(context, reservation, bill, demo_enabled)
+
 
                 # Action: Confirm vehicle passage & close barrier
                 if action == 'pass':

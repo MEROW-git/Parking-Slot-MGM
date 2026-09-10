@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils import timezone
 from parking_zones.models import ParkingZone, Reservation, PaymentTransaction
-from parking_zones.services import BillingService, PaymentService, GateService
+from parking_zones.services import BillingService, PaymentService, GateService, ExpiryService
 from parking_zones.payments import DemoPaymentAdapter
 
 
@@ -388,3 +388,359 @@ class PayExitSimplificationTests(TestCase):
             data={'action': 'pay'}
         )
         self.assertRedirects(resp_post, reverse('pay_exit', kwargs={'ticket_code': res.ticket_code}))
+
+
+class PayAtExitSimplificationFlowTests(TestCase):
+    def setUp(self):
+        self.zone = ParkingZone.objects.create(
+            name='Wat Phnom Zone B',
+            slug='wat-phnom-zone-b',
+            num_of_slots=10,
+            occupied_slots=2,
+            vacant_slots=8,
+            price=4000,
+            address='Street 96, Wat Phnom, Phnom Penh',
+            district='Doun Penh',
+        )
+        self.user = User.objects.create_user(
+            username='midnight_driver',
+            email='driver@sompark.test',
+            password='DriverPassword123!'
+        )
+        self.staff_user = User.objects.create_user(
+            username='staff_officer',
+            email='staff@sompark.test',
+            password='StaffPassword123!',
+            is_staff=True
+        )
+        self.client.login(username='midnight_driver', password='DriverPassword123!')
+
+    def test_booking_page_renders_payment_before_timing_and_shows_simplified_copy(self):
+        """
+        UI structure:
+        - Payment selection appears before timing fields.
+        - Shows 'Enter within 3 hours after booking. Pay when you leave.'
+        - Shows 'Your parking duration starts when you enter.'
+        """
+        resp = self.client.get(reverse('book') + f'?zone={self.zone.slug}')
+        self.assertEqual(resp.status_code, 200)
+
+        content = resp.content.decode('utf-8')
+        # Payment choice card appears before timing fields
+        pos_payment = content.find('id="group_payment_choices"')
+        pos_duration = content.find('id="id_reserved_days"')
+        pos_deposit_timing = content.find('id="deposit-arrival-fields"')
+        pos_timing_notice = content.find('id="pay-exit-timing-box"')
+
+        self.assertNotEqual(pos_payment, -1)
+        self.assertNotEqual(pos_duration, -1)
+        self.assertNotEqual(pos_deposit_timing, -1)
+        self.assertNotEqual(pos_timing_notice, -1)
+        self.assertLess(pos_payment, pos_duration)
+        self.assertLess(pos_payment, pos_deposit_timing)
+
+        # Copy assertions
+        self.assertContains(resp, 'Enter within 3 hours after booking. Pay when you leave.')
+        self.assertContains(resp, 'Your parking duration starts when you enter.')
+        self.assertContains(resp, 'Actual parking deadline = check-in + reserved days × 24 hours.')
+
+    def test_pay_at_exit_with_missing_date_inputs_succeeds(self):
+        """
+        Missing date inputs:
+        When booking PAY_AT_EXIT without start_date, finish_date, start_time, or finish_time,
+        the backend accepts the submission, sets arrival start to server booking time,
+        and sets arrival_deadline to booking time + 3 hours.
+        """
+        t_before = timezone.now() - timedelta(seconds=2)
+        resp = self.client.post(reverse('book'), data={
+            'parking_zone': self.zone.id,
+            'payment_method': 'PAY_AT_EXIT',
+            'reserved_days': 2,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2BC-4321',
+            'phone_number': '+85512345678',
+            # Notice: NO start_date, finish_date, start_time, finish_time
+        })
+        t_after = timezone.now() + timedelta(seconds=2)
+
+        self.assertEqual(resp.status_code, 302)
+        res = Reservation.objects.filter(customer=self.user).first()
+        self.assertIsNotNone(res)
+        self.assertEqual(res.payment_method, 'PAY_AT_EXIT')
+        self.assertEqual(res.status, 'CONFIRMED')
+        self.assertEqual(res.payment_status, 'UNPAID')
+        self.assertEqual(res.effective_reserved_days, 2)
+
+        # Arrival start set to server booking time
+        self.assertGreaterEqual(res.start_time, t_before)
+        self.assertLessEqual(res.start_time, t_after)
+
+        # Arrival deadline set to booking time + 3 hours
+        expected_deadline = res.start_time + timedelta(hours=3)
+        self.assertEqual(res.arrival_deadline, expected_deadline)
+        self.assertEqual(res.finish_time, expected_deadline)
+
+    def test_pay_at_exit_ignores_tampered_dates(self):
+        """
+        Tampered date inputs:
+        If client submits past dates, inverted dates, or distant future dates with PAY_AT_EXIT,
+        the backend ignores them completely and enforces server booking time + 3 hours hold.
+        """
+        t_before = timezone.now() - timedelta(seconds=2)
+        resp = self.client.post(reverse('book'), data={
+            'parking_zone': self.zone.id,
+            'payment_method': 'PAY_AT_EXIT',
+            'reserved_days': 1,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2BC-9999',
+            'phone_number': '+85512345678',
+            # Tampered client inputs:
+            'start_date': '2020-01-01',
+            'finish_date': '2019-01-01',
+            'start_time': '03:00',
+            'finish_time': '02:00',
+        })
+        t_after = timezone.now() + timedelta(seconds=2)
+
+        self.assertEqual(resp.status_code, 302)
+        res = Reservation.objects.filter(customer=self.user, plate_number='Phnom Penh 2BC-9999').first()
+        self.assertIsNotNone(res)
+        self.assertEqual(res.payment_method, 'PAY_AT_EXIT')
+        self.assertEqual(res.status, 'CONFIRMED')
+
+        # Tampered 2020/2019 dates must NOT be used
+        self.assertNotEqual(res.start_date.year, 2020)
+        self.assertNotEqual(res.finish_date.year, 2019)
+        self.assertGreaterEqual(res.start_time, t_before)
+        self.assertLessEqual(res.start_time, t_after)
+        self.assertEqual(res.arrival_deadline, res.start_time + timedelta(hours=3))
+
+    def test_booking_near_midnight_crosses_midnight_without_shortening(self):
+        """
+        Booking near midnight (e.g. 23:15):
+        The 3-hour arrival window crosses midnight to 02:15 next morning.
+        It is NOT shortened to 23:59:59 or 22:00.
+        Gate validation at 00:45 next day allows entry.
+        """
+        tz = timezone.get_current_timezone()
+        # Booking at 23:15 on 2026-09-10
+        booking_time = timezone.make_aware(datetime(2026, 9, 10, 23, 15, 0), tz)
+        deadline = booking_time + timedelta(hours=3)  # 2026-09-11 02:15:00
+
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-7777',
+            phone_number='+85512345678',
+            start_date=booking_time.date(),
+            start_time=booking_time,
+            finish_date=deadline.date(),
+            finish_time=deadline,
+            arrival_deadline=deadline,
+            daily_rate=4000,
+            payment_method='PAY_AT_EXIT',
+            status='CONFIRMED',
+            reserved_days=1,
+        )
+
+        # Deadline crosses into next calendar day
+        self.assertEqual(res.arrival_deadline.day, 11)
+        self.assertEqual(res.arrival_deadline.hour, 2)
+        self.assertEqual(res.arrival_deadline.minute, 15)
+
+        # Test A: Gate entry at 00:45 next morning (past midnight, within 3h hold)
+        arrival_time_valid = timezone.make_aware(datetime(2026, 9, 11, 0, 45, 0), tz)
+        with timezone.override(tz):
+            from unittest.mock import patch
+            with patch('django.utils.timezone.now', return_value=arrival_time_valid):
+                is_valid, _, msg = GateService.validate_entry(res.ticket_code, zone_id=self.zone.id)
+                self.assertTrue(is_valid, f"Entry failed with message: {msg}")
+                self.assertIn('ready for gate entry', msg)
+
+        # Test B: Gate entry at 02:30 next morning (past 02:15 deadline)
+        arrival_time_late = timezone.make_aware(datetime(2026, 9, 11, 2, 30, 0), tz)
+        with timezone.override(tz):
+            from unittest.mock import patch
+            with patch('django.utils.timezone.now', return_value=arrival_time_late):
+                is_valid, res_ref, msg = GateService.validate_entry(res.ticket_code, zone_id=self.zone.id)
+                self.assertFalse(is_valid)
+                self.assertIn('3-hour arrival window', msg)
+                res_ref.refresh_from_db()
+                self.assertEqual(res_ref.status, 'EXPIRED')
+
+    def test_expiry_service_auto_expires_holds_past_3_hours(self):
+        """
+        Unpaid holds past their 3-hour deadline are expired by ExpiryService.
+        """
+        t0 = timezone.now() - timedelta(hours=4)
+        deadline = t0 + timedelta(hours=3)  # Expired 1 hour ago
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2BC-1111',
+            phone_number='+85512345678',
+            start_date=t0.date(),
+            start_time=t0,
+            finish_date=deadline.date(),
+            finish_time=deadline,
+            arrival_deadline=deadline,
+            daily_rate=4000,
+            payment_method='PAY_AT_EXIT',
+            status='CONFIRMED',
+            reserved_days=1,
+        )
+
+        results = ExpiryService.expire_stale_holds()
+        self.assertGreaterEqual(results['unpaid_holds'], 1)
+        res.refresh_from_db()
+        self.assertEqual(res.status, 'EXPIRED')
+
+    def test_duration_and_parking_deadline_start_at_actual_entry(self):
+        """
+        Reserved Duration:
+        - Your parking duration starts when you enter.
+        - Actual parking deadline = check-in + reserved days x 24 hours.
+        - 3-hour arrival deadline stops applying once vehicle is checked in.
+        """
+        now = timezone.now()
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2BC-2222',
+            phone_number='+85512345678',
+            start_date=now.date(),
+            start_time=now,
+            finish_date=(now + timedelta(hours=3)).date(),
+            finish_time=now + timedelta(hours=3),
+            arrival_deadline=now + timedelta(hours=3),
+            daily_rate=4000,
+            payment_method='PAY_AT_EXIT',
+            status='CONFIRMED',
+            reserved_days=3,
+        )
+
+        # Before entry: parking deadline is None, parked charges are 0
+        bill_before = BillingService.calculate_bill(res, as_of=now)
+        self.assertIsNone(bill_before['parking_deadline'])
+        self.assertEqual(bill_before['normal_charge'], 0)
+        self.assertEqual(bill_before['parked_duration_display'], 'Parking charges start when you enter.')
+
+        # Vehicle physically enters 1 hour later
+        entry_time = now + timedelta(hours=1)
+        from unittest.mock import patch
+        with patch('django.utils.timezone.now', return_value=entry_time):
+            success, checked_in_res, msg = GateService.confirm_entry(res.id, staff_user=self.staff_user)
+            self.assertTrue(success)
+
+        checked_in_res.refresh_from_db()
+        self.assertEqual(checked_in_res.status, 'CHECKED_IN')
+        self.assertEqual(checked_in_res.checked_in_at, entry_time)
+
+        # Parking deadline is entry_time + 3 * 24 hours
+        expected_parking_deadline = entry_time + timedelta(days=3)
+        self.assertEqual(checked_in_res.parking_deadline, expected_parking_deadline)
+
+        # 4 hours after original booking (past original 3-hour arrival deadline),
+        # vehicle is legitimately parked and does NOT expire!
+        t_during_stay = now + timedelta(hours=4)
+        bill_during = BillingService.calculate_bill(checked_in_res, as_of=t_during_stay)
+        self.assertEqual(bill_during['parking_deadline'], expected_parking_deadline)
+        self.assertFalse(bill_during['is_overstay'])
+        self.assertEqual(bill_during['normal_days'], 1)
+        self.assertEqual(bill_during['normal_charge'], 4000)
+
+    def test_deposit_mode_rules_remain_unchanged(self):
+        """
+        DEPOSIT mode rules:
+        - Omitting dates raises validation errors.
+        - Past date raises validation error.
+        - Valid dates create PAYMENT_PENDING reservation with 15-minute deposit transaction.
+        """
+        # A: Missing dates in DEPOSIT mode fails
+        resp_missing = self.client.post(reverse('book'), data={
+            'parking_zone': self.zone.id,
+            'payment_method': 'DEPOSIT',
+            'reserved_days': 1,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2AZ-8888',
+            'phone_number': '+85512345678',
+        })
+        self.assertEqual(resp_missing.status_code, 200)
+        form_missing = resp_missing.context['form']
+        self.assertIn('start_date', form_missing.errors)
+        self.assertIn('Please enter a start date.', form_missing.errors['start_date'])
+        self.assertIn('finish_date', form_missing.errors)
+        self.assertIn('Please enter a finish date.', form_missing.errors['finish_date'])
+
+        # B: Past date in DEPOSIT mode fails
+        yesterday = timezone.localdate() - timedelta(days=1)
+        resp_past = self.client.post(reverse('book'), data={
+            'parking_zone': self.zone.id,
+            'payment_method': 'DEPOSIT',
+            'reserved_days': 1,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2AZ-8888',
+            'phone_number': '+85512345678',
+            'start_date': yesterday.strftime('%Y-%m-%d'),
+            'finish_date': yesterday.strftime('%Y-%m-%d'),
+        })
+        self.assertEqual(resp_past.status_code, 200)
+        form_past = resp_past.context['form']
+        self.assertIn('start_date', form_past.errors)
+        self.assertIn('Start date cannot be in the past.', form_past.errors['start_date'])
+
+        # C: Valid DEPOSIT booking creates PAYMENT_PENDING with deposit transaction
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        resp_valid = self.client.post(reverse('book'), data={
+            'parking_zone': self.zone.id,
+            'payment_method': 'DEPOSIT',
+            'reserved_days': 1,
+            'plate_province': 'Phnom Penh',
+            'plate_code': '2AZ-8888',
+            'phone_number': '+85512345678',
+            'start_date': tomorrow.strftime('%Y-%m-%d'),
+            'finish_date': (tomorrow + timedelta(days=1)).strftime('%Y-%m-%d'),
+            'start_time': '08:00',
+            'finish_time': '20:00',
+        })
+        self.assertEqual(resp_valid.status_code, 302)
+        res = Reservation.objects.filter(customer=self.user, plate_number='Phnom Penh 2AZ-8888').first()
+        self.assertIsNotNone(res)
+        self.assertEqual(res.status, 'PAYMENT_PENDING')
+        self.assertEqual(res.payment_method, 'DEPOSIT')
+        self.assertIsNotNone(res.payment_deadline)
+        self.assertTrue(res.transactions.filter(purpose='DEPOSIT', status='PENDING').exists())
+
+    def test_ticket_detail_displays_simplified_pay_at_exit_info(self):
+        """
+        Ticket display for PAY_AT_EXIT:
+        - Shows 'Enter within 3 hours after booking. Pay when you leave.'
+        - Shows arrival deadline and live countdown timer.
+        - Shows 'Parking charges start when you enter.'
+        """
+        now = timezone.now()
+        deadline = now + timedelta(hours=3)
+        res = Reservation.objects.create(
+            customer=self.user,
+            parking_zone=self.zone,
+            plate_number='Phnom Penh 2AZ-5555',
+            phone_number='+85512345678',
+            start_date=now.date(),
+            start_time=now,
+            finish_date=deadline.date(),
+            finish_time=deadline,
+            arrival_deadline=deadline,
+            daily_rate=4000,
+            payment_method='PAY_AT_EXIT',
+            status='CONFIRMED',
+            reserved_days=1,
+        )
+
+        resp = self.client.get(reverse('ticket_code', kwargs={'ticket_code': res.ticket_code}))
+        self.assertEqual(resp.status_code, 200)
+
+        self.assertContains(resp, 'Enter within 3 hours after booking. Pay when you leave.')
+        self.assertContains(resp, 'Enter before')
+        self.assertContains(resp, 'Parking charges start when you enter.')
+        self.assertContains(resp, 'Set when you enter')
+

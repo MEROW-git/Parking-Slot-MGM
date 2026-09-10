@@ -95,7 +95,8 @@
     <div class="no-print sp-arrival-banner" id="arrival-countdown-card" data-reveal="up">
       <div class="sp-arrival-banner-info">
         <div class="sp-arrival-banner-heading">
-          Arrive within 3 hours (សូមមកដល់ក្នុងរង្វង់ ៣ ម៉ោង)
+          Enter within 3 hours after booking. Pay when you leave.
+          <div style="font-size:0.85rem; font-weight:normal; opacity:0.9;">(ចូលចតក្នុងរយៈពេល ៣ ម៉ោងបន្ទាប់ពីការកក់។ បង់ប្រាក់នៅពេលអ្នកចេញ)</div>
         </div>
         <div class="sp-arrival-banner-deadline">
           Enter before <strong>{{ reservation.arrival_deadline|date:"g:i A" }}</strong> on <strong>{{ reservation.arrival_deadline|date:"d M Y" }}</strong>.
@@ -249,7 +250,14 @@
 
       <div>
         <span style="font-size:0.8rem; color:var(--color-print-muted); display:block; letter-spacing:0.04em;">ARRIVAL VALIDITY (សុពលភាពមកដល់)</span>
-        <strong>{{ reservation.start_datetime|date:"d M Y, H:i" }}</strong> to <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
+        {% if reservation.payment_method == 'PAY_AT_EXIT' %}
+          <strong>Enter within 3 hours after booking. Pay when you leave.</strong>
+          <div style="font-size:0.82rem; margin-top:0.25rem;">
+            Enter before: <strong>{{ reservation.arrival_deadline|date:"d M Y, H:i" }}</strong>
+          </div>
+        {% else %}
+          <strong>{{ reservation.start_datetime|date:"d M Y, H:i" }}</strong> to <strong>{{ reservation.finish_datetime|date:"d M Y, H:i" }}</strong>
+        {% endif %}
         <div style="font-size:0.78rem; color:var(--color-print-muted); margin-top:0.25rem;">
           Reserved: <strong>{{ reservation.effective_reserved_days }} day{{ reservation.effective_reserved_days|pluralize }}</strong> (24h/day after entry)
         </div>

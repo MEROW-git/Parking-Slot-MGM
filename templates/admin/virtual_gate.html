@@ -130,21 +130,79 @@
         <!-- Exit Settlement Actions (When Balance Is Due) -->
         {% if bill.balance_due and not gate_open and not passed %}
           <div class="vg-settlement-actions" id="vg-settlement-box">
-            <div class="vg-alert vg-alert-warning">
+            <div class="vg-alert vg-alert-warning" style="margin-bottom: 1rem;">
               <strong>Exit Payment Required:</strong> An outstanding balance of <strong>{{ bill.balance_due|floatformat:"0" }} KHR</strong> must be settled before opening the exit barrier.
             </div>
-            <div class="vg-settlement-buttons">
-              <button type="submit" name="action" value="settle" class="vg-btn vg-btn-primary" onclick="document.getElementById('payment-provider-input').value='CASH';">
-                Record Cash Settlement ({{ bill.balance_due|floatformat:"0" }} KHR)
-              </button>
-              {% if demo_enabled %}
-                <button type="submit" name="action" value="settle" class="vg-btn vg-btn-secondary" onclick="document.getElementById('payment-provider-input').value='DEMO';">
-                  Simulate Demo Exit Payment ({{ bill.balance_due|floatformat:"0" }} KHR)
+
+            <div class="vg-settlement-grid" style="display: flex; flex-direction: column; gap: 1rem;">
+              <!-- 1. Cash Settlement (Attendant Confirmation) -->
+              <div class="vg-settlement-card vg-cash-card" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <span style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">💵 Method 1: Cash Settlement</span>
+                  <span class="vg-badge badge-green" style="font-size: 0.75rem;">ATTENDANT VERIFIED</span>
+                </div>
+                <p style="font-size: 0.82rem; color: #94a3b8; margin: 0 0 0.75rem; line-height: 1.4;">
+                  Attendant verifies physical cash received in hand from driver. Confirms transaction and authorizes departure.
+                </p>
+                <button type="submit" name="action" value="settle" class="vg-btn vg-btn-primary" id="btn-confirm-cash" style="width: 100%; justify-content: center;" onclick="document.getElementById('payment-provider-input').value='CASH'; document.getElementById('demo-outcome-input').value='success';">
+                  Attendant Confirms Cash Received ({{ bill.balance_due|floatformat:"0" }} KHR)
                 </button>
+              </div>
+
+              <!-- 2. ABA QR — Demo Simulation -->
+              {% if demo_enabled %}
+                <div class="vg-settlement-card vg-demo-qr-card" style="background: rgba(15, 23, 42, 0.85); border: 2px dashed rgba(59, 130, 246, 0.5); border-radius: 8px; padding: 1rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <span style="background: #2563eb; color: white; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 4px;">
+                        ABA QR &mdash; DEMO
+                      </span>
+                      <span style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">Method 2: Simulated Mobile Payment</span>
+                    </div>
+                    <span style="font-size: 0.72rem; color: #94a3b8;">Ref: {{ demo_payment_ref }}</span>
+                  </div>
+
+                  <div style="display: flex; flex-direction: row; gap: 1rem; align-items: center; margin-bottom: 0.85rem; background: rgba(0,0,0,0.25); padding: 0.75rem; border-radius: 6px;">
+                    {% if demo_payment_qr %}
+                      <div style="background: white; padding: 6px; border-radius: 6px; display: inline-flex; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                        <img src="{{ demo_payment_qr }}" alt="Simulated ABA QR Payment" width="130" height="130" style="display: block;" id="vg-demo-qr-img">
+                      </div>
+                    {% endif %}
+                    <div style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+                      <div style="font-weight: 700; color: #60a5fa; margin-bottom: 0.25rem;">SIMULATED ABA QR &middot; DEVELOPMENT ONLY</div>
+                      <div>Amount: <strong style="color: #f8fafc; font-size: 1rem;">{{ bill.balance_due|floatformat:"0" }} KHR</strong></div>
+                      <div style="color: #94a3b8; font-size: 0.75rem; margin-top: 0.35rem;">
+                        ⚠️ This simulated QR uses <code>sompark:payment:demo:...</code> and is strictly separated from parking access passes. It will <strong>NOT</strong> initiate real bank transfers or debit accounts.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.5rem; font-weight: 600;">
+                    Simulation Controls (Test Gateway Outcomes):
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                    <button type="submit" name="action" value="settle" class="vg-btn vg-btn-success" id="btn-demo-qr-success" style="justify-content: center; font-size: 0.82rem; padding: 0.5rem 0.25rem;" onclick="document.getElementById('payment-provider-input').value='DEMO'; document.getElementById('demo-outcome-input').value='success';">
+                      ✓ Success
+                    </button>
+                    <button type="submit" name="action" value="settle" class="vg-btn vg-btn-secondary" id="btn-demo-qr-failure" style="justify-content: center; font-size: 0.82rem; padding: 0.5rem 0.25rem; color: #f87171; border-color: rgba(239, 68, 68, 0.4);" onclick="document.getElementById('payment-provider-input').value='DEMO'; document.getElementById('demo-outcome-input').value='failure';">
+                      ✕ Failure
+                    </button>
+                    <button type="submit" name="action" value="settle" class="vg-btn vg-btn-secondary" id="btn-demo-qr-cancel" style="justify-content: center; font-size: 0.82rem; padding: 0.5rem 0.25rem;" onclick="document.getElementById('payment-provider-input').value='DEMO'; document.getElementById('demo-outcome-input').value='cancel';">
+                      ⊘ Cancel
+                    </button>
+                  </div>
+                </div>
+              {% else %}
+                <div class="vg-alert vg-alert-info" style="font-size: 0.82rem;">
+                  <strong>Demo Payments Disabled:</strong> Simulated QR payments are disabled in system configuration (<code>DEMO_PAYMENT_ENABLED=False</code>). Use attendant cash settlement above or real gateway.
+                </div>
               {% endif %}
+
               <input type="hidden" name="payment_provider" id="payment-provider-input" value="CASH">
+              <input type="hidden" name="outcome" id="demo-outcome-input" value="success">
             </div>
-            <p class="vg-settlement-alt">
+
+            <p class="vg-settlement-alt" style="margin-top: 0.75rem;">
               Or open the <a href="{% url 'staff_gate_scanner' %}?zone_id={{ form.zone.value|default:reservation.parking_zone_id }}&token={{ reservation.ticket_code }}&mode=exit&return_to=virtual_gate" class="vg-inline-link">full staff payment terminal</a> to process external settlement and return here.
             </p>
           </div>

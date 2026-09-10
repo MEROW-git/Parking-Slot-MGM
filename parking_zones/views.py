@@ -17,7 +17,7 @@ from django.utils import timezone
 from .models import ParkingZone, Reservation, PaymentTransaction
 from .forms import ReservationForm
 from .services import BillingService, CapacityService, PaymentService, GateService, ExpiryService
-from .qr import generate_access_qr_base64, render_access_qr_response
+from .qr import generate_access_qr_base64, render_access_qr_response, generate_demo_payment_qr_base64
 from .payments import DemoPaymentAdapter
 
 
@@ -142,8 +142,8 @@ def booking(request):
                         # Pay at exit: 3-hour arrival hold
                         messages.success(
                             request,
-                            f'ចំណតត្រូវបានកក់ដោយជោគជ័យ! 3-hour arrival hold confirmed. '
-                            f'Ticket Code: {reservation.ticket_code}. Please arrive before deadline.'
+                            f'ចំណតត្រូវបានកក់ដោយជោគជ័យ! Enter within 3 hours after booking. Pay when you leave. '
+                            f'Ticket Code: {reservation.ticket_code}.'
                         )
                         return redirect('ticket_code', ticket_code=reservation.ticket_code)
 
@@ -181,7 +181,8 @@ def booking(request):
 def pay_deposit(request, ticket_code):
     """
     Deposit payment screen. Explains deposit policy, displays 15-minute timeout countdown,
-    and provides demo simulation buttons in development mode.
+    provides ABA QR demo simulation experience, and enforces that cash deposits must be
+    confirmed by parking staff (never a customer self-certification button).
     """
     reservation = get_object_or_404(Reservation, ticket_code=ticket_code)
 
@@ -196,15 +197,43 @@ def pay_deposit(request, ticket_code):
         messages.error(request, f'This reservation is {reservation.get_status_display().lower()}. Please book a new slot.')
         return redirect('book')
 
+    # Handle staff cash deposit confirmation or reject customer cash self-certification attempts
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'staff_confirm_cash':
+            if not request.user.is_staff:
+                raise PermissionDenied('Customers cannot self-confirm cash deposits. Cash must be verified by parking staff.')
+            success, msg = PaymentService.record_cash_deposit(reservation, staff_user=request.user)
+            if success:
+                messages.success(request, msg)
+                return redirect('ticket_code', ticket_code=reservation.ticket_code)
+            else:
+                messages.error(request, msg)
+                return redirect('pay_deposit', ticket_code=reservation.ticket_code)
+        elif 'cash' in (action or '').lower() or request.POST.get('payment_method') == 'CASH':
+            if not request.user.is_staff:
+                raise PermissionDenied('Customers cannot self-confirm cash deposits. Cash must be verified by parking staff.')
+
     txn = reservation.transactions.filter(purpose='DEPOSIT', status='PENDING').first()
     if not txn:
         txn = PaymentService.create_deposit_transaction(reservation)
+
+    demo_enabled = DemoPaymentAdapter.is_enabled()
+    demo_payment_qr = None
+    if txn and demo_enabled:
+        demo_payment_qr = generate_demo_payment_qr_base64(
+            reference=txn.provider_ref,
+            amount=int(txn.amount),
+            currency=txn.currency or 'KHR'
+        )
 
     context = {
         'reservation': reservation,
         'transaction': txn,
         'deposit_amount': reservation.daily_rate,
-        'demo_enabled': DemoPaymentAdapter.is_enabled(),
+        'demo_enabled': demo_enabled,
+        'demo_payment_qr': demo_payment_qr,
+        'demo_payment_ref': txn.provider_ref if txn else '',
         'title': f'Deposit Payment · Ticket #{reservation.ticket_code} | SomPark',
     }
     return render(request, 'parking_zones/pay_deposit.html', context)
@@ -353,6 +382,16 @@ def pay_exit(request, ticket_code):
 
     # GET REQUEST: Pure read-only view. No transaction creation or cancellation!
     existing_txn = reservation.transactions.filter(purpose='EXIT_BALANCE', status='PENDING').first()
+    demo_enabled = DemoPaymentAdapter.is_enabled()
+    demo_payment_qr = None
+    demo_ref = None
+    if bill['balance_due'] > 0 and demo_enabled:
+        demo_ref = existing_txn.transaction_reference if existing_txn else f"EXIT-{reservation.ticket_code}"
+        demo_payment_qr = generate_demo_payment_qr_base64(
+            reference=demo_ref,
+            amount=int(bill['balance_due']),
+            currency='KHR'
+        )
 
     context = {
         'reservation': reservation,
@@ -362,7 +401,9 @@ def pay_exit(request, ticket_code):
         'exit_window_minutes': exit_window_minutes,
         'is_exit_authorized': is_exit_authorized,
         'is_exit_window_expired': is_exit_window_expired,
-        'demo_enabled': DemoPaymentAdapter.is_enabled(),
+        'demo_enabled': demo_enabled,
+        'demo_payment_qr': demo_payment_qr,
+        'demo_payment_ref': demo_ref,
         'title': f'Pay & Prepare to Leave · Ticket #{reservation.ticket_code} | SomPark',
     }
     return render(request, 'parking_zones/pay_exit.html', context)
