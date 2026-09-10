@@ -250,26 +250,31 @@
           </div>
         {% endif %}
 
-        <!-- Passage Confirmation Actions (When Gate Is Open) -->
-        {% if gate_open %}
-          <div class="vg-pass-actions" id="vg-pass-actions-box">
-            <input type="hidden" name="permit" id="vg-permit-input" value="{{ permit }}">
-            <div class="vg-permit-banner" id="vg-permit-timer" role="status" data-expires-at="{{ permit_expires_at|default:'' }}">
-              Barrier is OPEN. Authorization permit valid for <span id="vg-timer-seconds">120</span>s.
-            </div>
-            <p class="vg-pass-note">
-              Re-checks ticket status, deadlines, and facility capacity atomically at passage confirmation before recording vehicle movement.
-            </p>
-            <div class="vg-pass-buttons">
-              <button type="submit" name="action" value="pass" class="vg-btn vg-btn-success" id="vg-pass">
-                Vehicle passed &mdash; close barrier
-              </button>
-              <button type="submit" name="action" value="close" class="vg-btn vg-btn-secondary" id="vg-close">
-                Close without passage
-              </button>
-            </div>
+        <!-- Passage Confirmation Actions (Always present in DOM; visible when gate is open) -->
+        <div class="vg-pass-actions" id="vg-pass-actions-box" {% if not gate_open %}style="display: none;"{% endif %}>
+          <input type="hidden" name="permit" id="vg-permit-input" value="{{ permit|default:'' }}">
+          <div class="vg-permit-banner" id="vg-permit-timer" role="status" data-expires-at="{{ permit_expires_at|default:'' }}">
+            Barrier is OPEN. Authorization permit valid for <span id="vg-timer-seconds">120</span>s.
           </div>
-        {% endif %}
+          <p class="vg-pass-note">
+            Re-checks ticket status, deadlines, and facility capacity atomically at passage confirmation before recording vehicle movement.
+          </p>
+          <div class="vg-pass-buttons">
+            <button type="submit" name="action" value="pass" class="vg-btn vg-btn-success vg-btn-pulse" id="vg-pass">
+              <span class="vg-btn-icon" aria-hidden="true">&#128663;</span>
+              <span id="vg-pass-text">
+                {% if form.mode.value == 'exit' %}
+                  Confirm Vehicle Departure &mdash; Close Barrier (ឡានចេញរួច)
+                {% else %}
+                  Confirm Vehicle Entry &mdash; Close Barrier (ឡានចូលរួច)
+                {% endif %}
+              </span>
+            </button>
+            <button type="submit" name="action" value="close" class="vg-btn vg-btn-secondary" id="vg-close">
+              Close without passage
+            </button>
+          </div>
+        </div>
 
         <!-- Exit Settlement Actions (When Balance Is Due and Plate Matched) -->
         {% if bill.balance_due and not gate_open and not passed and plate_matched != False %}
@@ -391,8 +396,14 @@
     <!-- Right Column: Animated Barrier & Live Telemetry -->
     <section class="vg-panel vg-display-panel" aria-labelledby="heading-barrier-telemetry">
       <div class="vg-panel-header">
-        <h2 id="heading-barrier-telemetry">Virtual Barrier &amp; Telemetry</h2>
-        <span class="vg-live-indicator" aria-label="System active"><span class="vg-live-dot"></span> LIVE</span>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <h2 id="heading-barrier-telemetry">Virtual Barrier &amp; Telemetry</h2>
+          <span class="vg-live-indicator" aria-label="System active"><span class="vg-live-dot"></span> LIVE</span>
+        </div>
+        <div class="vg-view-toggles" role="group" aria-label="Simulator View Mode">
+          <button type="button" class="vg-view-btn is-active" id="vg-view-btn-all" title="Full Roadway and Reservation Record">Roadway &amp; Record</button>
+          <button type="button" class="vg-view-btn" id="vg-view-btn-compact" title="Compact Roadway for maximized record view">Compact</button>
+        </div>
       </div>
 
       <!-- Animated SVG / CSS Barrier Scene -->
@@ -730,5 +741,5 @@
 
 <script id="vg-zones-info-data" type="application/json">{{ zones_info_json|safe }}</script>
 
-<script src="{% static 'js/virtual-gate.js' %}?v=2.2.2" defer></script>
+<script src="{% static 'js/virtual-gate.js' %}?v=2.2.3" defer></script>
 {% endblock %}

@@ -5,7 +5,7 @@
 {% block content %}
 {% include "components/page_header.html" with title=parking_zone.name subtitle=parking_zone.address khmer_tag=parking_zone.khmer_name %}
 
-<div style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:2rem;" id="zone-detail-grid">
+<div style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:2rem; align-items:start;" id="zone-detail-grid">
   <!-- Left Column: Overview & Availability -->
   <div>
     <!-- Availability Card -->
@@ -66,8 +66,8 @@
   </div>
 
   <!-- Right Column: Booking Card -->
-  <div>
-    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard-lg); position:sticky; top:100px;">
+  <div style="position:-webkit-sticky; position:sticky; top:100px; align-self:start;">
+    <div style="background:var(--sp-surface); border:2px solid var(--sp-border-strong); padding:2rem; box-shadow:var(--sp-shadow-hard-lg); margin-bottom:0;">
       <div style="border-bottom:2px solid var(--sp-border); padding-bottom:1.25rem; margin-bottom:1.25rem;">
         <div style="font-size:0.85rem; font-weight:700; color:var(--sp-text-subtle); text-transform:uppercase;">Daily Rate</div>
         <div style="font-size:2.25rem; font-weight:800; font-family:var(--sp-font-mono); color:var(--sp-text);">

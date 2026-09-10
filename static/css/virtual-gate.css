@@ -65,6 +65,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
+  align-items: start;
 }
 .vg-panel {
   border: 1px solid var(--hairline-color, #e0e0e0);
@@ -73,6 +74,86 @@
   background: var(--body-bg, #ffffff);
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   min-width: 0;
+}
+
+/* Sticky Right Column (Virtual Barrier, Live Telemetry, and Reservation Record) */
+.vg-display-panel {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+.vg-display-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.vg-display-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.vg-display-panel::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
+}
+.vg-display-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+
+@media (max-width: 900px) {
+  .vg-layout {
+    grid-template-columns: 1fr;
+  }
+  .vg-display-panel {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+/* View Mode Toggles in Panel Header */
+.vg-view-toggles {
+  display: inline-flex;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.vg-view-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.vg-view-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+}
+.vg-view-btn.is-active {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Glowing Pulse for Open Passage Confirmation Button */
+.vg-btn-pulse {
+  animation: vg-pulse-glow 2s infinite;
+}
+@keyframes vg-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
 }
 .vg-panel-header {
   display: flex;
@@ -404,12 +485,36 @@
 /* Animated CSS Barrier Scene */
 .vg-scene {
   position: relative;
-  height: 440px;
+  height: 340px;
   border-radius: 8px;
   overflow: hidden;
   background: #0b0f19;
   border: 2px solid #1e293b;
   margin-bottom: 14px;
+  transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vg-scene.is-compact {
+  height: 120px;
+}
+.vg-scene.is-compact .vg-road {
+  top: -110px;
+}
+.vg-scene.is-compact .vg-machine {
+  top: 15px;
+}
+.vg-scene.is-compact .vg-arm {
+  top: 30px;
+}
+.vg-scene.is-compact .vg-anpr-camera-unit {
+  top: 8px;
+  transform: scale(0.8);
+}
+.vg-scene.is-compact[data-direction="entry"] .vg-car-track {
+  top: 75px;
+}
+.vg-scene.is-compact[data-direction="exit"] .vg-car-track {
+  top: 15px;
 }
 .vg-sky {
   position: absolute;
@@ -560,7 +665,7 @@
 
 /* Direction: Entrance (Bottom to Top) */
 .vg-scene[data-direction="entry"] .vg-car-track {
-  top: 300px;
+  top: 240px;
   transform: translateY(0);
 }
 .vg-scene[data-direction="entry"] .vg-car {
@@ -568,12 +673,12 @@
 }
 .vg-scene[data-direction="entry"].is-moving .vg-car-track,
 .vg-scene[data-direction="entry"].is-passed .vg-car-track {
-  transform: translateY(-380px);
+  transform: translateY(-320px);
 }
 
 /* Direction: Exit (Top to Bottom) */
 .vg-scene[data-direction="exit"] .vg-car-track {
-  top: 60px;
+  top: 40px;
   transform: translateY(0);
 }
 .vg-scene[data-direction="exit"] .vg-car {
@@ -581,7 +686,7 @@
 }
 .vg-scene[data-direction="exit"].is-moving .vg-car-track,
 .vg-scene[data-direction="exit"].is-passed .vg-car-track {
-  transform: translateY(380px);
+  transform: translateY(320px);
 }
 
 /* Mobile Responsive Scene Adjustment */
@@ -1020,6 +1125,11 @@
   padding: 16px;
 }
 .vg-telemetry-heading {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  background: inherit;
+  z-index: 4;
   margin: 0 0 12px 0;
   font-size: 15px;
   font-weight: 700;

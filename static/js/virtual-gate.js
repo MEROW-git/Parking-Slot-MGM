@@ -17,14 +17,31 @@
   const form = document.getElementById('gate-machine-form');
   const zoneSelect = document.getElementById('id_zone') || document.querySelector('select[name="zone"]');
   const modeRadios = document.querySelectorAll('input[name="mode"]');
+  const checkBtn = document.getElementById('btn-check-open');
+  const reopenBtn = document.getElementById('btn-reopen-barrier');
 
   const permitSecondsEl = document.getElementById('vg-timer-seconds');
   const permitTimerBanner = document.getElementById('vg-permit-timer');
   const passBtn = document.getElementById('vg-pass');
+  const passText = document.getElementById('vg-pass-text');
   const closeBtn = document.getElementById('vg-close');
   const sceneEl = document.getElementById('vg-scene-viewport');
   const statusBanner = document.getElementById('vg-gate-status-banner');
   const statusText = document.getElementById('vg-status-text');
+
+  function updateGateDirection() {
+    const selectedMode = document.querySelector('input[name="mode"]:checked')?.value || 'entry';
+    if (sceneEl) {
+      sceneEl.dataset.direction = selectedMode;
+    }
+    if (passText) {
+      if (selectedMode === 'exit') {
+        passText.innerHTML = 'Confirm Vehicle Departure &mdash; Close Barrier (ឡានចេញរួច)';
+      } else {
+        passText.innerHTML = 'Confirm Vehicle Entry &mdash; Close Barrier (ឡានចូលរួច)';
+      }
+    }
+  }
 
   let stream = null;
   let scanning = false;
@@ -364,7 +381,6 @@
   const anprUnit = document.getElementById('vg-anpr-camera-unit');
   const anprHudText = document.getElementById('vg-anpr-hud-text');
   const carPlateEl = document.getElementById('vg-car-plate');
-  const checkBtn = document.getElementById('btn-check-open');
   const detectedPlateInput = document.getElementById('vg-detected-plate-input');
   const customPlateInput = document.getElementById('custom-detected-plate-input');
   const mismatchCb = document.getElementById('simulate-plate-mismatch-cb');
@@ -510,8 +526,6 @@
       // Immediate guard against re-entry while in-flight or animating
       if (isCrossing || isPassageInFlight) return;
       isPassageInFlight = true;
-
-      const checkBtn = document.getElementById('btn-check-open');
 
       // 1. CRITICAL: Snapshot FormData BEFORE disabling any form controls!
       // In HTML standard, disabled form elements are omitted from FormData.
@@ -904,9 +918,11 @@
     updateWalkinFacilityDisplay();
   }
 
-  // Update card visibility on gate direction change (Entrance / Exit)
+  // Update card visibility & simulator direction on gate mode change (Entrance / Exit)
+  updateGateDirection();
   modeRadios.forEach(radio => {
     radio.addEventListener('change', () => {
+      updateGateDirection();
       if (walkinCard) {
         if (radio.value === 'entry' && (!codeInput || !codeInput.value.trim())) {
           walkinCard.style.display = 'block';
@@ -1016,6 +1032,7 @@
           if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
           startPermitCountdown();
 
+          updateGateDirection();
           const passBox = document.getElementById('vg-pass-actions-box');
           if (passBox) passBox.style.display = 'block';
 
@@ -1148,7 +1165,8 @@
         if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
         startPermitCountdown();
 
-        // Show passage actions
+        // Show passage actions with correct direction label
+        updateGateDirection();
         const passBox = document.getElementById('vg-pass-actions-box');
         if (passBox) passBox.style.display = 'block';
 
@@ -1209,6 +1227,105 @@
       e.preventDefault();
       handleExitSettlement('DEMO', 'cancel');
     });
+  }
+
+  // Reopen Barrier Action Handler (When settled and barrier needs to reopen for exit)
+  if (reopenBtn && form) {
+    reopenBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      reopenBtn.disabled = true;
+
+      const formData = new FormData(form);
+      formData.set('action', 'open');
+
+      try {
+        const postUrl = form.getAttribute('action') || window.location.pathname || window.location.href;
+        const resp = await fetch(postUrl, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formData
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.success && data.gate_open) {
+          if (sceneEl) {
+            sceneEl.classList.add('is-open');
+            sceneEl.classList.remove('is-passed');
+          }
+          if (statusBanner && statusText) {
+            statusBanner.className = 'vg-status-indicator status-open';
+            statusText.textContent = 'BARRIER OPEN — WAITING FOR VEHICLE';
+          }
+          const reopenBox = document.getElementById('vg-reopen-box');
+          if (reopenBox) reopenBox.style.display = 'none';
+
+          const permitInput = document.getElementById('vg-permit-input');
+          if (permitInput) permitInput.value = data.permit;
+          if (permitTimerBanner) permitTimerBanner.dataset.expiresAt = data.permit_expires_at;
+          startPermitCountdown();
+
+          updateGateDirection();
+          const passBox = document.getElementById('vg-pass-actions-box');
+          if (passBox) passBox.style.display = 'block';
+
+          let noticeBox = document.querySelector('.vg-notice');
+          if (!noticeBox && statusBanner && statusBanner.parentNode) {
+            noticeBox = document.createElement('div');
+            statusBanner.parentNode.insertBefore(noticeBox, statusBanner.nextSibling);
+          }
+          if (noticeBox) {
+            noticeBox.className = 'vg-notice is-success';
+            noticeBox.textContent = data.notice || 'Barrier is OPEN — waiting for vehicle to pass.';
+          }
+        } else {
+          // If server rejects or non-JSON, submit standard form
+          const actionInput = document.createElement('input');
+          actionInput.type = 'hidden';
+          actionInput.name = 'action';
+          actionInput.value = 'open';
+          form.appendChild(actionInput);
+          form.submit();
+        }
+      } catch (err) {
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'open';
+        form.appendChild(actionInput);
+        form.submit();
+      } finally {
+        reopenBtn.disabled = false;
+      }
+    });
+  }
+
+  // View Mode Toggles (Roadway & Record vs Compact)
+  const viewBtnAll = document.getElementById('vg-view-btn-all');
+  const viewBtnCompact = document.getElementById('vg-view-btn-compact');
+  if (viewBtnAll && viewBtnCompact && sceneEl) {
+    viewBtnCompact.addEventListener('click', () => {
+      sceneEl.classList.add('is-compact');
+      viewBtnCompact.classList.add('is-active');
+      viewBtnAll.classList.remove('is-active');
+      try { localStorage.setItem('sompark_vg_view', 'compact'); } catch (_) {}
+    });
+    viewBtnAll.addEventListener('click', () => {
+      sceneEl.classList.remove('is-compact');
+      viewBtnAll.classList.add('is-active');
+      viewBtnCompact.classList.remove('is-active');
+      try { localStorage.setItem('sompark_vg_view', 'all'); } catch (_) {}
+    });
+
+    try {
+      if (localStorage.getItem('sompark_vg_view') === 'compact') {
+        sceneEl.classList.add('is-compact');
+        viewBtnCompact.classList.add('is-active');
+        viewBtnAll.classList.remove('is-active');
+      }
+    } catch (_) {}
   }
 
   // Cleanup on page hide or navigate away
