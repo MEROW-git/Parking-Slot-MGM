@@ -1,0 +1,42 @@
+<dialog
+  id="reservation-cancel-dialog"
+  class="sp-dialog"
+  closedby="any"
+  aria-labelledby="reservation-cancel-dialog-title"
+  aria-describedby="reservation-cancel-dialog-message"
+>
+  <div class="sp-dialog-box" role="document">
+    <div class="sp-dialog-header">
+      <div class="sp-dialog-icon" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <div>
+        <h2 id="reservation-cancel-dialog-title" class="sp-dialog-title">
+          Cancel this reservation?
+        </h2>
+        <span class="sp-dialog-subtitle">បញ្ជាក់ការបោះបង់ការកក់</span>
+      </div>
+    </div>
+
+    <div class="sp-dialog-body">
+      <p id="reservation-cancel-dialog-message" class="sp-dialog-message">
+        Reservation <strong id="reservation-cancel-ticket" class="sp-dialog-ticket-highlight"></strong>
+        <span id="reservation-cancel-zone-wrap">at <strong id="reservation-cancel-zone"></strong></span>
+        will be cancelled and its held parking space will be released. Its gate pass can no longer be used.
+      </p>
+    </div>
+
+    <div class="sp-dialog-actions">
+      <button type="button" class="sp-btn sp-btn-secondary" id="reservation-cancel-no">
+        No, keep reservation
+      </button>
+      <button type="button" class="sp-btn sp-btn-destructive" id="reservation-cancel-yes">
+        Yes, cancel reservation
+      </button>
+    </div>
+  </div>
+</dialog>

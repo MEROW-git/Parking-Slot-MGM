@@ -172,7 +172,7 @@
 
     <!-- Cancel Reservation Action -->
     <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--color-surface-2); padding-top:1.25rem;">
-      <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" onsubmit="return confirm('Are you sure you want to release this parking hold?');">
+      <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" data-cancel-confirm data-ticket-code="{{ reservation.ticket_code }}" data-zone-name="{{ reservation.parking_zone.name }}">
         {% csrf_token %}
         <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#ef4444;" id="btn-cancel-deposit-hold">
           ✕ Cancel Booking & Release Hold

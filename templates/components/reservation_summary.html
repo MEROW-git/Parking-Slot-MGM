@@ -41,7 +41,7 @@ Usage:
         </button>
       </form>
     {% elif allow_checkout and reservation.status == 'CONFIRMED' %}
-      <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" class="sp-inline-form" id="form-cancel-banner" onsubmit="return confirm('Cancel this parking hold?');">
+      <form action="{% url 'cancel_booking' reservation.ticket_code %}" method="post" class="sp-inline-form" id="form-cancel-banner" data-cancel-confirm data-ticket-code="{{ reservation.ticket_code }}" data-zone-name="{{ reservation.parking_zone.name }}">
         {% csrf_token %}
         <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#f87171;" id="btn-cancel-banner">
           Cancel

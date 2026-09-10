@@ -185,6 +185,12 @@ class UserAuthenticationTests(TestCase):
         self.assertContains(response, 'Central Promenade Lot')
         self.assertContains(response, '2AZ-9999')
         self.assertContains(response, 'CURRENT ACTIVE SESSION')
+        # Cancellation uses the branded Yes/No dialog, not window.confirm().
+        self.assertContains(response, 'id="reservation-cancel-dialog"')
+        self.assertContains(response, 'data-cancel-confirm')
+        self.assertContains(response, 'No, keep reservation')
+        self.assertContains(response, 'Yes, cancel reservation')
+        self.assertNotContains(response, "return confirm(")
         # 3. Quick actions
         self.assertContains(response, 'Find parking')
         self.assertContains(response, 'Reserve a space')

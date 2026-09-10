@@ -129,7 +129,7 @@
               </button>
             </form>
           {% else %}
-            <form action="{% url 'cancel_booking' active_reservation.ticket_code %}" method="post" class="sp-inline-form" id="form-active-cancel" onsubmit="return confirm('Cancel this parking hold?');">
+            <form action="{% url 'cancel_booking' active_reservation.ticket_code %}" method="post" class="sp-inline-form" id="form-active-cancel" data-cancel-confirm data-ticket-code="{{ active_reservation.ticket_code }}" data-zone-name="{{ active_reservation.parking_zone.name }}">
               {% csrf_token %}
               <button type="submit" class="sp-btn sp-btn-secondary sp-btn-sm" style="color:#f87171;" id="btn-active-cancel">
                 Cancel
