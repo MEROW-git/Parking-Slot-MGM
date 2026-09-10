@@ -4,7 +4,8 @@
 {% block title %}Pay Deposit · Ticket #{{ reservation.ticket_code }} | SomPark Phnom Penh{% endblock %}
 
 {% block content %}
-{% include "components/page_header.html" with title="Complete Deposit Payment" subtitle="Lock in your guaranteed parking space by paying the first day's deposit" khmer_tag="ទូទាត់ប្រាក់កក់ថ្ងៃដំបូង" %}
+{% url 'ticket_code' ticket_code=reservation.ticket_code as ticket_url %}
+{% include "components/page_header.html" with title="Complete Deposit Payment" subtitle="Lock in your guaranteed parking space by paying the first day's deposit" khmer_tag="ទូទាត់ប្រាក់កក់ថ្ងៃដំបូង" back_url=ticket_url back_label="Ticket details" back_khmer="ព័ត៌មានសំបុត្រ" back_id="btn-back-ticket" %}
 
 <div class="sp-booking-container" style="max-width: 680px; margin-inline: auto;" id="pay-deposit-container">
   <!-- Payment Timeout Countdown Banner -->

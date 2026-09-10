@@ -1,8 +1,11 @@
 {% comment %}
 Usage:
-{% include "components/page_header.html" with title="Book Parking Spot" subtitle="Reserve your slot in central Phnom Penh" khmer_tag="កក់កន្លែងចំណត" %}
+{% include "components/page_header.html" with title="Book Parking Spot" subtitle="Reserve your slot in central Phnom Penh" khmer_tag="កក់កន្លែងចំណត" back_url=url back_label="Find parking" back_khmer="ស្វែងរកចំណត" %}
 {% endcomment %}
 <header class="sp-page-header" id="page-header" data-reveal="up">
+  {% if back_url %}
+    {% include "components/back_link.html" with url=back_url label=back_label khmer=back_khmer confirm_unsaved=confirm_unsaved id=back_id %}
+  {% endif %}
   {% if khmer_tag %}
     <div class="sp-page-khmer">
       {{ khmer_tag }}

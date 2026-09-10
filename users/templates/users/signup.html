@@ -4,6 +4,8 @@
 
 {% block content %}
 <div class="sp-auth-container" id="signup-container">
+  {% url 'login' as login_url %}
+  {% include "components/back_link.html" with url=login_url label="Sign in" khmer="ចូលប្រើប្រាស់" id="btn-back-login" %}
   <div class="sp-auth-card" data-reveal="up">
     <div class="sp-auth-header">
       <div class="sp-brand" aria-label="SomPark Phnom Penh">

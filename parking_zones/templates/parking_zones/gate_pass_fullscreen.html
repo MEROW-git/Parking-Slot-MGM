@@ -39,15 +39,28 @@
     .btn-gate-close {
       background: #f1f5f9;
       border: 1px solid #cbd5e1;
-      color: #334155;
-      padding: 0.5rem 1rem;
+      color: #0f172a;
+      min-height: 44px;
+      min-width: 44px;
+      padding: 0.5rem 1.15rem;
       border-radius: 999px;
-      font-size: 0.85rem;
-      font-weight: 600;
+      font-size: 0.88rem;
+      font-weight: 700;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn-gate-close:hover {
+      background: #e2e8f0;
+      border-color: #94a3b8;
+      color: #0f172a;
+    }
+    .btn-gate-close:focus-visible {
+      outline: 3px solid #2563eb;
+      outline-offset: 2px;
     }
     .gate-facility-title {
       font-size: 1.2rem;
@@ -121,8 +134,9 @@
 </head>
 <body>
   <div class="gate-top-bar">
-    <a href="{% url 'ticket_code' reservation.ticket_code %}" class="btn-gate-close" id="btn-gate-back">
-      ← Close Pass
+    <a href="{% url 'ticket_code' reservation.ticket_code %}" class="btn-gate-close" id="btn-gate-back" aria-label="Close pass and return to ticket details">
+      <span aria-hidden="true">&larr;</span>
+      <span>Close pass <small style="font-weight: 500; opacity: 0.85;">(ត្រឡប់ទៅសំបុត្រ)</small></span>
     </a>
     <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; letter-spacing: 0.08em;">
       SOMPARK GATE PASS

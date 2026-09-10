@@ -7,11 +7,8 @@
 <div class="sp-pay-exit-container" id="pay-exit-page-container">
 
   <!-- 1. Back to ticket -->
-  <div class="sp-ticket-nav-bar no-print" id="pay-exit-nav-bar" data-reveal="up" style="margin-bottom: var(--space-sm);">
-    <a href="{% url 'ticket_code' reservation.ticket_code %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-back-to-ticket">
-      &larr; Back to ticket (ត្រឡប់ទៅសំបុត្រ)
-    </a>
-  </div>
+  {% url 'ticket_code' reservation.ticket_code as ticket_url %}
+  {% include "components/back_link.html" with url=ticket_url label="Back to ticket" khmer="ត្រឡប់ទៅសំបុត្រ" id="btn-back-to-ticket" %}
 
   <div class="sp-pay-exit-card" data-reveal="up">
     <!-- 2. Pay before you leave heading & facility/plate -->

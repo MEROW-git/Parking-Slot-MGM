@@ -18,9 +18,8 @@
       </p>
     </div>
     <div class="sp-admin-header-actions">
-      <a href="{% url 'admin_dashboard' %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-return-admin-dash">
-        ← Operations Dashboard
-      </a>
+      {% url 'admin_dashboard' as admin_dash_url %}
+      {% include "components/back_link.html" with url=admin_dash_url label="Operations dashboard" khmer="ផ្ទាំងគ្រប់គ្រងបុគ្គលិក" id="btn-return-admin-dash" %}
     </div>
   </header>
 

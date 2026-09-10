@@ -1,0 +1,18 @@
+{% comment %}
+SomPark Reusable Back Navigation Link
+Provides accessible, visible Back navigation above page headers/cards.
+Enforces at least 44x44px touch target, visible keyboard focus, and safe explicit routes.
+Usage:
+{% include "components/back_link.html" with url=target_url label="Find parking" khmer="ស្វែងរកចំណត" id="btn-back-find-parking" confirm_unsaved=False %}
+{% endcomment %}
+<nav class="sp-back-nav no-print" aria-label="Page navigation back link">
+  <a href="{{ url }}" class="sp-back-link" id="{{ id|default:'btn-back-nav' }}" {% if confirm_unsaved %}data-confirm-unsaved="true"{% endif %}>
+    <span class="sp-back-icon" aria-hidden="true">&larr;</span>
+    <span class="sp-back-label">
+      <span class="sp-back-text">{{ label }}</span>
+      {% if khmer %}
+        <span class="sp-back-khmer">({{ khmer }})</span>
+      {% endif %}
+    </span>
+  </a>
+</nav>

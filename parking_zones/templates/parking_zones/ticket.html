@@ -6,12 +6,9 @@
 {% block content %}
 <div class="sp-ticket-page-container" id="ticket-page-container">
 
-  <!-- 1. Ticket History Navigation Link (Left-aligned) -->
-  <div class="no-print sp-ticket-nav-bar" id="ticket-nav-bar" data-reveal="up">
-    <a href="{% url 'all_tickets' %}" class="sp-btn sp-btn-secondary sp-btn-sm" id="btn-back-history">
-      ← Ticket History (ប្រវត្តិកក់)
-    </a>
-  </div>
+  <!-- 1. Ticket Navigation Link (My tickets) -->
+  {% url 'all_tickets' as all_tickets_url %}
+  {% include "components/back_link.html" with url=all_tickets_url label="My tickets" khmer="សំបុត្ររបស់ខ្ញុំ" id="btn-back-history" %}
 
   <!-- 2. State-Driven Action Buttons (Centered) -->
   <div class="no-print sp-ticket-actions-bar" id="ticket-actions-bar" data-reveal="up">

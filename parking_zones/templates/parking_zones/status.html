@@ -40,7 +40,8 @@
 {% endblock %}
 
 {% block content %}
-{% include "components/page_header.html" with title=parking_zone.name subtitle=parking_zone.address khmer_tag=parking_zone.khmer_name %}
+{% url 'home' as home_url %}
+{% include "components/page_header.html" with title=parking_zone.name subtitle=parking_zone.address khmer_tag=parking_zone.khmer_name back_url=home_url|add:"#parking-zones" back_label="Find parking" back_khmer="ស្វែងរកចំណត" back_id="btn-back-find-parking" %}
 
 <div class="sp-zone-detail-grid" id="zone-detail-grid">
   <!-- Left Column: Overview & Availability -->

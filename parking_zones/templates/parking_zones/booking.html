@@ -3,7 +3,13 @@
 {% block title %}Reserve Parking Spot | SomPark Phnom Penh{% endblock %}
 
 {% block content %}
-{% include "components/page_header.html" with title="Reserve a Parking Slot" subtitle="Guaranteed parking space in central Phnom Penh with real-time capacity hold" khmer_tag="កក់កន្លែងចំណតទុកជាមុន" %}
+{% if selected_zone %}
+  {% url 'zone_detail' slug=selected_zone.slug as facility_url %}
+  {% include "components/page_header.html" with title="Reserve a Parking Slot" subtitle="Guaranteed parking space in central Phnom Penh with real-time capacity hold" khmer_tag="កក់កន្លែងចំណតទុកជាមុន" back_url=facility_url back_label=selected_zone.name back_khmer=selected_zone.khmer_name|default:"ទីតាំងចំណត" confirm_unsaved=True back_id="btn-back-facility" %}
+{% else %}
+  {% url 'home' as home_url %}
+  {% include "components/page_header.html" with title="Reserve a Parking Slot" subtitle="Guaranteed parking space in central Phnom Penh with real-time capacity hold" khmer_tag="កក់កន្លែងចំណតទុកជាមុន" back_url=home_url|add:"#parking-zones" back_label="Find parking" back_khmer="ស្វែងរកចំណត" confirm_unsaved=True back_id="btn-back-facility" %}
+{% endif %}
 
 <div class="sp-booking-container" id="booking-container">
   {% if active_reservation %}

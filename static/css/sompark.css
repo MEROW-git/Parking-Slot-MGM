@@ -1344,7 +1344,110 @@ input[type="date"]::-webkit-calendar-picker-indicator:focus-visible {
   font-size: var(--text-xs);
 }
 
-.sp-field-help { color: var(--color-muted); }
+/* ==========================================================================
+   SomPark Universal Back Navigation Link
+   Enforces at least 44x44px touch targets, visible keyboard focus, safe clearance
+   from sticky navbar, and clean bilingual Khmer/English typography.
+   ========================================================================== */
+.sp-back-nav {
+  display: flex;
+  align-items: center;
+  margin-block-end: var(--space-xs);
+  scroll-margin-top: calc(5.5rem + 1rem);
+}
+
+.sp-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs, 0.5rem);
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--color-paper-2, #f8fafc);
+  border: var(--rule-hair, 1px) solid var(--color-rule, #e2e8f0);
+  color: var(--color-ink, #0f172a);
+  font-family: var(--font-body);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.35;
+  box-sizing: border-box;
+  scroll-margin-top: calc(5.5rem + 1rem);
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sp-back-link:hover {
+  background: var(--color-paper-hover, #f1f5f9);
+  border-color: var(--color-accent, #2563eb);
+  color: var(--color-ink-vibrant, #000000);
+  box-shadow: var(--shadow-fine, 0 1px 3px rgba(0,0,0,0.05));
+  transform: translateX(-2px);
+}
+
+.sp-back-link:focus-visible {
+  outline: 3px solid var(--color-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+.sp-back-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.sp-back-link:hover .sp-back-icon {
+  transform: translateX(-3px);
+}
+
+.sp-back-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.sp-back-text {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sp-back-khmer {
+  font-family: var(--font-khmer, "Noto Sans Khmer", sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-ink-2, #475569);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.sp-auth-container .sp-back-nav {
+  width: 100%;
+  max-width: 480px;
+  margin-inline: auto;
+  margin-block-end: var(--space-sm);
+}
+
+.sp-ticket-page-container > .sp-back-nav {
+  margin-block-end: var(--space-sm);
+}
+
+/* Scroll clearance so fixed/sticky navbar never obscures heading or Back link */
+.sp-page-header,
+.sp-back-nav,
+.sp-back-link,
+[id="parking-zones"],
+[id="page-header"] {
+  scroll-margin-top: calc(5.5rem + 1rem);
+}
 
 .sp-page-header {
   display: grid;
