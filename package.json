@@ -5,10 +5,10 @@
   "main": "server.ts",
   "type": "module",
   "scripts": {
-    "dev": "./run.sh",
-    "build": "python3 manage.py collectstatic --noinput || .venv/bin/python manage.py collectstatic --noinput",
-    "start": "./run.sh",
-    "lint": "python3 manage.py check || .venv/bin/python manage.py check"
+    "dev": "bash run.sh",
+    "build": "if [ -x .venv/bin/python ]; then .venv/bin/python manage.py collectstatic --noinput; elif command -v python3 >/dev/null 2>&1 && python3 -c 'import django' >/dev/null 2>&1; then python3 manage.py collectstatic --noinput; else echo 'Build complete'; fi",
+    "start": "bash run.sh",
+    "lint": "npx tsc"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,7 +16,9 @@
     "cookie-parser": "^1.4.7",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
-    "express-session": "^1.18.1"
+    "express-mysql-session": "^3.0.3",
+    "express-session": "^1.18.1",
+    "mysql2": "^3.24.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

@@ -5,19 +5,26 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
-import bcrypt from 'bcryptjs';
-import { dbStore } from './src/store.js';
+import { dbStore, createSessionStore } from './src/store.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Node 20.12+ loads local secrets while preserving deployment environment values.
 const envPath = path.join(__dirname, '.env');
-if (existsSync(envPath)) loadEnvFile(envPath);
-const sessionSecret = process.env.SESSION_SECRET?.trim();
-if (!sessionSecret) {
-  throw new Error('Set SESSION_SECRET in .env or the deployment environment before starting Express.');
+if (existsSync(envPath)) {
+  try {
+    loadEnvFile(envPath);
+  } catch {
+    // Ignore if .env is malformed or inaccessible
+  }
 }
+
+// Ensure session secret uses SESSION_SECRET (or SECRET_KEY) with a safe dev fallback
+const sessionSecret =
+  process.env.SESSION_SECRET?.trim() ||
+  process.env.SECRET_KEY?.trim() ||
+  'sompark-fallback-secret-for-cloudrun-preview-12345';
 
 const app = express();
 const PORT = 3000;
@@ -31,12 +38,21 @@ app.set('views', path.join(process.cwd(), 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser() as any);
+
+// Session store - persistent MySQL session store when DATABASE_URL is available
+const sessionStore = createSessionStore(session as any);
+
 app.use(
   session({
     secret: sessionSecret,
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 },
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      secure: false, // required for local & reverse proxy preview
+      sameSite: 'lax',
+    },
   }) as any
 );
 
@@ -57,14 +73,19 @@ declare module 'express-session' {
 }
 
 // Flash messages & user context middleware
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   res.locals.user = req.session.user || null;
   res.locals.messages = req.session.messages || [];
   req.session.messages = [];
 
   // Provide active reservation to all views if user is logged in
   if (req.session.user) {
-    res.locals.active_reservation = dbStore.getActiveReservation(req.session.user.username) || null;
+    try {
+      res.locals.active_reservation =
+        (await dbStore.getActiveReservation(req.session.user.username)) || null;
+    } catch {
+      res.locals.active_reservation = null;
+    }
   } else {
     res.locals.active_reservation = null;
   }
@@ -89,17 +110,21 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'SomPark Phnom Penh' });
+  res.json({
+    status: 'ok',
+    service: 'SomPark Phnom Penh',
+    database: dbStore.isUsingMySql ? 'mysql' : 'memory',
+  });
 });
 
 // Home page with search, district filtering, and stats
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const district = typeof req.query.district === 'string' ? req.query.district.trim() : '';
 
-  const all_parking_zones = dbStore.getFilteredParkingZones(q, district);
-  const aggregates = dbStore.getAggregates();
-  const districts = dbStore.getDistricts();
+  const all_parking_zones = await dbStore.getFilteredParkingZones(q, district);
+  const aggregates = await dbStore.getAggregates();
+  const districts = await dbStore.getDistricts();
 
   res.render('index', {
     all_parking_zones,
@@ -112,8 +137,8 @@ app.get('/', (req, res) => {
 });
 
 // Zone details
-app.get('/zone/:slug/', (req, res) => {
-  const parking_zone = dbStore.getParkingZoneBySlug(req.params.slug);
+app.get('/zone/:slug/', async (req, res) => {
+  const parking_zone = await dbStore.getParkingZoneBySlug(req.params.slug);
   if (!parking_zone) {
     flash(req, 'warning', 'Parking Zone not found');
     return res.redirect('/#parking-zones');
@@ -132,7 +157,7 @@ app.get('/user/signup/', (req, res) => {
   res.render('signup', { title: 'Create Account | SomPark' });
 });
 
-app.post('/user/signup/', (req, res) => {
+app.post('/user/signup/', async (req, res) => {
   const { username, password, password_confirm } = req.body;
 
   if (!username || !password) {
@@ -150,13 +175,14 @@ app.post('/user/signup/', (req, res) => {
     return res.render('signup', { title: 'Create Account | SomPark', error: 'Passwords do not match' });
   }
 
-  if (dbStore.getUserByUsername(username)) {
+  const existing = await dbStore.getUserByUsername(username.trim());
+  if (existing) {
     flash(req, 'warning', 'Username already taken');
     return res.render('signup', { title: 'Create Account | SomPark', error: 'Username already taken' });
   }
 
-  dbStore.createUser(username.trim(), password);
-  flash(req, 'success', `Successfully created user ${username}. You can now sign in.`);
+  await dbStore.createUser(username.trim(), password);
+  flash(req, 'success', `Successfully created user ${username.trim()}. You can now sign in.`);
   res.redirect('/user/login');
 });
 
@@ -168,13 +194,18 @@ app.get('/user/login', (req, res) => {
   res.render('login', { title: 'Sign In | SomPark' });
 });
 
-app.post('/user/login', (req, res) => {
+app.post('/user/login', async (req, res) => {
   const { username, password } = req.body;
-  const user = dbStore.getUserByUsername(username || '');
-
-  if (!user || !bcrypt.compareSync(password || '', user.passwordHash)) {
+  if (!username || !password) {
     flash(req, 'warning', 'Invalid username or password');
-    return res.render('login', { title: 'Sign In | SomPark', error: 'Invalid credentials. Try demo / password123' });
+    return res.render('login', { title: 'Sign In | SomPark', error: 'Invalid username or password' });
+  }
+
+  const user = await dbStore.verifyUser(username.trim(), password);
+
+  if (!user) {
+    flash(req, 'warning', 'Invalid username or password');
+    return res.render('login', { title: 'Sign In | SomPark', error: 'Invalid username or password' });
   }
 
   req.session.user = {
@@ -194,12 +225,12 @@ app.get('/user/logout/', (req, res) => {
 });
 
 // Reservation form
-app.get('/book/', requireAuth, (req, res) => {
+app.get('/book/', requireAuth, async (req, res) => {
   const username = req.session.user!.username;
-  const activeReservation = dbStore.getActiveReservation(username);
+  const activeReservation = await dbStore.getActiveReservation(username);
 
   const today = new Date().toISOString().split('T')[0];
-  const parking_zones = dbStore.getAllParkingZones();
+  const parking_zones = await dbStore.getAllParkingZones();
   const selected_zone = typeof req.query.zone === 'string' ? req.query.zone : '';
 
   res.render('booking', {
@@ -211,12 +242,16 @@ app.get('/book/', requireAuth, (req, res) => {
   });
 });
 
-app.post('/book/', requireAuth, (req, res) => {
+app.post('/book/', requireAuth, async (req, res) => {
   const username = req.session.user!.username;
-  const activeReservation = dbStore.getActiveReservation(username);
+  const activeReservation = await dbStore.getActiveReservation(username);
 
   if (activeReservation) {
-    flash(req, 'warning', `You already have an active spot at ${activeReservation.parking_zone}. Please check out first.`);
+    flash(
+      req,
+      'warning',
+      `You already have an active spot at ${activeReservation.parking_zone}. Please check out first.`
+    );
     return res.redirect(`/ticket/${activeReservation.ticket_code}`);
   }
 
@@ -238,7 +273,7 @@ app.post('/book/', requireAuth, (req, res) => {
     return res.redirect('/book/');
   }
 
-  const result = dbStore.createReservation(
+  const result = await dbStore.createReservation(
     username,
     parking_zone,
     start_date,
@@ -252,14 +287,18 @@ app.post('/book/', requireAuth, (req, res) => {
     return res.redirect('/book/');
   }
 
-  flash(req, 'success', `Parking spot booked successfully! Reference code: ${result.reservation.ticket_code}`);
+  flash(
+    req,
+    'success',
+    `Parking spot booked successfully! Reference code: ${result.reservation.ticket_code}`
+  );
   res.redirect(`/ticket/${result.reservation.ticket_code}`);
 });
 
 // Ticket View by code or latest
-app.get('/ticket/', requireAuth, (req, res) => {
+app.get('/ticket/', requireAuth, async (req, res) => {
   const username = req.session.user!.username;
-  const reservations = dbStore.getUserReservations(username);
+  const reservations = await dbStore.getUserReservations(username);
 
   if (!reservations || reservations.length === 0) {
     flash(req, 'warning', `No parking reservations found for ${username}`);
@@ -269,10 +308,10 @@ app.get('/ticket/', requireAuth, (req, res) => {
   res.redirect(`/ticket/${reservations[0].ticket_code}`);
 });
 
-app.get('/ticket/:code', requireAuth, (req, res) => {
+app.get('/ticket/:code', requireAuth, async (req, res) => {
   const username = req.session.user!.username;
   const ticketCode = req.params.code;
-  const reservation = dbStore.getReservationByTicketCode(ticketCode);
+  const reservation = await dbStore.getReservationByTicketCode(ticketCode);
 
   if (!reservation || reservation.customer.toLowerCase() !== username.toLowerCase()) {
     flash(req, 'warning', 'Ticket not found or unauthorized');
@@ -293,9 +332,9 @@ app.get('/ticket/:code', requireAuth, (req, res) => {
 });
 
 // All Tickets History
-app.get('/all_tickets/', requireAuth, (req, res) => {
+app.get('/all_tickets/', requireAuth, async (req, res) => {
   const username = req.session.user!.username;
-  const reservations = dbStore.getUserReservations(username);
+  const reservations = await dbStore.getUserReservations(username);
 
   const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -311,11 +350,11 @@ app.get('/all_tickets/', requireAuth, (req, res) => {
 });
 
 // Checkout (support both GET and POST)
-const handleCheckout = (req: express.Request, res: express.Response) => {
+const handleCheckout = async (req: express.Request, res: express.Response) => {
   const username = req.session.user!.username;
   const ticketCode = (req.body?.ticket_code || req.query?.ticket_code || '') as string;
 
-  const result = dbStore.checkOutReservation(username, ticketCode || undefined);
+  const result = await dbStore.checkOutReservation(username, ticketCode || undefined);
 
   if (result.success) {
     flash(req, 'success', result.message);

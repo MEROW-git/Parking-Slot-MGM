@@ -13,11 +13,6 @@
       </p>
     </div>
 
-    <!-- Demo Credentials Notice -->
-    <div style="background:var(--sp-bg-alt); border-left:3px solid var(--sp-green); padding:0.75rem 1rem; margin-bottom:1.5rem; font-size:0.85rem; color:var(--sp-text);">
-      <strong>Demo Account:</strong> Username: <code style="font-weight:700;">demo</code> • Password: <code style="font-weight:700;">password123</code>
-    </div>
-
     <% if (typeof error !== 'undefined' && error) { %>
       <div class="sp-alert sp-alert-error" role="alert" style="margin-bottom:1.25rem;">
         <div><%= error %></div>
@@ -27,7 +22,7 @@
     <form action="/user/login" method="post" id="login-form">
       <div class="sp-form-group" id="group_username" style="margin-bottom:1.25rem;">
         <label for="username" class="sp-label">Username (ឈ្មោះគណនី) <span class="sp-required">*</span></label>
-        <input type="text" name="username" id="username" class="sp-input" placeholder="e.g. demo" required autocomplete="username">
+        <input type="text" name="username" id="username" class="sp-input" placeholder="Enter your username" required autocomplete="username">
       </div>
 
       <div class="sp-form-group" id="group_password" style="margin-bottom:1.25rem;">
