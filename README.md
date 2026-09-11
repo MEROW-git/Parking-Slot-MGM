@@ -207,6 +207,8 @@ The `python manage.py seed_demo` command is **idempotent** — safe to run anyti
 | Category | Variable | Required | Default | Description |
 |---|---|---|---|---|
 | **Django** | `DEBUG` | No | `True` | Set to `False` for production deployments. |
+| | `NODE_ENV` | No | `development` | Hosting-mode hint. Set to `production` when publishing; Django security behavior is controlled by `DEBUG`. |
+| | `PORT` | No | `3000` | Port used by `run.sh`; managed platforms may inject this automatically. |
 | | `SECRET_KEY` | **Yes** | — | Cryptographic secret for signing tokens and sessions. |
 | | `ALLOWED_HOSTS` | No | `localhost,127.0.0.1` | Comma-separated allowed hostnames. |
 | **Database** | `DB_CONNECTION` | No | `sqlite` | Set `mysql` for local/cloud MySQL; unset for SQLite fallback. |
